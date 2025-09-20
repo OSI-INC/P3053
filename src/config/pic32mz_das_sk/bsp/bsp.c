@@ -70,16 +70,17 @@
     Refer to bsp.h for usage information.
 */
 
-void BSP_Initialize(void )
+void BSP_Initialize(void)
 {
-
+    /* Configure LED pins as outputs */
+    TRISFCLR = (1 << 3) | (1 << 2) | (1 << 8);  // RF3, RF2, RF8
+    TRISACLR = (1 << 2);                        // RA2
 
     /* Switch off LEDs */
-		LED2_Off();
-		LED3_Off();
-		LED1_Off();
-
-
+    LED1_Off();  // Green
+    LED2_Off();  // Blue
+    LED3_Off();  // White
+    LED4_Off();  // Red
 }
 
 /*******************************************************************************

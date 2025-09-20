@@ -60,6 +60,9 @@
 void GPIO_Initialize ( void )
 {
 
+// NOTE: This device (PIC32MZ2048EFH100) does not implement Ports H or J.
+// Do not use GPIO_PORT_H or GPIO_PORT_J or any GPIO_PIN_RH* / GPIO_PIN_RJ* defines.
+
     /* PORTA Initialization */
     /* PORTB Initialization */
     ANSELBCLR = 0x7000U; /* Digital Mode Enable */
@@ -71,11 +74,11 @@ void GPIO_Initialize ( void )
     /* PORTG Initialization */
     ANSELGCLR = 0x40U; /* Digital Mode Enable */
     /* PORTH Initialization */
-    LATH = 0x0U; /* Initial Latch Value */
-    TRISHCLR = 0x7U; /* Direction Control */
-    ANSELHCLR = 0x33U; /* Digital Mode Enable */
+    // LATH = 0x0U; /* Initial Latch Value */
+    // TRISHCLR = 0x7U; /* Direction Control */
+    // ANSELHCLR = 0x33U; /* Digital Mode Enable */
     /* PORTJ Initialization */
-    ANSELJCLR = 0xb00U; /* Digital Mode Enable */
+    // ANSELJCLR = 0xb00U; /* Digital Mode Enable */
     /* PORTK Initialization */
 
     /* Unlock system for PPS configuration */
