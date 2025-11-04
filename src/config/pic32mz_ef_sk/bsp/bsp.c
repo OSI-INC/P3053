@@ -78,10 +78,10 @@ void BSP_Initialize(void)
     TRISACLR = (1 << 2);                        // RA2
 
     /* Switch off LEDs */
-    LED1_Off();  // Green
-    LED2_Off();  // Blue
-    LED3_Off();  // White
-    LED4_Off();  // Red
+    LED1_On();  // Green
+    LED2_On();  // Blue
+    LED3_On();  // White
+    LED4_On();  // Red
 }
 /*******************************************************************************
  End of File
