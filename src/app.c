@@ -35,8 +35,8 @@
 
   Description:
     This file contains the source code for the MPLAB Harmony application.  It
-    implements the logic of the application's state machine and it may call
-    API routines of other MPLAB Harmony modules in the system, such as drivers,
+    implements the logic of the application's state machine and it may call API
+    routines of other MPLAB Harmony modules in the system, such as drivers,
     system services, and middleware.  However, it does not call any of the
     system interfaces (such as the "Initialize" and "Tasks" functions) of any of
     the modules in the system or make any assumptions about when those functions
@@ -52,6 +52,8 @@
 
 #include "app.h"
 #define SERVER_PORT 9760
+
+
 // *****************************************************************************
 // *****************************************************************************
 // Section: Global Data Definitions
@@ -137,18 +139,19 @@ void APP_Tasks ( void )
     int                 i, nNets;
     TCPIP_NET_HANDLE    netH;
 
-    switch(appData.state)
+    switch (appData.state)
     {
         case APP_TCPIP_WAIT_INIT:
             tcpipStat = TCPIP_STACK_Status(sysObj.tcpip);
-            if(tcpipStat < 0)
-            {   // some error occurred
+            if (tcpipStat < 0)
+            {   
+            	// Some error occurred
                 SYS_CONSOLE_MESSAGE(" APP: TCP/IP stack initialization failed!\r\n");
                 appData.state = APP_TCPIP_ERROR;
             }
             else if(tcpipStat == SYS_STATUS_READY)
             {
-                // now that the stack is ready we can check the
+                // Now that the stack is ready we can check the
                 // available interfaces
                 nNets = TCPIP_STACK_NumberOfNetworksGet();
                 for(i = 0; i < nNets; i++)
@@ -159,10 +162,12 @@ void APP_Tasks ( void )
                     netBiosName = TCPIP_STACK_NetBIOSName(netH);
 
 #if defined(TCPIP_STACK_USE_NBNS)
-                    SYS_CONSOLE_PRINT("    Interface %s on host %s - NBNS enabled\r\n", netName, netBiosName);
+                    SYS_CONSOLE_PRINT("    Interface %s on host %s - NBNS enabled\r\n", 
+                    	netName, netBiosName);
 #else
-                    SYS_CONSOLE_PRINT("    Interface %s on host %s - NBNS disabled\r\n", netName, netBiosName);
-#endif  // defined(TCPIP_STACK_USE_NBNS)
+                    SYS_CONSOLE_PRINT("    Interface %s on host %s - NBNS disabled\r\n", 
+                    	netName, netBiosName);
+#endif 
                     (void)netName;          // avoid compiler warning 
                     (void)netBiosName;      // if SYS_CONSOLE_PRINT is null macro
 
@@ -174,8 +179,8 @@ void APP_Tasks ( void )
 
         case APP_TCPIP_WAIT_FOR_IP:
 
-            // if the IP address of an interface has changed
-            // display the new value on the system console
+            // If the IP address of an interface has changed
+            // display the new value on the system console.
             nNets = TCPIP_STACK_NumberOfNetworksGet();
 
             for (i = 0; i < nNets; i++)
@@ -183,16 +188,17 @@ void APP_Tasks ( void )
                 netH = TCPIP_STACK_IndexToNet(i);
                 if(!TCPIP_STACK_NetIsReady(netH))
                 {
-                    return;    // interface not ready yet!
+                    return;
                 }
                 ipAddr.Val = TCPIP_STACK_NetAddress(netH);
-                if(dwLastIP[i].Val != ipAddr.Val)
+                if (dwLastIP[i].Val != ipAddr.Val)
                 {
                     dwLastIP[i].Val = ipAddr.Val;
 
                     SYS_CONSOLE_MESSAGE(TCPIP_STACK_NetNameGet(netH));
                     SYS_CONSOLE_MESSAGE(" IP Address: ");
-                    SYS_CONSOLE_PRINT("%d.%d.%d.%d \r\n", ipAddr.v[0], ipAddr.v[1], ipAddr.v[2], ipAddr.v[3]);
+                    SYS_CONSOLE_PRINT("%d.%d.%d.%d \r\n", ipAddr.v[0], 
+                    	ipAddr.v[1], ipAddr.v[2], ipAddr.v[3]);
                 }
                 appData.state = APP_TCPIP_OPENING_SERVER;
             }
@@ -219,7 +225,6 @@ void APP_Tasks ( void )
             }
             else
             {
-                // We got a connection
                 appData.state = APP_TCPIP_SERVING_CONNECTION;
                 SYS_CONSOLE_MESSAGE("Received a connection\r\n");
             }
@@ -228,7 +233,8 @@ void APP_Tasks ( void )
 
         case APP_TCPIP_SERVING_CONNECTION:
         {
-            if (!TCPIP_TCP_IsConnected(appData.socket) || TCPIP_TCP_WasDisconnected(appData.socket))
+            if (!TCPIP_TCP_IsConnected(appData.socket) 
+            	|| TCPIP_TCP_WasDisconnected(appData.socket))
             {
                 appData.state = APP_TCPIP_CLOSING_CONNECTION;
                 SYS_CONSOLE_MESSAGE("Connection was closed\r\n");
@@ -237,34 +243,36 @@ void APP_Tasks ( void )
             int16_t wMaxGet, wMaxPut, wCurrentChunk;
             uint16_t w, w2;
             uint8_t AppBuffer[32 + 1];
+            
             // Figure out how many bytes have been received and how many we can transmit.
             wMaxGet = TCPIP_TCP_GetIsReady(appData.socket);	// Get TCP RX FIFO byte count
             wMaxPut = TCPIP_TCP_PutIsReady(appData.socket);	// Get TCP TX FIFO free space
 
-            // Make sure we don't take more bytes out of the RX FIFO than we can put into the TX FIFO
-            if(wMaxPut < wMaxGet)
+            // Make sure we don't take more bytes out of the RX FIFO than we can
+            // put into the TX FIFO
+            if (wMaxPut < wMaxGet)
                     wMaxGet = wMaxPut;
 
-            // Process all bytes that we can
-            // This is implemented as a loop, processing up to sizeof(AppBuffer)
-            // bytes at a time. This limits memory usage while maximizing
-            // performance.  Single byte Gets and Puts are a lot slower than
-            // multibyte GetArrays and PutArrays.
+            // Process all bytes that we can. This is implemented as a loop,
+            // processing up to sizeof(AppBuffer) bytes at a time. This limits
+            // memory usage while maximizing performance.  Single byte Gets and
+            // Puts are a lot slower than multibyte GetArrays and PutArrays.
             wCurrentChunk = sizeof(AppBuffer) -1;
-            for(w = 0; w < wMaxGet; w += sizeof(AppBuffer) - 1)
+            for (w = 0; w < wMaxGet; w += sizeof(AppBuffer) - 1)
             {
-                // Make sure the last chunk, which will likely be smaller than sizeof(AppBuffer), is treated correctly.
-                if(w + sizeof(AppBuffer) - 1 > wMaxGet)
-                    wCurrentChunk = wMaxGet - w;
+				// Make sure the last chunk, which will likely be smaller than
+				// sizeof(AppBuffer), is treated correctly.
+				if (w + sizeof(AppBuffer) - 1 > wMaxGet) wCurrentChunk = wMaxGet - w;
 
-                // Transfer the data out of the TCP RX FIFO and into our local processing buffer.
+                // Transfer the data out of the TCP RX FIFO and into our local
+                // processing buffer.
                 TCPIP_TCP_ArrayGet(appData.socket, AppBuffer, wCurrentChunk);
 
                 // Perform the "ToUpper" operation on each data byte
-                for(w2 = 0; w2 < wCurrentChunk; w2++)
+                for (w2 = 0; w2 < wCurrentChunk; w2++)
                 {
                     i = AppBuffer[w2];
-                    if(i == '\x1b')   // escape
+                    if (i == '\x1b')   // escape
                     {
                         appData.state = APP_TCPIP_CLOSING_CONNECTION;
                         SYS_CONSOLE_MESSAGE("Connection was closed\r\n");
@@ -272,11 +280,16 @@ void APP_Tasks ( void )
                 }
                 AppBuffer[w2] = 0;  // end the console string properly
 
-                // Transfer the data out of our local processing buffer and into the TCP TX FIFO.
+                // Transfer the data out of our local processing buffer and into
+                // the TCP TX FIFO.
                 SYS_CONSOLE_PRINT("Server Sending %s\r\n", AppBuffer);
                 TCPIP_TCP_ArrayPut(appData.socket, AppBuffer, wCurrentChunk);
 
-                // No need to perform any flush.  TCP data in TX FIFO will automatically transmit itself after it accumulates for a while.  If you want to decrease latency (at the expense of wasting network bandwidth on TCP overhead), perform and explicit flush via the TCPFlush() API.
+                // No need to perform any flush. TCP data in TX FIFO will
+                // automatically transmit itself after it accumulates for a
+                // while. If you want to decrease latency at the expense of
+                // wasting network bandwidth on TCP overhead, perform an
+                // explicit flush via the TCPFlush() API.
             }
         }
         break;
@@ -286,15 +299,14 @@ void APP_Tasks ( void )
             TCPIP_TCP_Close(appData.socket);
             appData.socket = INVALID_SOCKET;
             appData.state = APP_TCPIP_WAIT_FOR_IP;
-
         }
         break;
         default:
-            break;
+        break;
     }
 }
 
 
 /*******************************************************************************
  End of File
- */
+*/

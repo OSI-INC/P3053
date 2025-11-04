@@ -121,8 +121,8 @@ extern "C" {
 // *****************************************************************************
 // *****************************************************************************
 /*** MIIM Driver Configuration ***/
-#define DRV_MIIM_ETH_MODULE_ID_0                _ETH_BASE_ADDRESS
-#define DRV_MIIM_DRIVER_INDEX_0                 0
+#define DRV_MIIM_ETH_MODULE_ID_0            _ETH_BASE_ADDRESS
+#define DRV_MIIM_DRIVER_INDEX_0             0
 #define DRV_MIIM_INSTANCES_NUMBER           1
 #define DRV_MIIM_INSTANCE_OPERATIONS        4
 #define DRV_MIIM_INSTANCE_CLIENTS           2

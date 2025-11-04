@@ -42,13 +42,11 @@
 #
 # NOCDDL
 
-
 # Environment 
 MKDIR=mkdir
 CP=cp
 CCADMIN=CCadmin
 RANLIB=ranlib
-
 
 # build
 build: .build-post
@@ -58,7 +56,6 @@ build: .build-post
 
 .build-post: .build-impl
 # Add your post 'build' code here...
-
 
 # clean
 clean: .clean-post
@@ -74,7 +71,6 @@ clean: .clean-post
 .clean-post: .clean-impl
 # Add your post 'clean' code here...
 
-
 # clobber
 clobber: .clobber-post
 
@@ -83,7 +79,6 @@ clobber: .clobber-post
 
 .clobber-post: .clobber-impl
 # Add your post 'clobber' code here...
-
 
 # all
 all: .all-post
@@ -94,7 +89,6 @@ all: .all-post
 .all-post: .all-impl
 # Add your post 'all' code here...
 
-
 # help
 help: .help-post
 
@@ -103,8 +97,6 @@ help: .help-post
 
 .help-post: .help-impl
 # Add your post 'help' code here...
-
-
 
 # include project implementation makefile
 include nbproject/Makefile-impl.mk

@@ -70,6 +70,7 @@
     Refer to bsp.h for usage information.
 */
 
+
 void BSP_Initialize(void)
 {
     /* Configure LED pins as outputs */
