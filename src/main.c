@@ -21,14 +21,21 @@
 #include <stdlib.h>                     // Defines EXIT_FAILURE
 #include "definitions.h"                // SYS function prototypes
 
-int main ( void )
+int main(void)
 {
-    SYS_Initialize ( NULL );
+    // Init RED LED (RA2)
+    TRISACLR = (1 << 2);
+    LATACLR = (1 << 2);  // RED OFF
 
-    while ( true )
+    // Init GREEN LED (RF3)
+    TRISFCLR = (1 << 3);
+    LATFSET = (1 << 3);  // Try turning it ON
+
+    while (1)
     {
-        SYS_Tasks ( );
+        // toggle every half second
+        LATFINV = (1 << 3);
+        LATAINV = (1 << 2);
+        for (volatile int i = 0; i < 1000000; ++i);
     }
-
-    return ( EXIT_FAILURE );
 }
