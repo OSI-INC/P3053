@@ -16,29 +16,6 @@
 
 *******************************************************************************/
 
-/*******************************************************************************
-* Copyright (C) 2019 Microchip Technology Inc. and its subsidiaries.
-*
-* Subject to your compliance with these terms, you may use Microchip software
-* and any derivatives exclusively with Microchip products. It is your
-* responsibility to comply with third party license terms applicable to your
-* use of third party software (including open source software) that may
-* accompany Microchip software.
-*
-* THIS SOFTWARE IS SUPPLIED BY MICROCHIP "AS IS". NO WARRANTIES, WHETHER
-* EXPRESS, IMPLIED OR STATUTORY, APPLY TO THIS SOFTWARE, INCLUDING ANY IMPLIED
-* WARRANTIES OF NON-INFRINGEMENT, MERCHANTABILITY, AND FITNESS FOR A
-* PARTICULAR PURPOSE.
-*
-* IN NO EVENT WILL MICROCHIP BE LIABLE FOR ANY INDIRECT, SPECIAL, PUNITIVE,
-* INCIDENTAL OR CONSEQUENTIAL LOSS, DAMAGE, COST OR EXPENSE OF ANY KIND
-* WHATSOEVER RELATED TO THE SOFTWARE, HOWEVER CAUSED, EVEN IF MICROCHIP HAS
-* BEEN ADVISED OF THE POSSIBILITY OR THE DAMAGES ARE FORESEEABLE. TO THE
-* FULLEST EXTENT ALLOWED BY LAW, MICROCHIP'S TOTAL LIABILITY ON ALL CLAIMS IN
-* ANY WAY RELATED TO THIS SOFTWARE WILL NOT EXCEED THE AMOUNT OF FEES, IF ANY,
-* THAT YOU HAVE PAID DIRECTLY TO MICROCHIP FOR THIS SOFTWARE.
-*******************************************************************************/
-
 #ifndef PLIB_GPIO_H
 #define PLIB_GPIO_H
 
@@ -46,22 +23,6 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <stddef.h>
-
-// DOM-IGNORE-BEGIN
-#ifdef __cplusplus  // Provide C++ Compatibility
-
-    extern "C" {
-
-#endif
-// DOM-IGNORE-END
-
-// *****************************************************************************
-// *****************************************************************************
-// Section: Data types and constants
-// *****************************************************************************
-// *****************************************************************************
-
-
 
 // *****************************************************************************
 /* GPIO Port
@@ -79,7 +40,6 @@
     Not all ports are available on all devices.  Refer to the specific
     device data sheet to determine which ports are supported.
 */
-
 
 #define    GPIO_PORT_A  (0)
 #define    GPIO_PORT_B  (1)
@@ -99,7 +59,7 @@ typedef enum
     GPIO_INTERRUPT_ON_RISING_EDGE,
     GPIO_INTERRUPT_ON_FALLING_EDGE,
     GPIO_INTERRUPT_ON_BOTH_EDGES,
-}GPIO_INTERRUPT_STYLE;
+} GPIO_INTERRUPT_STYLE;
 
 // *****************************************************************************
 /* GPIO Port Pins
@@ -117,7 +77,6 @@ typedef enum
     Not all pins are available on all devices.  Refer to the specific
     device data sheet to determine which pins are supported.
 */
-
 
 #define     GPIO_PIN_RA0  (0U)
 #define     GPIO_PIN_RA1  (1U)
@@ -240,20 +199,12 @@ typedef enum
 #define     GPIO_PIN_RK6  (150U)
 #define     GPIO_PIN_RK7  (151U)
 
-    /* This element should not be used in any of the GPIO APIs.
-       It will be used by other modules or application to denote that none of the GPIO Pin is used */
 #define    GPIO_PIN_NONE   (-1)
 
 typedef uint32_t GPIO_PIN;
 
 
 void GPIO_Initialize(void);
-
-// *****************************************************************************
-// *****************************************************************************
-// Section: GPIO Functions which operates on multiple pins of a port
-// *****************************************************************************
-// *****************************************************************************
 
 uint32_t GPIO_PortRead(GPIO_PORT port);
 
@@ -270,12 +221,6 @@ void GPIO_PortToggle(GPIO_PORT port, uint32_t mask);
 void GPIO_PortInputEnable(GPIO_PORT port, uint32_t mask);
 
 void GPIO_PortOutputEnable(GPIO_PORT port, uint32_t mask);
-
-// *****************************************************************************
-// *****************************************************************************
-// Section: GPIO Functions which operates on one pin at a time
-// *****************************************************************************
-// *****************************************************************************
 
 static inline void GPIO_PinWrite(GPIO_PIN pin, bool value)
 {
@@ -318,12 +263,4 @@ static inline void GPIO_PinOutputEnable(GPIO_PIN pin)
     GPIO_PortOutputEnable((pin>>4U), (uint32_t)0x1U << (pin & 0xFU));
 }
 
-
-// DOM-IGNORE-BEGIN
-#ifdef __cplusplus  // Provide C++ Compatibility
-
-    }
-
 #endif
-// DOM-IGNORE-END
-#endif // PLIB_GPIO_H

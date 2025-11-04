@@ -15,31 +15,6 @@
     declarations 
 *******************************************************************************/
 
-// DOM-IGNORE-BEGIN
-/*******************************************************************************
-* Copyright (C) 2018 Microchip Technology Inc. and its subsidiaries.
-*
-* Subject to your compliance with these terms, you may use Microchip software
-* and any derivatives exclusively with Microchip products. It is your
-* responsibility to comply with third party license terms applicable to your
-* use of third party software (including open source software) that may
-* accompany Microchip software.
-*
-* THIS SOFTWARE IS SUPPLIED BY MICROCHIP "AS IS". NO WARRANTIES, WHETHER
-* EXPRESS, IMPLIED OR STATUTORY, APPLY TO THIS SOFTWARE, INCLUDING ANY IMPLIED
-* WARRANTIES OF NON-INFRINGEMENT, MERCHANTABILITY, AND FITNESS FOR A
-* PARTICULAR PURPOSE.
-*
-* IN NO EVENT WILL MICROCHIP BE LIABLE FOR ANY INDIRECT, SPECIAL, PUNITIVE,
-* INCIDENTAL OR CONSEQUENTIAL LOSS, DAMAGE, COST OR EXPENSE OF ANY KIND
-* WHATSOEVER RELATED TO THE SOFTWARE, HOWEVER CAUSED, EVEN IF MICROCHIP HAS
-* BEEN ADVISED OF THE POSSIBILITY OR THE DAMAGES ARE FORESEEABLE. TO THE
-* FULLEST EXTENT ALLOWED BY LAW, MICROCHIP'S TOTAL LIABILITY ON ALL CLAIMS IN
-* ANY WAY RELATED TO THIS SOFTWARE WILL NOT EXCEED THE AMOUNT OF FEES, IF ANY,
-* THAT YOU HAVE PAID DIRECTLY TO MICROCHIP FOR THIS SOFTWARE.
-*******************************************************************************/
-// DOM-IGNORE-END
-
 #ifndef BSP_H
 #define BSP_H
 
@@ -61,7 +36,7 @@
 // *****************************************************************************
 // *****************************************************************************
 #define pic32mz_ef_sk
-#define BSP_NAME             "pic32mz_ef_sk"
+#define BSP_NAME		"pic32mz_ef_sk"
 
 /*** LED Macros for Green LED on RF3 ***/
 #define LED1_Toggle()   (LATFINV = (1UL<<3))
@@ -86,16 +61,6 @@
 #define LED4_Get()      ((PORTA >> 2) & 0x1U)
 #define LED4_On()       (LATASET = (1UL<<2))
 #define LED4_Off()      (LATACLR = (1UL<<2))
-
-/*** SWITCH Macros for SWITCH1 ***/
-#define SWITCH1_Get() ((PORTB >> 12) & 0x1U)
-#define SWITCH1_STATE_PRESSED 0U
-#define SWITCH1_STATE_RELEASED 1U
-
-/*** SWITCH Macros for SWITCH2 ***/
-#define SWITCH2_Get() ((PORTB >> 13) & 0x1U)
-#define SWITCH2_STATE_PRESSED 0U
-#define SWITCH2_STATE_RELEASED 1U
 
 
 // *****************************************************************************
@@ -136,8 +101,4 @@
 
 void BSP_Initialize(void);
 
-#endif // BSP_H
-
-/*******************************************************************************
- End of File
-*/
+#endif 

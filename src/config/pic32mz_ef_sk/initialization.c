@@ -13,46 +13,9 @@
     and allocates any necessary global system resources,
  *******************************************************************************/
 
-// DOM-IGNORE-BEGIN
-/*******************************************************************************
-* Copyright (C) 2018 Microchip Technology Inc. and its subsidiaries.
-*
-* Subject to your compliance with these terms, you may use Microchip software
-* and any derivatives exclusively with Microchip products. It is your
-* responsibility to comply with third party license terms applicable to your
-* use of third party software (including open source software) that may
-* accompany Microchip software.
-*
-* THIS SOFTWARE IS SUPPLIED BY MICROCHIP "AS IS". NO WARRANTIES, WHETHER
-* EXPRESS, IMPLIED OR STATUTORY, APPLY TO THIS SOFTWARE, INCLUDING ANY IMPLIED
-* WARRANTIES OF NON-INFRINGEMENT, MERCHANTABILITY, AND FITNESS FOR A
-* PARTICULAR PURPOSE.
-*
-* IN NO EVENT WILL MICROCHIP BE LIABLE FOR ANY INDIRECT, SPECIAL, PUNITIVE,
-* INCIDENTAL OR CONSEQUENTIAL LOSS, DAMAGE, COST OR EXPENSE OF ANY KIND
-* WHATSOEVER RELATED TO THE SOFTWARE, HOWEVER CAUSED, EVEN IF MICROCHIP HAS
-* BEEN ADVISED OF THE POSSIBILITY OR THE DAMAGES ARE FORESEEABLE. TO THE
-* FULLEST EXTENT ALLOWED BY LAW, MICROCHIP'S TOTAL LIABILITY ON ALL CLAIMS IN
-* ANY WAY RELATED TO THIS SOFTWARE WILL NOT EXCEED THE AMOUNT OF FEES, IF ANY,
-* THAT YOU HAVE PAID DIRECTLY TO MICROCHIP FOR THIS SOFTWARE.
- *******************************************************************************/
-// DOM-IGNORE-END
-
-// *****************************************************************************
-// *****************************************************************************
-// Section: Included Files
-// *****************************************************************************
-// *****************************************************************************
 #include "configuration.h"
 #include "definitions.h"
 #include "device.h"
-
-
-// ****************************************************************************
-// ****************************************************************************
-// Section: Configuration Bits
-// ****************************************************************************
-// ****************************************************************************
 
 /*** DEVCFG0 ***/
 #pragma config DEBUG =      OFF
@@ -105,23 +68,9 @@
 #pragma config FUSBIDIO =   ON
 
 /*** BF1SEQ0 ***/
-
 #pragma config TSEQ =       0xffff
 #pragma config CSEQ =       0x0
 
-
-
-
-
-// *****************************************************************************
-// *****************************************************************************
-// Section: Driver Initialization Data
-// *****************************************************************************
-// *****************************************************************************
-/* Following MISRA-C rules are deviated in the below code block */
-/* MISRA C-2012 Rule 11.1 */
-/* MISRA C-2012 Rule 11.3 */
-/* MISRA C-2012 Rule 11.8 */
 /* Forward declaration of MAC initialization data */
 const TCPIP_MODULE_MAC_PIC32INT_CONFIG tcpipMACPIC32INTInitData;
 
@@ -133,22 +82,8 @@ static const DRV_MIIM_INIT drvMiimInitData_0;
 const DRV_ETHPHY_INIT tcpipPhyInitData_LAN8740;
 
 
-
-
-// *****************************************************************************
-// *****************************************************************************
-// Section: System Data
-// *****************************************************************************
-// *****************************************************************************
-/* Structure to hold the object handles for the modules in the system. */
 SYSTEM_OBJECTS sysObj;
 
-// *****************************************************************************
-// *****************************************************************************
-// Section: Library/Stack Initialization Data
-// *****************************************************************************
-// *****************************************************************************
-/*** ETH MAC Initialization Data ***/
 const TCPIP_MODULE_MAC_PIC32INT_CONFIG tcpipMACPIC32INTInitData =
 { 
     .nTxDescriptors         = TCPIP_EMAC_TX_DESCRIPTORS,
@@ -165,16 +100,6 @@ const TCPIP_MODULE_MAC_PIC32INT_CONFIG tcpipMACPIC32INTInitData =
     .pPhyInit               = &tcpipPhyInitData_LAN8740,
 };
 
-
-
-
-// <editor-fold defaultstate="collapsed" desc="TCP/IP Stack Initialization Data">
-// *****************************************************************************
-// *****************************************************************************
-// Section: TCPIP Data
-// *****************************************************************************
-// *****************************************************************************
-/*** ARP Service Initialization Data ***/
 const TCPIP_ARP_MODULE_CONFIG tcpipARPInitData =
 { 
     .cacheEntries       = TCPIP_ARP_CACHE_ENTRIES,     
@@ -189,15 +114,12 @@ const TCPIP_ARP_MODULE_CONFIG tcpipARPInitData =
     .gratProbeCount     = TCPIP_ARP_GRATUITOUS_PROBE_COUNT,
 };
 
-
-/*** UDP Sockets Initialization Data ***/
 const TCPIP_UDP_MODULE_CONFIG tcpipUDPInitData =
 {
     .nSockets       = TCPIP_UDP_MAX_SOCKETS,
     .sktTxBuffSize  = TCPIP_UDP_SOCKET_DEFAULT_TX_SIZE, 
 };
 
-/*** TCP Sockets Initialization Data ***/
 const TCPIP_TCP_MODULE_CONFIG tcpipTCPInitData =
 {
     .nSockets       = TCPIP_TCP_MAX_SOCKETS,
@@ -206,11 +128,6 @@ const TCPIP_TCP_MODULE_CONFIG tcpipTCPInitData =
 };
 
 
-
-
-
-
-/*** DHCP client Initialization Data ***/
 const TCPIP_DHCP_MODULE_CONFIG tcpipDHCPInitData =
 {     
     .dhcpEnable     = false,   
@@ -220,25 +137,11 @@ const TCPIP_DHCP_MODULE_CONFIG tcpipDHCPInitData =
 
 };
 
-
-/*** ICMP Server Initialization Data ***/
 const TCPIP_ICMP_MODULE_CONFIG tcpipICMPInitData = 
 {
     0
 };
 
-
-
-
-
-
-
-
-
-
-
-
-/*** DNS Client Initialization Data ***/
 const TCPIP_DNS_CLIENT_MODULE_CONFIG tcpipDNSClientInitData =
 {
     .deleteOldLease         = TCPIP_DNS_CLIENT_DELETE_OLD_ENTRIES,
@@ -250,19 +153,10 @@ const TCPIP_DNS_CLIENT_MODULE_CONFIG tcpipDNSClientInitData =
 };
 
 
-
-/*** IPv4 Initialization Data ***/
-
-
 const TCPIP_IPV4_MODULE_CONFIG  tcpipIPv4InitData = 
 {
     .arpEntries = TCPIP_IPV4_ARP_SLOTS, 
 };
-
-
-
-
-
 
 TCPIP_STACK_HEAP_INTERNAL_CONFIG tcpipHeapConfig =
 {
@@ -274,10 +168,8 @@ TCPIP_STACK_HEAP_INTERNAL_CONFIG tcpipHeapConfig =
     .heapSize = TCPIP_STACK_DRAM_SIZE,
 };
 
-
 const TCPIP_NETWORK_CONFIG __attribute__((unused))  TCPIP_HOSTS_CONFIGURATION[] =
 {
-    /*** Network Configuration Index 0 ***/
     {
         .interface = TCPIP_NETWORK_DEFAULT_INTERFACE_NAME_IDX0,
         .hostName = TCPIP_NETWORK_DEFAULT_HOST_NAME_IDX0,
@@ -293,29 +185,28 @@ const TCPIP_NETWORK_CONFIG __attribute__((unused))  TCPIP_HOSTS_CONFIGURATION[] 
     },
 };
 
-const size_t TCPIP_HOSTS_CONFIGURATION_SIZE = sizeof (TCPIP_HOSTS_CONFIGURATION) / sizeof (*TCPIP_HOSTS_CONFIGURATION);
+const size_t TCPIP_HOSTS_CONFIGURATION_SIZE = 
+	sizeof (TCPIP_HOSTS_CONFIGURATION) / sizeof (*TCPIP_HOSTS_CONFIGURATION);
 
 const TCPIP_STACK_MODULE_CONFIG TCPIP_STACK_MODULE_CONFIG_TBL [] =
 {
     {TCPIP_MODULE_IPV4,             &tcpipIPv4InitData},
-
     {TCPIP_MODULE_ICMP,             0},                             // TCPIP_MODULE_ICMP
-
     {TCPIP_MODULE_ARP,              &tcpipARPInitData},             // TCPIP_MODULE_ARP
     {TCPIP_MODULE_UDP,              &tcpipUDPInitData},             // TCPIP_MODULE_UDP
     {TCPIP_MODULE_TCP,              &tcpipTCPInitData},             // TCPIP_MODULE_TCP
     {TCPIP_MODULE_DHCP_CLIENT,      &tcpipDHCPInitData},            // TCPIP_MODULE_DHCP_CLIENT
     {TCPIP_MODULE_DNS_CLIENT,       &tcpipDNSClientInitData},       // TCPIP_MODULE_DNS_CLIENT
-
     {TCPIP_MODULE_COMMAND,          0},                             // TCPIP_MODULE_COMMAND,
     { TCPIP_MODULE_MANAGER,         &tcpipHeapConfig },             // TCPIP_MODULE_MANAGER
-
-// MAC modules
     {TCPIP_MODULE_MAC_PIC32INT,     &tcpipMACPIC32INTInitData},     // TCPIP_MODULE_MAC_PIC32INT
 
 };
 
-const size_t TCPIP_STACK_MODULE_CONFIG_TBL_SIZE = sizeof (TCPIP_STACK_MODULE_CONFIG_TBL) / sizeof (*TCPIP_STACK_MODULE_CONFIG_TBL);
+const size_t TCPIP_STACK_MODULE_CONFIG_TBL_SIZE = 
+	sizeof (TCPIP_STACK_MODULE_CONFIG_TBL) / sizeof (*TCPIP_STACK_MODULE_CONFIG_TBL);
+
+
 /*********************************************************************
  * Function:        SYS_MODULE_OBJ TCPIP_STACK_Init()
  *
@@ -336,8 +227,6 @@ const size_t TCPIP_STACK_MODULE_CONFIG_TBL_SIZE = sizeof (TCPIP_STACK_MODULE_CON
  *                  stack or its component routines are used.
  *
  ********************************************************************/
-
-
 SYS_MODULE_OBJ TCPIP_STACK_Init(void)
 {
     TCPIP_STACK_INIT    tcpipInit;
@@ -350,15 +239,12 @@ SYS_MODULE_OBJ TCPIP_STACK_Init(void)
 
     return TCPIP_STACK_Initialize(0, &tcpipInit.moduleInit);
 }
-// </editor-fold>
 
-/*** MIIM Driver Instance 0 Configuration ***/
 static const DRV_MIIM_INIT drvMiimInitData_0 =
 {
    .miimId = DRV_MIIM_ETH_MODULE_ID_0,
 };
 
-/*** LAN8740 PHY Driver Time-Out Initialization Data ***/
 DRV_ETHPHY_TMO drvlan8740Tmo = 
 {
     .resetTmo = DRV_ETHPHY_LAN8740_RESET_CLR_TMO,
@@ -366,7 +252,6 @@ DRV_ETHPHY_TMO drvlan8740Tmo =
     .aNegInitTmo = DRV_ETHPHY_LAN8740_NEG_INIT_TMO,    
 };
 
-/*** ETH PHY Initialization Data ***/
 const DRV_ETHPHY_INIT tcpipPhyInitData_LAN8740 =
 {    
     .ethphyId               = DRV_LAN8740_PHY_PERIPHERAL_ID,
@@ -379,16 +264,6 @@ const DRV_ETHPHY_INIT tcpipPhyInitData_LAN8740 =
     .pMiimInit              = &drvMiimInitData_0,
     .miimIndex              = 0,
 };
-
-
-
-
-// *****************************************************************************
-// *****************************************************************************
-// Section: System Initialization
-// *****************************************************************************
-// *****************************************************************************
-// <editor-fold defaultstate="collapsed" desc="SYS_TIME Initialization Data">
 
 static const SYS_TIME_PLIB_INTERFACE sysTimePlibAPI = {
     .timerCallbackSet = (SYS_TIME_PLIB_CALLBACK_REGISTER)CORETIMER_CallbackSet,
@@ -406,18 +281,16 @@ static const SYS_TIME_INIT sysTimeInitData =
     .hwTimerIntNum = 0,
 };
 
-// </editor-fold>
-// <editor-fold defaultstate="collapsed" desc="SYS_CONSOLE Instance 0 Initialization Data">
-
-
 static const SYS_CONSOLE_UART_PLIB_INTERFACE sysConsole0UARTPlibAPI =
 {
     .read_t = (SYS_CONSOLE_UART_PLIB_READ)UART2_Read,
     .readCountGet = (SYS_CONSOLE_UART_PLIB_READ_COUNT_GET)UART2_ReadCountGet,
-    .readFreeBufferCountGet = (SYS_CONSOLE_UART_PLIB_READ_FREE_BUFFFER_COUNT_GET)UART2_ReadFreeBufferCountGet,
+    .readFreeBufferCountGet =
+    (SYS_CONSOLE_UART_PLIB_READ_FREE_BUFFFER_COUNT_GET)UART2_ReadFreeBufferCountGet,
     .write_t = (SYS_CONSOLE_UART_PLIB_WRITE)UART2_Write,
     .writeCountGet = (SYS_CONSOLE_UART_PLIB_WRITE_COUNT_GET)UART2_WriteCountGet,
-    .writeFreeBufferCountGet = (SYS_CONSOLE_UART_PLIB_WRITE_FREE_BUFFER_COUNT_GET)UART2_WriteFreeBufferCountGet,
+    .writeFreeBufferCountGet =
+    (SYS_CONSOLE_UART_PLIB_WRITE_FREE_BUFFER_COUNT_GET)UART2_WriteFreeBufferCountGet,
 };
 
 static const SYS_CONSOLE_UART_INIT_DATA sysConsole0UARTInitData =
@@ -432,18 +305,12 @@ static const SYS_CONSOLE_INIT sysConsole0Init =
     .deviceIndex = 0,
 };
 
-
-
-// </editor-fold>
-
-
 const SYS_CMD_INIT sysCmdInit =
 {
     .moduleInit = {0},
     .consoleCmdIOParam = SYS_CMD_SINGLE_CHARACTER_READ_CONSOLE_IO_PARAM,
 	.consoleIndex = 0,
 };
-
 
 static const SYS_DEBUG_INIT debugInit =
 {
@@ -452,107 +319,34 @@ static const SYS_DEBUG_INIT debugInit =
     .consoleIndex = 0,
 };
 
-
-
-
-
-// *****************************************************************************
-// *****************************************************************************
-// Section: Local initialization functions
-// *****************************************************************************
-// *****************************************************************************
-
-/* MISRAC 2012 deviation block end */
-
-/*******************************************************************************
-  Function:
-    void SYS_Initialize ( void *data )
-
-  Summary:
-    Initializes the board, services, drivers, application and other modules.
-
-  Remarks:
- */
-
 void SYS_Initialize ( void* data )
 {
-
-    /* MISRAC 2012 deviation block start */
-    /* MISRA C-2012 Rule 2.2 deviated in this file.  Deviation record ID -  H3_MISRAC_2012_R_2_2_DR_1 */
-
-    /* Start out with interrupts disabled before configuring any modules */
-    (void)__builtin_disable_interrupts();
-
-  
-    CLK_Initialize();
-    /* Configure Prefetch, Wait States and ECC */
-    PRECONbits.PREFEN = 3;
-    PRECONbits.PFMWS = 3;
-    CFGCONbits.ECCCON = 3;
-
-
-
+	(void)__builtin_disable_interrupts();
+	
+	CLK_Initialize();
+	PRECONbits.PREFEN = 3;
+	PRECONbits.PFMWS = 3;
+	CFGCONbits.ECCCON = 3;
+	
 	GPIO_Initialize();
-
-    NVM_Initialize();
-
-    CORETIMER_Initialize();
+	NVM_Initialize();
+	CORETIMER_Initialize();
 	UART2_Initialize();
-
 	BSP_Initialize();
-
-
-    /* MISRAC 2012 deviation block start */
-    /* Following MISRA-C rules deviated in this block  */
-    /* MISRA C-2012 Rule 11.3 - Deviation record ID - H3_MISRAC_2012_R_11_3_DR_1 */
-    /* MISRA C-2012 Rule 11.8 - Deviation record ID - H3_MISRAC_2012_R_11_8_DR_1 */
-
-
-   /* Initialize the MIIM Driver Instance 0*/
-   sysObj.drvMiim_0 = DRV_MIIM_OBJECT_BASE_Default.DRV_MIIM_Initialize(DRV_MIIM_DRIVER_INDEX_0, (const SYS_MODULE_INIT *) &drvMiimInitData_0); 
-
-
-    /* MISRA C-2012 Rule 11.3, 11.8 deviated below. Deviation record ID -  
-    H3_MISRAC_2012_R_11_3_DR_1 & H3_MISRAC_2012_R_11_8_DR_1*/
-        
-    sysObj.sysTime = SYS_TIME_Initialize(SYS_TIME_INDEX_0, (SYS_MODULE_INIT *)&sysTimeInitData);
-    
-    /* MISRAC 2012 deviation block end */
-    /* MISRA C-2012 Rule 11.3, 11.8 deviated below. Deviation record ID -  
-     H3_MISRAC_2012_R_11_3_DR_1 & H3_MISRAC_2012_R_11_8_DR_1*/
-        sysObj.sysConsole0 = SYS_CONSOLE_Initialize(SYS_CONSOLE_INDEX_0, (SYS_MODULE_INIT *)&sysConsole0Init);
-   /* MISRAC 2012 deviation block end */
-    SYS_CMD_Initialize((SYS_MODULE_INIT*)&sysCmdInit);
-
-    /* MISRA C-2012 Rule 11.3, 11.8 deviated below. Deviation record ID -  
-     H3_MISRAC_2012_R_11_3_DR_1 & H3_MISRAC_2012_R_11_8_DR_1*/
-        
-    sysObj.sysDebug = SYS_DEBUG_Initialize(SYS_DEBUG_INDEX_0, (SYS_MODULE_INIT*)&debugInit);
-
-    /* MISRAC 2012 deviation block end */
-
-
-   /* TCPIP Stack Initialization */
-   sysObj.tcpip = TCPIP_STACK_Init();
-   SYS_ASSERT(sysObj.tcpip != SYS_MODULE_OBJ_INVALID, "TCPIP_STACK_Init Failed" );
-
-
-    CRYPT_WCCB_Initialize();
-
-    /* MISRAC 2012 deviation block end */
-    APP_Initialize();
-
-
-    EVIC_Initialize();
-
-	/* Enable global interrupts */
-    (void)__builtin_enable_interrupts();
-
-
-
-    /* MISRAC 2012 deviation block end */
+	sysObj.drvMiim_0 = DRV_MIIM_OBJECT_BASE_Default.DRV_MIIM_Initialize(DRV_MIIM_DRIVER_INDEX_0,
+		(const SYS_MODULE_INIT *) &drvMiimInitData_0); 
+	
+	sysObj.sysTime = SYS_TIME_Initialize(SYS_TIME_INDEX_0,
+		(SYS_MODULE_INIT *)&sysTimeInitData);
+		sysObj.sysConsole0 = SYS_CONSOLE_Initialize(SYS_CONSOLE_INDEX_0,
+			(SYS_MODULE_INIT *)&sysConsole0Init);
+	SYS_CMD_Initialize((SYS_MODULE_INIT*)&sysCmdInit);
+	sysObj.sysDebug = SYS_DEBUG_Initialize(SYS_DEBUG_INDEX_0, (SYS_MODULE_INIT*)&debugInit);
+	sysObj.tcpip = TCPIP_STACK_Init();
+	SYS_ASSERT(sysObj.tcpip != SYS_MODULE_OBJ_INVALID, "TCPIP_STACK_Init Failed" );
+	CRYPT_WCCB_Initialize();
+	APP_Initialize();
+	EVIC_Initialize();
+	
+	(void)__builtin_enable_interrupts();
 }
-
-/*******************************************************************************
- End of File
-*/
