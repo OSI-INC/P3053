@@ -40,10 +40,7 @@ endif
 OBJECTDIR=build/${CND_CONF}/${IMAGE_TYPE}
 DISTDIR=dist/${CND_CONF}/${IMAGE_TYPE}
 
-SRC_DIRS := \
-    src/config/pic32mz_ef_sk \
-    src/third_party/wolfssl \
-    src
+SRC_DIRS := src
 SOURCEFILES := $(shell find $(SRC_DIRS) -type f \( -name '*.c' -o -name '*.S' \))
 OBJECTFILES := $(patsubst src/%, $(OBJECTDIR)/src/%, $(SOURCEFILES:.c=.o))
 OBJECTFILES := $(OBJECTFILES:.S=.o)
