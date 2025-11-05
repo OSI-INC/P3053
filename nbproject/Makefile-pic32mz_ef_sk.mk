@@ -101,7 +101,7 @@ ${OBJECTDIR}/src/config/pic32mz_ef_sk/library/tcpip/src/tcpip_helper_c32.o: src/
 	@${RM} ${OBJECTDIR}/src/config/pic32mz_ef_sk/library/tcpip/src/tcpip_helper_c32.o 
 	@${RM} ${OBJECTDIR}/src/config/pic32mz_ef_sk/library/tcpip/src/tcpip_helper_c32.o.ok ${OBJECTDIR}/src/config/pic32mz_ef_sk/library/tcpip/src/tcpip_helper_c32.o.err 
 	${MP_CC} $(MP_EXTRA_AS_PRE)  -D__DEBUG -D__MPLAB_DEBUGGER_ICD4=1 -c -mprocessor=$(MP_PROCESSOR_OPTION)  -MMD -MF "${OBJECTDIR}/src/config/pic32mz_ef_sk/library/tcpip/src/tcpip_helper_c32.o.d"  -o ${OBJECTDIR}/src/config/pic32mz_ef_sk/library/tcpip/src/tcpip_helper_c32.o src/config/pic32mz_ef_sk/library/tcpip/src/tcpip_helper_c32.S  -DXPRJ_pic32mz_ef_sk=$(CND_CONF)    -Wa,--defsym=__MPLAB_BUILD=1$(MP_EXTRA_AS_POST),-MD="${OBJECTDIR}/src/config/pic32mz_ef_sk/library/tcpip/src/tcpip_helper_c32.o.asm.d",--defsym=__ICD2RAM=1,--defsym=__MPLAB_DEBUG=1,--gdwarf-2,--defsym=__DEBUG=1,--defsym=__MPLAB_DEBUGGER_ICD4=1 -mdfp="${DFP_DIR}"
-	"${OBJECTDIR}/src/config/pic32mz_ef_sk/library/tcpip/src/tcpip_helper_c32.o.d" "${OBJECTDIR}/src/config/pic32mz_ef_sk/library/tcpip/src/tcpip_helper_c32.o.asm.d" -t $(SILENT) -rsi ${MP_CC_DIR}../ 
+	@${FIXDEPS} "${OBJECTDIR}/src/config/pic32mz_ef_sk/library/tcpip/src/tcpip_helper_c32.o.d" "${OBJECTDIR}/src/config/pic32mz_ef_sk/library/tcpip/src/tcpip_helper_c32.o.asm.d" -t $(SILENT) -rsi ${MP_CC_DIR}../ 
 	
 else
 ${OBJECTDIR}/src/config/pic32mz_ef_sk/library/tcpip/src/tcpip_helper_c32.o: src/config/pic32mz_ef_sk/library/tcpip/src/tcpip_helper_c32.S  .generated_files/flags/pic32mz_ef_sk/a8c19dafe5d5ee43fc14b92a32348a929a8ba935 .generated_files/flags/pic32mz_ef_sk/da39a3ee5e6b4b0d3255bfef95601890afd80709
@@ -110,7 +110,7 @@ ${OBJECTDIR}/src/config/pic32mz_ef_sk/library/tcpip/src/tcpip_helper_c32.o: src/
 	@${RM} ${OBJECTDIR}/src/config/pic32mz_ef_sk/library/tcpip/src/tcpip_helper_c32.o 
 	@${RM} ${OBJECTDIR}/src/config/pic32mz_ef_sk/library/tcpip/src/tcpip_helper_c32.o.ok ${OBJECTDIR}/src/config/pic32mz_ef_sk/library/tcpip/src/tcpip_helper_c32.o.err 
 	${MP_CC} $(MP_EXTRA_AS_PRE)  -c -mprocessor=$(MP_PROCESSOR_OPTION)  -MMD -MF "${OBJECTDIR}/src/config/pic32mz_ef_sk/library/tcpip/src/tcpip_helper_c32.o.d"  -o ${OBJECTDIR}/src/config/pic32mz_ef_sk/library/tcpip/src/tcpip_helper_c32.o src/config/pic32mz_ef_sk/library/tcpip/src/tcpip_helper_c32.S  -DXPRJ_pic32mz_ef_sk=$(CND_CONF)    -Wa,--defsym=__MPLAB_BUILD=1$(MP_EXTRA_AS_POST),-MD="${OBJECTDIR}/src/config/pic32mz_ef_sk/library/tcpip/src/tcpip_helper_c32.o.asm.d",--gdwarf-2 -mdfp="${DFP_DIR}"
-	"${OBJECTDIR}/src/config/pic32mz_ef_sk/library/tcpip/src/tcpip_helper_c32.o.d" "${OBJECTDIR}/src/config/pic32mz_ef_sk/library/tcpip/src/tcpip_helper_c32.o.asm.d" -t $(SILENT) -rsi ${MP_CC_DIR}../ 
+	@${FIXDEPS} "${OBJECTDIR}/src/config/pic32mz_ef_sk/library/tcpip/src/tcpip_helper_c32.o.d" "${OBJECTDIR}/src/config/pic32mz_ef_sk/library/tcpip/src/tcpip_helper_c32.o.asm.d" -t $(SILENT) -rsi ${MP_CC_DIR}../ 
 	
 endif
 
