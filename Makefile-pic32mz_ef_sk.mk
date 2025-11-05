@@ -40,7 +40,14 @@ endif
 OBJECTDIR=build/${CND_CONF}/${IMAGE_TYPE}
 DISTDIR=dist/${CND_CONF}/${IMAGE_TYPE}
 
-include Makefile-lists.mk
+SRC_DIRS := \
+    src/config/pic32mz_ef_sk \
+    src/third_party/wolfssl \
+    src
+SOURCEFILES := $(shell find $(SRC_DIRS) -type f \( -name '*.c' -o -name '*.S' \))
+OBJECTFILES := $(patsubst src/%, $(OBJECTDIR)/src/%, $(SOURCEFILES:.c=.o))
+OBJECTFILES := $(OBJECTFILES:.S=.o)
+POSSIBLE_DEPFILES := $(OBJECTFILES:.o=.o.d)
 
 CFLAGS=
 ASFLAGS=
@@ -1819,12 +1826,12 @@ endif
 ifeq ($(TYPE_IMAGE), DEBUG_RUN)
 ${DISTDIR}/P3053.${IMAGE_TYPE}.${OUTPUT_SUFFIX}: ${OBJECTFILES} Makefile-${CND_CONF}.mk src/config/pic32mz_ef_sk/p32MZ2048EFH100.ld
 	@${MKDIR} ${DISTDIR} 
-	${MP_CC} $(MP_EXTRA_LD_PRE) -g -mdebugger -D__MPLAB_DEBUGGER_ICD4=1 -mprocessor=$(MP_PROCESSOR_OPTION) -o ${DISTDIR}/P3053.${IMAGE_TYPE}.${OUTPUT_SUFFIX} ${OBJECTFILES_QUOTED_IF_SPACED} -DXPRJ_pic32mz_ef_sk=$(CND_CONF) $(COMPARISON_BUILD) -mreserve=data@0x0:0x37F -Wl,--defsym=__MPLAB_BUILD=1$(MP_EXTRA_LD_POST)$(MP_LINKER_FILE_OPTION),--defsym=__MPLAB_DEBUG=1,--defsym=__DEBUG=1,-D=__DEBUG_D,--defsym=__MPLAB_DEBUGGER_ICD4=1,--defsym=_min_heap_size=64960,--gc-sections,--no-code-in-dinit,--no-dinit-in-serial-mem,-Map="${DISTDIR}/${PROJECTNAME}.${IMAGE_TYPE}.map",--memorysummary,${DISTDIR}/memoryfile.xml -mdfp="${DFP_DIR}"
+	${MP_CC} $(MP_EXTRA_LD_PRE) -g -mdebugger -D__MPLAB_DEBUGGER_ICD4=1 -mprocessor=$(MP_PROCESSOR_OPTION) -o ${DISTDIR}/P3053.${IMAGE_TYPE}.${OUTPUT_SUFFIX} ${OBJECTFILES} -DXPRJ_pic32mz_ef_sk=$(CND_CONF) $(COMPARISON_BUILD) -mreserve=data@0x0:0x37F -Wl,--defsym=__MPLAB_BUILD=1$(MP_EXTRA_LD_POST)$(MP_LINKER_FILE_OPTION),--defsym=__MPLAB_DEBUG=1,--defsym=__DEBUG=1,-D=__DEBUG_D,--defsym=__MPLAB_DEBUGGER_ICD4=1,--defsym=_min_heap_size=64960,--gc-sections,--no-code-in-dinit,--no-dinit-in-serial-mem,-Map="${DISTDIR}/${PROJECTNAME}.${IMAGE_TYPE}.map",--memorysummary,${DISTDIR}/memoryfile.xml -mdfp="${DFP_DIR}"
 	
 else
 ${DISTDIR}/P3053.${IMAGE_TYPE}.${OUTPUT_SUFFIX}: ${OBJECTFILES} Makefile-${CND_CONF}.mk src/config/pic32mz_ef_sk/p32MZ2048EFH100.ld
 	@${MKDIR} ${DISTDIR} 
-	${MP_CC} $(MP_EXTRA_LD_PRE) -mprocessor=$(MP_PROCESSOR_OPTION) -o ${DISTDIR}/P3053.${IMAGE_TYPE}.${DEBUGGABLE_SUFFIX} ${OBJECTFILES_QUOTED_IF_SPACED} -DXPRJ_pic32mz_ef_sk=$(CND_CONF) $(COMPARISON_BUILD) -Wl,--defsym=__MPLAB_BUILD=1$(MP_EXTRA_LD_POST)$(MP_LINKER_FILE_OPTION),--defsym=_min_heap_size=64960,--gc-sections,--no-code-in-dinit,--no-dinit-in-serial-mem,-Map="${DISTDIR}/${PROJECTNAME}.${IMAGE_TYPE}.map",--memorysummary,${DISTDIR}/memoryfile.xml -mdfp="${DFP_DIR}"
+	${MP_CC} $(MP_EXTRA_LD_PRE) -mprocessor=$(MP_PROCESSOR_OPTION) -o ${DISTDIR}/P3053.${IMAGE_TYPE}.${DEBUGGABLE_SUFFIX} ${OBJECTFILES} -DXPRJ_pic32mz_ef_sk=$(CND_CONF) $(COMPARISON_BUILD) -Wl,--defsym=__MPLAB_BUILD=1$(MP_EXTRA_LD_POST)$(MP_LINKER_FILE_OPTION),--defsym=_min_heap_size=64960,--gc-sections,--no-code-in-dinit,--no-dinit-in-serial-mem,-Map="${DISTDIR}/${PROJECTNAME}.${IMAGE_TYPE}.map",--memorysummary,${DISTDIR}/memoryfile.xml -mdfp="${DFP_DIR}"
 	${MP_CC_DIR}/xc32-bin2hex ${DISTDIR}/P3053.${IMAGE_TYPE}.${DEBUGGABLE_SUFFIX} 
 endif
 
