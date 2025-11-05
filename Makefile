@@ -30,6 +30,15 @@ CND_ARTIFACT_NAME_pic32mz_ef_sk=$(PROJECT).production.hex
 CND_ARTIFACT_PATH_pic32mz_ef_sk=dist/pic32mz_ef_sk/production/$(PROJECT).production.hex
 
 #
+# Colors for text output.
+#
+RED    := \033[1;31m
+YELLOW := \033[1;33m
+BLUE   := \033[1;34m
+CYAN   := \033[1;36m
+RESET  := \033[0m
+
+#
 # All the x32 build tools: compilers, linkers, archivers, and assemblers.
 #
 MP_CC="/Applications/microchip/xc32/v4.60/bin/xc32-gcc"
@@ -43,20 +52,16 @@ MP_AS_DIR="/Applications/microchip/xc32/v4.60/bin"
 MP_LD_DIR="/Applications/microchip/xc32/v4.60/bin"
 MP_AR_DIR="/Applications/microchip/xc32/v4.60/bin"
 
-ifeq ($(TYPE_IMAGE), DEBUG_RUN)
+ifeq ($(DEBUG_MODE),debug)
 IMAGE_TYPE=debug
-OUTPUT_SUFFIX=elf
-DEBUGGABLE_SUFFIX=elf
-OUTPUT_FILE=${DISTDIR}/$(PROJECT).${IMAGE_TYPE}.${OUTPUT_SUFFIX}
 else
 IMAGE_TYPE=production
-OUTPUT_SUFFIX=hex
-DEBUGGABLE_SUFFIX=elf
-OUTPUT_FILE=${DISTDIR}/$(PROJECT).${IMAGE_TYPE}.${OUTPUT_SUFFIX}
 endif
 
-OBJECTDIR=build/${CONF}/${IMAGE_TYPE}
-DISTDIR=dist/${CONF}/${IMAGE_TYPE}
+OBJECTDIR=build/
+DISTDIR=dist/
+OUTPUT_FILE=${DISTDIR}/${IMAGE_TYPE}.elf
+
 SRC_DIRS := src
 SOURCEFILES := $(shell find $(SRC_DIRS) -type f \( -name '*.c' -o -name '*.S' \))
 OBJECTFILES := $(patsubst src/%, $(OBJECTDIR)/src/%, $(SOURCEFILES:.c=.o))
@@ -64,7 +69,7 @@ OBJECTFILES := $(OBJECTFILES:.S=.o)
 
 CFLAGS=
 ASFLAGS=
-LDLIBSOPTIONS=
+LDFLAGS=
 
 CFLAGS += -ffunction-sections -fdata-sections -O1 -fno-common \
 	-mprocessor=$(CPU) \
@@ -77,38 +82,7 @@ CFLAGS += -ffunction-sections -fdata-sections -O1 -fno-common \
 ASFLAGS += -Wa,--defsym=__MPLAB_BUILD=1 \
 	-Wa,--gdwarf-2 \
 	-mprocessor=$(CPU) 
-
-$(OBJECTDIR)/%.o : CFLAGS += -MP -MMD -MF "$@.d"
-$(OBJECTDIR)/%.o : ASFLAGS += -MP -MMD -MF "$@.d"
-
-ifeq ($(TYPE_IMAGE),DEBUG_RUN)
-CFLAGS += -D__DEBUG \
-	-D__MPLAB_DEBUGGER_ICD4=1 \
-	-fframe-base-loclist
-ASFLAGS += -D__DEBUG \
-	-D__MPLAB_DEBUGGER_ICD4=1 \
-    -Wa,--defsym=__MPLAB_DEBUG=1 \
-    -Wa,--defsym=__MPLAB_DEBUGGER_ICD4=1 \
-    -Wa,--gdwarf-2
-endif
-
-$(OBJECTDIR)/%.o : %.S
-	@mkdir -p $(dir $@)
-	@echo Assembling $<
-	$(MP_CC) $(MP_EXTRA_AS_PRE) -x assembler-with-cpp -c \
-		$(ASFLAGS) \
-		-o $@ \
-		$< \
-		-DXPRJ_pic32mz_ef_sk=$(CONF) -mdfp="$(DFP_DIR)"
-
-$(OBJECTDIR)/%.o : %.c
-	@mkdir -p $(dir $@)
-	@echo Compiling $<
-	$(MP_CC) $(MP_EXTRA_CC_PRE) -x c -c $(CFLAGS) \
-		-o $@ \
-		$<
-
-LDFLAGS_COMMON = \
+LDFLAGS += \
 	-mprocessor=$(CPU) \
 	-Wl,--defsym=__MPLAB_BUILD=1$(MP_EXTRA_LD_POST) \
 	-Wl,--script=$(CPULD) \
@@ -119,25 +93,50 @@ LDFLAGS_COMMON = \
 	-Wl,-Map="$(DISTDIR)/$(PROJECT).$(IMAGE_TYPE).map" \
 	-Wl,--memorysummary,$(DISTDIR)/memoryfile.xml \
 	-mdfp="$(DFP_DIR)"
-	
-ifeq ($(TYPE_IMAGE),DEBUG_RUN)
-LDFLAGS_EXTRA = \
-	-g -mdebugger -D__MPLAB_DEBUGGER_ICD4=1 \
+
+ifeq ($(DEBUG_MODE),debug)
+CFLAGS += -D__DEBUG \
+	-D__MPLAB_DEBUGGER_ICD4=1 \
+	-fframe-base-loclist
+ASFLAGS += -D__DEBUG \
+	-D__MPLAB_DEBUGGER_ICD4=1 \
+    -Wa,--defsym=__MPLAB_DEBUG=1 \
+    -Wa,--defsym=__MPLAB_DEBUGGER_ICD4=1 \
+    -Wa,--gdwarf-2
+LDFLAGS += -g -mdebugger \
+	-D__MPLAB_DEBUGGER_ICD4=1 \
 	-Wl,--defsym=__MPLAB_DEBUG=1 \
 	-Wl,--defsym=__DEBUG=1 \
 	-Wl,--defsym=__MPLAB_DEBUGGER_ICD4=1
-OUTPUT_FILE := $(DISTDIR)/$(PROJECT).$(IMAGE_TYPE).$(OUTPUT_SUFFIX)
+endif
+
+$(OBJECTDIR)/%.o : %.S
+	@mkdir -p $(dir $@)
+	@printf "$(GREEN)ASSEMBLE: $< $(RESET)\n"
+	$(MP_CC) $(MP_EXTRA_AS_PRE) -x assembler-with-cpp -c \
+		$(ASFLAGS) -MP -MMD -MF "$@.d" \
+		-o $@ \
+		$< \
+		-DXPRJ_pic32mz_ef_sk=$(CONF) -mdfp="$(DFP_DIR)"
+
+$(OBJECTDIR)/%.o : %.c
+	@mkdir -p $(dir $@)
+	@printf "$(CYAN)Compiling $< $(RESET)\n"
+	$(MP_CC) $(MP_EXTRA_CC_PRE) -x c -c \
+		$(CFLAGS) -MP -MMD -MF "$@.d" \
+		-o $@ \
+		$<
+
+ifeq ($(DEBUG_MODE),debug)
 POST_LINK :=
 else
-LDFLAGS_EXTRA =
-OUTPUT_FILE := $(DISTDIR)/$(PROJECT).$(IMAGE_TYPE).$(DEBUGGABLE_SUFFIX)
 POST_LINK := $(MP_CC_DIR)/xc32-bin2hex $(OUTPUT_FILE)
 endif
 	
 $(OUTPUT_FILE): $(OBJECTFILES) Makefile src/config/pic32mz_ef_sk/p32MZ2048EFH100.ld
 	@mkdir -p $(DISTDIR)
-	@echo Linking $@
-	$(MP_CC) $(MP_EXTRA_LD_PRE) $(LDFLAGS_EXTRA) $(LDFLAGS_COMMON) \
+	@echo "$(BLUE)Linking $@ $(RESET)\n"
+	$(MP_CC) $(MP_EXTRA_LD_PRE) $(LDFLAGS) \
 		-o $@ $(OBJECTFILES) \
 		-DXPRJ_pic32mz_ef_sk=$(CONF)
 	$(POST_LINK)
@@ -155,6 +154,13 @@ build: $(OUTPUT_FILE)
 clean:
 	rm -fr ${OBJECTDIR}
 	rm -fr ${DISTDIR}
+
+#
+# The remove target removes the output file so that we can, by calling
+# make, re-link the output file and test the link command.
+#
+remove:
+	rm $(OUTPUT_FILE)
 
 #
 # We have told the compiler to create a dependency makefiles for every object it
