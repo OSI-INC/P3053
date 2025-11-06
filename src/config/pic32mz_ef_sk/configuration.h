@@ -72,7 +72,6 @@
 #define SYS_CONSOLE_USB_CDC_MAX_INSTANCES 	   		(0U)
 #define SYS_CONSOLE_PRINT_BUFFER_SIZE        		(200U)
 
-
 /*** MIIM Driver Configuration ***/
 #define DRV_MIIM_ETH_MODULE_ID_0            _ETH_BASE_ADDRESS
 #define DRV_MIIM_DRIVER_INDEX_0             0
@@ -82,7 +81,6 @@
 #define DRV_MIIM_CLIENT_OP_PROTECTION		false
 #define DRV_MIIM_COMMANDS					false
 #define DRV_MIIM_DRIVER_OBJECT              DRV_MIIM_OBJECT_BASE_Default            
-
 
 /*** DNS Client Configuration ***/
 #define TCPIP_STACK_USE_DNS
@@ -116,7 +114,6 @@
 #define TCPIP_EMAC_LINK_MTU		    			    1500
 #define TCPIP_EMAC_RX_BUFF_SIZE		    			1536
 #define TCPIP_EMAC_RX_FRAGMENTS		    			1
-
 #define TCPIP_EMAC_RX_FILTERS ( \
 	TCPIP_MAC_RX_FILTER_TYPE_BCAST_ACCEPT | \
 	TCPIP_MAC_RX_FILTER_TYPE_MCAST_ACCEPT | \
@@ -173,7 +170,6 @@
 #define TCPIP_DHCP_CLIENT_CONNECT_PORT              68
 #define TCPIP_DHCP_SERVER_LISTEN_PORT               67
 #define TCPIP_DHCP_CLIENT_CONSOLE_CMD               true
-
 #define TCPIP_DHCP_USE_OPTION_TIME_SERVER           0
 #define TCPIP_DHCP_TIME_SERVER_ADDRESSES            0
 #define TCPIP_DHCP_USE_OPTION_NTP_SERVER            0
@@ -182,7 +178,7 @@
 #define TCPIP_DHCP_WAIT_ARP_FAIL_CHECK_TMO          10
 
 /*** ARP Configuration ***/
-#define TCPIP_ARP_CACHE_ENTRIES                 		5
+#define TCPIP_ARP_CACHE_ENTRIES                 	5
 #define TCPIP_ARP_CACHE_DELETE_OLD		        	true
 #define TCPIP_ARP_CACHE_SOLVED_ENTRY_TMO			1200
 #define TCPIP_ARP_CACHE_PENDING_ENTRY_TMO			60
@@ -232,13 +228,7 @@
 #define TCPIP_STACK_HEAP_USAGE_CONFIG				TCPIP_STACK_HEAP_USE_DEFAULT
 #define TCPIP_STACK_SUPPORTED_HEAPS					1
 
-
-// *****************************************************************************
-// *****************************************************************************
-// Section: TCPIP Stack Configuration
-// *****************************************************************************
-// *****************************************************************************
-
+/* Section: TCPIP Stack Configuration */
 #define TCPIP_STACK_USE_IPV4
 #define TCPIP_STACK_USE_TCP
 #define TCPIP_STACK_USE_UDP
@@ -279,7 +269,7 @@
 #define DRV_ETHPHY_LAN8740_NEG_DONE_TMO					2000
 #define DRV_ETHPHY_LAN8740_RESET_CLR_TMO				500
 
-/*** wolfCrypt Library Configuration ***/
+/* wolfCrypt Library Configuration */
 #define MICROCHIP_PIC32
 #define MICROCHIP_MPLAB_HARMONY
 #define MICROCHIP_MPLAB_HARMONY_3
@@ -300,7 +290,7 @@
 #undef WOLFSSL_HAVE_MIN
 #undef WOLFSSL_HAVE_MAX
 
-// ---------- FUNCTIONAL CONFIGURATION START ----------
+/* Final configuration */
 #define WOLFSSL_AES_SMALL_TABLES
 #define NO_MD4
 #define WOLFSSL_SHA224
@@ -330,7 +320,6 @@
 #define NO_SIG_WRAPPER
 #define NO_ERROR_STRINGS
 #define NO_WOLFSSL_MEMORY
-// ---------- FUNCTIONAL CONFIGURATION END ----------
 
 #define TCPIP_STACK_NETWORK_INTERAFCE_COUNT  	1
 #endif 

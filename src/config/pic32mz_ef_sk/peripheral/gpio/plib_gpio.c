@@ -88,13 +88,13 @@ void GPIO_Initialize ( void )
 
     CFGCONbits.IOLOCK = 0U;
 
-    /* PPS Input Remapping */
-    U2RXR = 1;
-
-    /* PPS Output Remapping */
-    RPB14R = 2;
-
-        /* Lock back the system after PPS configuration */
+	// Direct RF8 to UART2 RX, T11+D4-WHITE.
+	U2RXR = 0b1011;
+	
+	// Direct UART2 TX to RF2, R10+D3-BLUE.
+	RPF2R = 0b0010;
+	
+    /* Lock back the system after PPS configuration */
     CFGCONbits.IOLOCK = 1U;
 
     SYSKEY = 0x00000000U;

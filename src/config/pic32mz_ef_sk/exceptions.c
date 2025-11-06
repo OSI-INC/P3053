@@ -137,6 +137,7 @@ void __attribute__((noreturn, weak)) _bootstrap_exception_handler(void)
         #endif
     }
 }
+
 /*******************************************************************************
   Function:
     void _cache_err_exception_handler ( void )

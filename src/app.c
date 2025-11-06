@@ -69,8 +69,7 @@ APP_DATA appData;
 
   Remarks:
     See prototype in app.h.
- */
-
+*******************************************************************************/
 void APP_Initialize ( void )
 {
     /* Place the App state machine in its initial state. */

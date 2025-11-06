@@ -357,15 +357,26 @@ void SYS_Initialize ( void* data )
 	CORETIMER_Initialize();
 	UART2_Initialize();
 	BSP_Initialize();
-	sysObj.drvMiim_0 = DRV_MIIM_OBJECT_BASE_Default.DRV_MIIM_Initialize(DRV_MIIM_DRIVER_INDEX_0,
+	sysObj.drvMiim_0 = 
+		DRV_MIIM_OBJECT_BASE_Default.DRV_MIIM_Initialize(DRV_MIIM_DRIVER_INDEX_0,
 		(const SYS_MODULE_INIT *) &drvMiimInitData_0); 
 	
 	sysObj.sysTime = SYS_TIME_Initialize(SYS_TIME_INDEX_0,
 		(SYS_MODULE_INIT *)&sysTimeInitData);
-		sysObj.sysConsole0 = SYS_CONSOLE_Initialize(SYS_CONSOLE_INDEX_0,
-			(SYS_MODULE_INIT *)&sysConsole0Init);
+
+	UART_SERIAL_SETUP uart2Setup = {
+		.baudRate = 115200,
+		.dataWidth = UART_DATA_8_BIT,
+		.parity = UART_PARITY_NONE,
+		.stopBits = UART_STOP_1_BIT
+	};
+    UART2_SerialSetup(&uart2Setup, 0);
+
+	sysObj.sysConsole0 = SYS_CONSOLE_Initialize(SYS_CONSOLE_INDEX_0,
+		(SYS_MODULE_INIT *)&sysConsole0Init);
 	SYS_CMD_Initialize((SYS_MODULE_INIT*)&sysCmdInit);
-	sysObj.sysDebug = SYS_DEBUG_Initialize(SYS_DEBUG_INDEX_0, (SYS_MODULE_INIT*)&debugInit);
+	sysObj.sysDebug = SYS_DEBUG_Initialize(SYS_DEBUG_INDEX_0,
+		(SYS_MODULE_INIT*)&debugInit);
 	sysObj.tcpip = TCPIP_STACK_Init();
 	SYS_ASSERT(sysObj.tcpip != SYS_MODULE_OBJ_INVALID, "TCPIP_STACK_Init Failed" );
 	CRYPT_WCCB_Initialize();

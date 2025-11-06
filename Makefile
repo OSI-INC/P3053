@@ -95,8 +95,7 @@ LDFLAGS=
 #
 # Flags that are shared by the production and debug builds.
 #
-CFLAGS += \
-	-mprocessor=$(CPU) \
+CFLAGS += -mprocessor=$(CPU) \
 	-ffunction-sections \
 	-fdata-sections \
 	-O1 \
@@ -111,13 +110,11 @@ CFLAGS += \
 	-I"src/third_party/wolfssl" \
 	-I"src/third_party/wolfssl/wolfssl" \
 	-Werror -Wall
-ASFLAGS += \
-	-mprocessor=$(CPU)  \
+ASFLAGS += -mprocessor=$(CPU)  \
 	-Wa,--defsym=__MPLAB_BUILD=1 \
 	-Wa,--gdwarf-2 \
 	-mdfp="$(DFP_DIR)"
-LDFLAGS += \
-	-mprocessor=$(CPU) \
+LDFLAGS += -mprocessor=$(CPU) \
 	-Wl,--defsym=__MPLAB_BUILD=1 \
 	-Wl,--script=$(CPULD) \
 	-Wl,--defsym=_min_heap_size=64960 \
@@ -132,18 +129,15 @@ LDFLAGS += \
 # Add flags depending upon whether this is a debug or production build.
 #
 ifeq ($(BUILD_MODE),debug)
-CFLAGS += \
-	-D__DEBUG \
+CFLAGS += -D__DEBUG \
 	-D__MPLAB_DEBUGGER_ICD4=1 \
 	-fframe-base-loclist
-ASFLAGS += \
-	-D__DEBUG \
+ASFLAGS += -D__DEBUG \
 	-D__MPLAB_DEBUGGER_ICD4=1 \
     -Wa,--defsym=__MPLAB_DEBUG=1 \
     -Wa,--defsym=__MPLAB_DEBUGGER_ICD4=1 \
     -Wa,--gdwarf-2
-LDFLAGS += \
-	-g -mdebugger \
+LDFLAGS += -g -mdebugger \
 	-D__MPLAB_DEBUGGER_ICD4=1 \
 	-Wl,--defsym=__MPLAB_DEBUG=1 \
 	-Wl,--defsym=__DEBUG=1 \
@@ -175,7 +169,7 @@ $(BUILD_DIR)/%.o : %.S
 #
 $(OUTPUT_FILE): $(OBJECTFILES) $(CPULD) Makefile
 	@mkdir -p $(DIST_DIR)
-	@echo "$(BLUE)Linking $@ $(RESET)\n"
+	@printf "$(BLUE)Linking $@ $(RESET)\n"
 	$(MP_CC) $(LDFLAGS) -o $@ $(OBJECTFILES)
 	$(POST_LINK)
 

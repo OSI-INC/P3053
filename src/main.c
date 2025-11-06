@@ -48,18 +48,24 @@
 
 int main ( void )
 {
-	TRISFCLR = (1 << 3) | (1 << 2) | (1 << 8);  // RF3, RF2, RF8
-	TRISACLR = (1 << 2);                        // RA2
-	LED1_On();
-	LED2_On();
-	LED3_On();
-	LED4_On();
+    TRISFCLR = (1 << 3) | (1 << 2) | (1 << 8); 
+    TRISACLR = (1 << 2);
+    LED1_On();  
+    LED2_Off(); 
+    LED3_On();
+    LED4_Off();
 
     SYS_Initialize ( NULL );
 
     while ( true )
     {
         SYS_Tasks ( );
+        
+		LED1_Toggle();
+		LED2_Toggle();
+		LED3_Toggle();
+		LED4_Toggle();
+		for (volatile int i = 0; i < 4000000; ++i);
     }
 
     return ( EXIT_FAILURE );
