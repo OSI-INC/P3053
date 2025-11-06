@@ -46,7 +46,7 @@ static void uart2_puthex(uint32_t value)
 static void uart2_send_int(uint32_t value)
 {
 	int i;
-	for (i = 3; i >= 0; i--) uart2_putc(((uint8_t*)&value)[i]);
+	for (i = 0; i <= 3; i++) uart2_putc(((uint8_t*)&value)[i]);
 }
 
 int main ( void )
@@ -69,7 +69,7 @@ int main ( void )
 		SYS_Tasks();
 		i = i+1;
 		if (i==10000) {
-			GPIO_PortInputEnable(GPIO_PORT_F, 0xFFFFFFFF);
+//			uart2_send_int(0x80800101);
 			uart2_send_int(TRISF);
 //			uart2_send_int(LATF);
 //			uart2_send_int(PORTF);
