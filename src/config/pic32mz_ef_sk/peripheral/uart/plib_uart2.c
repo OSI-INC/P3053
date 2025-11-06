@@ -64,14 +64,16 @@ volatile static uint8_t UART2_ReadBuffer[UART2_READ_BUFFER_SIZE];
 
 volatile static uint8_t UART2_WriteBuffer[UART2_WRITE_BUFFER_SIZE];
 
-#define UART2_IS_9BIT_MODE_ENABLED()    ( (U2MODE) & (_U2MODE_PDSEL0_MASK | _U2MODE_PDSEL1_MASK)) == (_U2MODE_PDSEL0_MASK | _U2MODE_PDSEL1_MASK) ? true:false
+#define UART2_IS_9BIT_MODE_ENABLED()    ( (U2MODE) & (_U2MODE_PDSEL0_MASK \
+	| _U2MODE_PDSEL1_MASK)) == (_U2MODE_PDSEL0_MASK | _U2MODE_PDSEL1_MASK) ? true:false
 
 void static UART2_ErrorClear( void )
 {
     UART_ERROR errors = UART_ERROR_NONE;
     uint8_t dummyData = 0u;
 
-    errors = (UART_ERROR)(U2STA & (_U2STA_OERR_MASK | _U2STA_FERR_MASK | _U2STA_PERR_MASK));
+    errors = (UART_ERROR)(U2STA & (_U2STA_OERR_MASK | 
+    		_U2STA_FERR_MASK | _U2STA_PERR_MASK));
 
     if(errors != UART_ERROR_NONE)
     {
@@ -171,7 +173,9 @@ bool UART2_SerialSetup( UART_SERIAL_SETUP *setup, uint32_t srcClkFreq )
     {
         baud = setup->baudRate;
 
-        if ((baud == 0U) || ((setup->dataWidth == UART_DATA_9_BIT) && (setup->parity != UART_PARITY_NONE)))
+        if ((baud == 0U) 
+        	|| ((setup->dataWidth == UART_DATA_9_BIT) 
+        	&& (setup->parity != UART_PARITY_NONE)))
         {
             return status;
         }
@@ -258,14 +262,16 @@ static inline bool UART2_RxPushByte(uint16_t rdByte)
 
     if (tempInIndex == uart2Obj.rdOutIndex)
     {
-        /* Queue is full - Report it to the application. Application gets a chance to free up space by reading data out from the RX ring buffer */
+        /* Queue is full - Report it to the application. Application gets a chance to 
+        free up space by reading data out from the RX ring buffer */
         if(uart2Obj.rdCallback != NULL)
         {
             uintptr_t rdContext = uart2Obj.rdContext;
 
             uart2Obj.rdCallback(UART_EVENT_READ_BUFFER_FULL, rdContext);
 
-            /* Read the indices again in case application has freed up space in RX ring buffer */
+            /* Read the indices again in case application has freed up space in 
+            RX ring buffer */
             tempInIndex = uart2Obj.rdInIndex + 1U;
 
             if (tempInIndex >= uart2Obj.rdBufferSize)

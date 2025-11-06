@@ -203,7 +203,6 @@ typedef enum
 
 typedef uint32_t GPIO_PIN;
 
-
 void GPIO_Initialize(void);
 
 uint32_t GPIO_PortRead(GPIO_PORT port);

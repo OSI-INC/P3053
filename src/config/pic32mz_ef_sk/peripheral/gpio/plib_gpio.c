@@ -16,7 +16,6 @@
 
 *******************************************************************************/
 
-//DOM-IGNORE-BEGIN
 /*******************************************************************************
 * Copyright (C) 2019 Microchip Technology Inc. and its subsidiaries.
 *
@@ -39,76 +38,20 @@
 * ANY WAY RELATED TO THIS SOFTWARE WILL NOT EXCEED THE AMOUNT OF FEES, IF ANY,
 * THAT YOU HAVE PAID DIRECTLY TO MICROCHIP FOR THIS SOFTWARE.
 *******************************************************************************/
-//DOM-IGNORE-END
 
 #include "plib_gpio.h"
 #include "interrupts.h"
 
-
-
-
 /******************************************************************************
-  Function:
-    GPIO_Initialize ( void )
-
-  Summary:
-    Initialize the GPIO library.
-
-  Remarks:
-    See plib_gpio.h for more details.
-*/
+  We have moved our GPIO initialization into our own source files, so this routine
+  now does nothing and need not be called anywhere.
+*******************************************************************************/
 void GPIO_Initialize ( void )
 {
-
-// NOTE: This device (PIC32MZ2048EFH100) does not implement Ports H or J.
-// Do not use GPIO_PORT_H or GPIO_PORT_J or any GPIO_PIN_RH* / GPIO_PIN_RJ* defines.
-
-    /* PORTA Initialization */
-    /* PORTB Initialization */
-    ANSELBCLR = 0x7000U; /* Digital Mode Enable */
-    CNPUBSET = 0x7000U; /* Pull-Up Enable */
-    /* PORTC Initialization */
-    /* PORTD Initialization */
-    /* PORTE Initialization */
-    /* PORTF Initialization */
-    /* PORTG Initialization */
-    ANSELGCLR = 0x40U; /* Digital Mode Enable */
-    /* PORTH Initialization */
-    // LATH = 0x0U; /* Initial Latch Value */
-    // TRISHCLR = 0x7U; /* Direction Control */
-    // ANSELHCLR = 0x33U; /* Digital Mode Enable */
-    /* PORTJ Initialization */
-    // ANSELJCLR = 0xb00U; /* Digital Mode Enable */
-    /* PORTK Initialization */
-
-    /* Unlock system for PPS configuration */
-    SYSKEY = 0x00000000U;
-    SYSKEY = 0xAA996655U;
-    SYSKEY = 0x556699AAU;
-
-    CFGCONbits.IOLOCK = 0U;
-
-	// Direct RF8 to UART2 RX, T11+D4-WHITE.
-	U2RXR = 0b1011;
-	
-	// Direct UART2 TX to RF2, R10+D3-BLUE.
-	RPF2R = 0b0010;
-	
-    /* Lock back the system after PPS configuration */
-    CFGCONbits.IOLOCK = 1U;
-
-    SYSKEY = 0x00000000U;
-
 }
 
-// *****************************************************************************
-// *****************************************************************************
-// Section: GPIO APIs which operates on multiple pins of a port
-// *****************************************************************************
-// *****************************************************************************
-
-// *****************************************************************************
-/* Function:
+/*****************************************************************************
+ Function:
     uint32_t GPIO_PortRead ( GPIO_PORT port )
 
   Summary:
@@ -128,14 +71,14 @@ void GPIO_Initialize ( void )
     If the port has less than 32-bits, unimplemented pins will read as
     low (0).
     Implemented pins are Right aligned in the 32-bit return value.
-*/
+*******************************************************************************/
 uint32_t GPIO_PortRead(GPIO_PORT port)
 {
     return (*(volatile uint32_t *)(&PORTA + (port * 0x40U)));
 }
 
-// *****************************************************************************
-/* Function:
+/*****************************************************************************
+  Function:
     void GPIO_PortWrite (GPIO_PORT port, uint32_t mask, uint32_t value);
 
   Summary:
@@ -143,14 +86,15 @@ uint32_t GPIO_PortRead(GPIO_PORT port)
 
   Remarks:
     See plib_gpio.h for more details.
-*/
+*******************************************************************************/
 void GPIO_PortWrite(GPIO_PORT port, uint32_t mask, uint32_t value)
 {
-    *(volatile uint32_t *)(&LATA + (port * 0x40U)) = (*(volatile uint32_t *)(&LATA + (port * 0x40U)) & (~mask)) | (mask & value);
+    *(volatile uint32_t *)(&LATA + (port * 0x40U)) = 
+    	(*(volatile uint32_t *)(&LATA + (port * 0x40U)) & (~mask)) | (mask & value);
 }
 
-// *****************************************************************************
-/* Function:
+/*****************************************************************************
+  Function:
     uint32_t GPIO_PortLatchRead ( GPIO_PORT port )
 
   Summary:
@@ -158,14 +102,14 @@ void GPIO_PortWrite(GPIO_PORT port, uint32_t mask, uint32_t value)
 
   Remarks:
     See plib_gpio.h for more details.
-*/
+*******************************************************************************/
 uint32_t GPIO_PortLatchRead(GPIO_PORT port)
 {
     return (*(volatile uint32_t *)(&LATA + (port * 0x40U)));
 }
 
-// *****************************************************************************
-/* Function:
+/*****************************************************************************
+  Function:
     void GPIO_PortSet ( GPIO_PORT port, uint32_t mask )
 
   Summary:
@@ -173,14 +117,14 @@ uint32_t GPIO_PortLatchRead(GPIO_PORT port)
 
   Remarks:
     See plib_gpio.h for more details.
-*/
+*******************************************************************************/
 void GPIO_PortSet(GPIO_PORT port, uint32_t mask)
 {
     *(volatile uint32_t *)(&LATASET + (port * 0x40U)) = mask;
 }
 
-// *****************************************************************************
-/* Function:
+/*****************************************************************************
+  Function:
     void GPIO_PortClear ( GPIO_PORT port, uint32_t mask )
 
   Summary:
@@ -188,14 +132,14 @@ void GPIO_PortSet(GPIO_PORT port, uint32_t mask)
 
   Remarks:
     See plib_gpio.h for more details.
-*/
+*******************************************************************************/
 void GPIO_PortClear(GPIO_PORT port, uint32_t mask)
 {
     *(volatile uint32_t *)(&LATACLR + (port * 0x40U)) = mask;
 }
 
-// *****************************************************************************
-/* Function:
+/*****************************************************************************
+  Function:
     void GPIO_PortToggle ( GPIO_PORT port, uint32_t mask )
 
   Summary:
@@ -203,14 +147,14 @@ void GPIO_PortClear(GPIO_PORT port, uint32_t mask)
 
   Remarks:
     See plib_gpio.h for more details.
-*/
+*******************************************************************************/
 void GPIO_PortToggle(GPIO_PORT port, uint32_t mask)
 {
     *(volatile uint32_t *)(&LATAINV + (port * 0x40U))= mask;
 }
 
-// *****************************************************************************
-/* Function:
+/*****************************************************************************
+  Function:
     void GPIO_PortInputEnable ( GPIO_PORT port, uint32_t mask )
 
   Summary:
@@ -218,14 +162,14 @@ void GPIO_PortToggle(GPIO_PORT port, uint32_t mask)
 
   Remarks:
     See plib_gpio.h for more details.
-*/
+*******************************************************************************/
 void GPIO_PortInputEnable(GPIO_PORT port, uint32_t mask)
 {
     *(volatile uint32_t *)(&TRISASET + (port * 0x40U)) = mask;
 }
 
-// *****************************************************************************
-/* Function:
+/*****************************************************************************
+  Function:
     void GPIO_PortOutputEnable ( GPIO_PORT port, uint32_t mask )
 
   Summary:
@@ -233,15 +177,8 @@ void GPIO_PortInputEnable(GPIO_PORT port, uint32_t mask)
 
   Remarks:
     See plib_gpio.h for more details.
-*/
+*******************************************************************************/
 void GPIO_PortOutputEnable(GPIO_PORT port, uint32_t mask)
 {
     *(volatile uint32_t *)(&TRISACLR + (port * 0x40U)) = mask;
 }
-
-
-
-
-/*******************************************************************************
- End of File
-*/
