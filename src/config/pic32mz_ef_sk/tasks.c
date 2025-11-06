@@ -19,7 +19,6 @@
     "Tasks" functions to identify the instance of the module to maintain.
  *******************************************************************************/
 
-// DOM-IGNORE-BEGIN
 /*******************************************************************************
 * Copyright (C) 2018 Microchip Technology Inc. and its subsidiaries.
 *
@@ -42,26 +41,10 @@
 * ANY WAY RELATED TO THIS SOFTWARE WILL NOT EXCEED THE AMOUNT OF FEES, IF ANY,
 * THAT YOU HAVE PAID DIRECTLY TO MICROCHIP FOR THIS SOFTWARE.
  *******************************************************************************/
-// DOM-IGNORE-END
-
-// *****************************************************************************
-// *****************************************************************************
-// Section: Included Files
-// *****************************************************************************
-// *****************************************************************************
 
 #include "configuration.h"
 #include "definitions.h"
 #include "sys_tasks.h"
-
-
-
-
-// *****************************************************************************
-// *****************************************************************************
-// Section: System "Tasks" Routine
-// *****************************************************************************
-// *****************************************************************************
 
 /*******************************************************************************
   Function:
@@ -69,40 +52,18 @@
 
   Remarks:
     See prototype in system/common/sys_module.h.
-*/
+********************************************************************************/
 void SYS_Tasks ( void )
 {
     /* Maintain system services */
-    
-
-SYS_CMD_Tasks();
-
-
-
+	SYS_CMD_Tasks();
 
     /* Maintain Device Drivers */
-       DRV_MIIM_OBJECT_BASE_Default.DRV_MIIM_Tasks(sysObj.drvMiim_0);
-
-
-
+    DRV_MIIM_OBJECT_BASE_Default.DRV_MIIM_Tasks(sysObj.drvMiim_0);
 
     /* Maintain Middleware & Other Libraries */
-    
-   TCPIP_STACK_Task(sysObj.tcpip);
-
-
-
+	TCPIP_STACK_Task(sysObj.tcpip);
 
     /* Maintain the application's state machine. */
-        /* Call Application task APP. */
     APP_Tasks();
-
-
-
-
 }
-
-/*******************************************************************************
- End of File
- */
-

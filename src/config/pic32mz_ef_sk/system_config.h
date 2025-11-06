@@ -22,7 +22,6 @@
     #include "system/system.h"
  *******************************************************************************/
 
-//DOM-IGNORE-BEGIN
 /*
 Copyright (C) 2017-2023, Microchip Technology Inc., and its subsidiaries. All rights reserved.
 
@@ -46,8 +45,6 @@ implied, are granted under any patent or other intellectual property rights of
 Microchip or any third party.
 */
 
-//DOM-IGNORE-END
-
 #ifndef SYSTEM_CONFIG_H
 #define SYSTEM_CONFIG_H
 
@@ -60,8 +57,4 @@ Microchip or any third party.
 
 #include "configuration.h"
 
-#endif // SYSTEM_CONFIG_H
-/*******************************************************************************
- End of File
-*/
-
+#endif

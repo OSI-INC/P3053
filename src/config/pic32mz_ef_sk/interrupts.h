@@ -14,7 +14,6 @@
     This file contains declarations of device vectors used by Harmony 3
  *******************************************************************************/
 
-// DOM-IGNORE-BEGIN
 /*******************************************************************************
 * Copyright (C) 2018 Microchip Technology Inc. and its subsidiaries.
 *
@@ -37,25 +36,11 @@
 * ANY WAY RELATED TO THIS SOFTWARE WILL NOT EXCEED THE AMOUNT OF FEES, IF ANY,
 * THAT YOU HAVE PAID DIRECTLY TO MICROCHIP FOR THIS SOFTWARE.
  *******************************************************************************/
-// DOM-IGNORE-END
 
 #ifndef INTERRUPTS_H
 #define INTERRUPTS_H
 
-// *****************************************************************************
-// *****************************************************************************
-// Section: Included Files
-// *****************************************************************************
-// *****************************************************************************
 #include <stdint.h>
-
-
-
-// *****************************************************************************
-// *****************************************************************************
-// Section: Handler Routines
-// *****************************************************************************
-// *****************************************************************************
 
 void CORE_TIMER_InterruptHandler( void );
 void UART2_FAULT_InterruptHandler( void );
@@ -64,6 +49,4 @@ void UART2_TX_InterruptHandler( void );
 void ETHERNET_InterruptHandler( void );
 void NVM_InterruptHandler( void );
 
-
-
-#endif // INTERRUPTS_H
+#endif 

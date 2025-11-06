@@ -15,7 +15,6 @@
     None
  *******************************************************************************/
 
-// DOM-IGNORE-BEGIN
 /*******************************************************************************
 * Copyright (C) 2023 Microchip Technology Inc. and its subsidiaries.
 *
@@ -38,7 +37,6 @@
 * ANY WAY RELATED TO THIS SOFTWARE WILL NOT EXCEED THE AMOUNT OF FEES, IF ANY,
 * THAT YOU HAVE PAID DIRECTLY TO MICROCHIP FOR THIS SOFTWARE.
  *******************************************************************************/
-// DOM-IGNORE-END
 
 #ifndef SYS_TASKS_H
 #define SYS_TASKS_H
@@ -53,4 +51,4 @@
 #include "definitions.h"
 
 
-#endif //SYS_TASKS_H
+#endif 

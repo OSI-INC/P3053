@@ -16,7 +16,6 @@
     where the exception occurred.
  *******************************************************************************/
 
-// DOM-IGNORE-BEGIN
 /*******************************************************************************
 * Copyright (C) 2018 Microchip Technology Inc. and its subsidiaries.
 *
@@ -39,34 +38,20 @@
 * ANY WAY RELATED TO THIS SOFTWARE WILL NOT EXCEED THE AMOUNT OF FEES, IF ANY,
 * THAT YOU HAVE PAID DIRECTLY TO MICROCHIP FOR THIS SOFTWARE.
 *******************************************************************************/
-// DOM-IGNORE-END
-// *****************************************************************************
-// *****************************************************************************
-// Section: Included Files
-// *****************************************************************************
-// *****************************************************************************
+
 #include "configuration.h"
 #include "device.h"
 #include "definitions.h"
 #include <stdio.h>
 
-// *****************************************************************************
-// *****************************************************************************
-// Section: Forward declaration of the handler functions
-// *****************************************************************************
-// *****************************************************************************
+
 /* MISRAC 2012 deviation block start */
-/* MISRA C-2012 Rule 21.2 deviated 8 times. Deviation record ID -  H3_MISRAC_2012_R_21_2_DR_4 */
+/* MISRA C-2012 Rule 21.2 deviated 8 times. */
+/* Deviation record ID -  H3_MISRAC_2012_R_21_2_DR_4 */
 void _general_exception_handler(void);
 void _bootstrap_exception_handler(void);
 void _cache_err_exception_handler (void);
 void _simple_tlb_refill_exception_handler(void);
-
-// *****************************************************************************
-// *****************************************************************************
-// Section: Global Data Definitions
-// *****************************************************************************
-// *****************************************************************************
 
 /*******************************************************************************
   Exception Reason Data
@@ -77,7 +62,7 @@ void _simple_tlb_refill_exception_handler(void);
     These global static items are used instead of local variables in the
     _general_exception_handler function because the stack may not be available
     if an exception has occured.
-*/
+*******************************************************************************/
 
 /* Exception codes */
 #define EXCEP_IRQ       0U // interrupt
@@ -101,8 +86,6 @@ static unsigned int exception_address;
 /* Code identifying the cause of the exception (CP0 Cause register). */
 static uint32_t  exception_code;
 
-// </editor-fold>
-
 /*******************************************************************************
   Function:
     void _general_exception_handler ( void )
@@ -113,8 +96,7 @@ static uint32_t  exception_code;
 
   Remarks:
     Refer to the XC32 User's Guide for additional information.
- */
-
+*******************************************************************************/
 void __attribute__((noreturn, weak)) _general_exception_handler ( void )
 {
     /* Mask off the ExcCode Field from the Cause Register
@@ -140,8 +122,7 @@ void __attribute__((noreturn, weak)) _general_exception_handler ( void )
 
   Remarks:
     Refer to the XC32 User's Guide for additional information.
- */
-
+*******************************************************************************/
 void __attribute__((noreturn, weak)) _bootstrap_exception_handler(void)
 {
     /* Mask off the ExcCode Field from the Cause Register
@@ -168,8 +149,7 @@ void __attribute__((noreturn, weak)) _bootstrap_exception_handler(void)
 
   Remarks:
     Refer to the XC32 User's Guide for additional information.
- */
-
+*******************************************************************************/
 void __attribute__((noreturn, weak)) _cache_err_exception_handler(void)
 {
     /* Mask off the ExcCode Field from the Cause Register
@@ -198,8 +178,7 @@ void __attribute__((noreturn, weak)) _cache_err_exception_handler(void)
 
   Remarks:
     Refer to the XC32 User's Guide for additional information.
- */
-
+*******************************************************************************/
 void __attribute__((noreturn, weak)) _simple_tlb_refill_exception_handler(void)
 {
     /* Mask off the ExcCode Field from the Cause Register
@@ -214,6 +193,3 @@ void __attribute__((noreturn, weak)) _simple_tlb_refill_exception_handler(void)
         #endif
     }
 }
-/*******************************************************************************
- End of File
-*/
