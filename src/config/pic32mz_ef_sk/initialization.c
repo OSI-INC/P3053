@@ -371,7 +371,7 @@ void SYS_Initialize (void* data)
 	ANSELE = 0x00000000;
 	ANSELF = 0x00000000;
 	ANSELG = 0x00000000;
-
+	
     // We unlock access to the configuration registers by writing a sequence of
     // three values to the SYSKEY register. These three key values work on all
     // PIC32 microprocessors. 

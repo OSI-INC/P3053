@@ -16,16 +16,43 @@
     machines of all modules in the system
  *******************************************************************************/
 
-#include <stddef.h>                     // Defines NULL
-#include <stdbool.h>                    // Defines true
-#include <stdlib.h>                     // Defines EXIT_FAILURE
-#include "definitions.h"                // SYS function prototypes
+#include <stdio.h>
+#include <stddef.h>                  
+#include <stdbool.h>
+#include <stdlib.h>
+#include "definitions.h"
+
+static void uart2_putc(char c)
+{
+    while (UART2_Write((uint8_t*)&c, 1) == 0); 
+}
+
+/*
+static void uart2_puts(const char *s)
+{
+    while (*s) uart2_putc(*s++);
+}
+*/
+
+/*
+static void uart2_puthex(uint32_t value)
+{
+    const char hex[] = "0123456789ABCDEF";
+    for (int shift = 28; shift >= 0; shift -= 4)
+        uart2_putc(hex[(value >> shift) & 0xF]);
+}
+*/
+
+static void uart2_send_int(uint32_t value)
+{
+	int i;
+	for (i = 3; i >= 0; i--) uart2_putc(((uint8_t*)&value)[i]);
+}
 
 int main ( void )
 {
 	// Variables.
 	int i;
-	uint8_t msg[] = "ABC";
 	
 	// Call the system initialization routine, which is to be found in tasks.c and
 	// with forward declaration in definitions.h.
@@ -42,7 +69,12 @@ int main ( void )
 		SYS_Tasks();
 		i = i+1;
 		if (i==10000) {
-			UART2_Write(msg, sizeof(msg) - 1);
+			GPIO_PortInputEnable(GPIO_PORT_F, 0xFFFFFFFF);
+			uart2_send_int(TRISF);
+//			uart2_send_int(LATF);
+//			uart2_send_int(PORTF);
+//			uart2_send_int(ODCF);
+//			uart2_send_int(RPF3R);
 			GPIO_PortToggle(GPIO_PORT_F,0x00000008);
 			GPIO_PortToggle(GPIO_PORT_A,0x00000004);
 		}
