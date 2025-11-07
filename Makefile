@@ -109,7 +109,9 @@ CFLAGS += -mprocessor=$(CPU) \
 	-I"src/config/$(CPU_FAMILY)/library/tcpip/src/common" \
 	-I"src/third_party/wolfssl" \
 	-I"src/third_party/wolfssl/wolfssl" \
-	-Werror -Wall
+	-Wno-error \
+	-Wno-unused-function \
+	-Wall
 ASFLAGS += -mprocessor=$(CPU)  \
 	-Wa,--defsym=__MPLAB_BUILD=1 \
 	-Wa,--gdwarf-2 \

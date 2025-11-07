@@ -406,6 +406,7 @@ void SYS_Initialize (void* data)
     // mask.
    	GPIO_PortOutputEnable(GPIO_PORT_F,0x00000008);
    	GPIO_PortOutputEnable(GPIO_PORT_A,0x00000004);
+   	GPIO_PortOutputEnable(GPIO_PORT_C,0x00008000);
 
 	// Microchip-provided code, not yet understood.
 	NVM_Initialize();

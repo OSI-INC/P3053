@@ -22,6 +22,7 @@
 #include <stdlib.h>
 #include "definitions.h"
 
+
 static void uart2_putc(char c)
 {
     while (UART2_Write((uint8_t*)&c, 1) == 0); 
@@ -43,11 +44,13 @@ static void uart2_puthex(uint32_t value)
 }
 */
 
+
 static void uart2_send_int(uint32_t value)
 {
 	int i;
 	for (i = 0; i <= 3; i++) uart2_putc(((uint8_t*)&value)[i]);
 }
+
 
 int main ( void )
 {
@@ -59,8 +62,8 @@ int main ( void )
 	SYS_Initialize(NULL);
 	
 	// Set out two LEDs to be on or off as we like.
-   	GPIO_PortSet(GPIO_PORT_F,0x00000008);
-   	GPIO_PortClear(GPIO_PORT_A,0x00000004);
+   	GPIO_PortSet(GPIO_PORT_A,0x00000004);
+   	GPIO_PortSet(GPIO_PORT_C,0x00008000);
    	
    	// A while loop with a counter to control the state of our LEDs. It calls SYS_Tasks,
    	// which is supposed to maintain the TCP/IP server.
@@ -68,17 +71,15 @@ int main ( void )
     while (true) {
 		SYS_Tasks();
 		i = i+1;
-		if (i==10000) {
-//			uart2_send_int(0x80800101);
-			uart2_send_int(TRISF);
+		if (i==200000) {
+			GPIO_PortToggle(GPIO_PORT_A,0x00000004);
+//			uart2_send_int(RPF3R);
 //			uart2_send_int(LATF);
 //			uart2_send_int(PORTF);
 //			uart2_send_int(ODCF);
 //			uart2_send_int(RPF3R);
-			GPIO_PortToggle(GPIO_PORT_F,0x00000008);
-			GPIO_PortToggle(GPIO_PORT_A,0x00000004);
+			i=0;
 		}
-		if (i==20000) i=0;
     }
     
     // The only reason to return is because of an error.
