@@ -28,21 +28,20 @@ static void uart2_putc(char c)
     while (UART2_Write((uint8_t*)&c, 1) == 0); 
 }
 
-/*
+
 static void uart2_puts(const char *s)
 {
     while (*s) uart2_putc(*s++);
 }
-*/
 
-/*
+
+
 static void uart2_puthex(uint32_t value)
 {
     const char hex[] = "0123456789ABCDEF";
     for (int shift = 28; shift >= 0; shift -= 4)
         uart2_putc(hex[(value >> shift) & 0xF]);
 }
-*/
 
 
 static void uart2_send_int(uint32_t value)
