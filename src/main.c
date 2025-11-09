@@ -20,6 +20,7 @@
 #include <stddef.h>                  
 #include <stdbool.h>
 #include <stdlib.h>
+#include "configuration.h"
 #include "definitions.h"
 
 
@@ -56,8 +57,7 @@ int main ( void )
 	// Variables.
 	int i;
 	
-	// Call the system initialization routine, which is to be found in tasks.c and
-	// with forward declaration in definitions.h.
+	// Call the system initialization routine.
 	SYS_Initialize(NULL);
 	
 	// Set out two LEDs to be on or off as we like.
@@ -68,7 +68,18 @@ int main ( void )
    	// which is supposed to maintain the TCP/IP server.
    	i=0;
     while (true) {
-		SYS_Tasks();
+		/* Maintain system services */
+		SYS_CMD_Tasks();
+	
+		/* Maintain Device Drivers */
+		DRV_MIIM_OBJECT_BASE_Default.DRV_MIIM_Tasks(sysObj.drvMiim_0);
+	
+		/* Maintain Middleware & Other Libraries */
+		TCPIP_STACK_Task(sysObj.tcpip);
+	
+		/* Maintain the application's state machine. */
+		APP_Tasks();
+		
 		i = i+1;
 		if (i==200000) {
 			GPIO_PortToggle(GPIO_PORT_A,0x00000004);
