@@ -61,9 +61,8 @@ endif
 # map file names.
 #
 BUILD_DIR=build
-DIST_DIR=dist
-OUTPUT_FILE=$(DIST_DIR)/$(BUILD_MODE).elf
-MAP_FILE=$(DIST_DIR)/$(BUILD_MODE).map
+OUTPUT_FILE=$(BUILD_DIR)/$(BUILD_MODE).elf
+MAP_FILE=$(BUILD_DIR)/$(BUILD_MODE).map
 
 #
 # We will translate the output file into hexadecimal if this is a production
@@ -124,7 +123,7 @@ LDFLAGS += -mprocessor=$(CPU) \
 	-Wl,--no-code-in-dinit \
 	-Wl,--no-dinit-in-serial-mem \
 	-Wl,-Map=$(MAP_FILE) \
-	-Wl,--memorysummary,$(DIST_DIR)/memoryfile.xml \
+	-Wl,--memorysummary,$(BUILD_DIR)/memoryfile.xml \
 	-mdfp="$(DFP_DIR)"
 
 #
@@ -170,7 +169,7 @@ $(BUILD_DIR)/%.o : %.S
 # use the post-link tasks to create a hexadecimal version of our elf output.
 #
 $(OUTPUT_FILE): $(OBJECTFILES) $(CPULD) Makefile
-	@mkdir -p $(DIST_DIR)
+	@mkdir -p $(BUILD_DIR)
 	@printf "$(BLUE)Linking $@ $(RESET)\n"
 	$(MP_CC) $(LDFLAGS) -o $@ $(OBJECTFILES)
 	$(POST_LINK)
@@ -186,8 +185,8 @@ build: $(OUTPUT_FILE)
 # distribution directory trees.
 #
 clean:
-	@printf "$(YELLOW)Cleaning ${BUILD_DIR} and ${DIST_DIR} directories$(RESET)\n"
-	find ${BUILD_DIR} ${DIST_DIR} -mindepth 1 -delete
+	@printf "$(YELLOW)Cleaning ${BUILD_DIR} directories$(RESET)\n"
+	find ${BUILD_DIR} -mindepth 1 -delete
 
 #
 # The remove target removes the output file so that we can, by calling
