@@ -423,9 +423,6 @@ void SYS_Initialize (void* data)
 	};
     UART2_SerialSetup(&uart2Setup, 0);
 	
-	// A routine we gutted.
-	BSP_Initialize();
-	
 	// Microchip-provided code, not yet understood.
 	sysObj.drvMiim_0 = 
 		DRV_MIIM_OBJECT_BASE_Default.DRV_MIIM_Initialize(DRV_MIIM_DRIVER_INDEX_0,
