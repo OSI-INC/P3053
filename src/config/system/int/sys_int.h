@@ -57,7 +57,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include "device.h"
-#include "peripheral/evic/plib_evic.h"
+#include "peripheral/plib_evic.h"
 
 // DOM-IGNORE-BEGIN
 #ifdef __cplusplus  // Provide C++ Compatibility

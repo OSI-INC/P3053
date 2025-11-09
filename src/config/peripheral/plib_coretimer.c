@@ -39,7 +39,7 @@
 *******************************************************************************/
 
 #include "device.h"
-#include "peripheral/coretimer/plib_coretimer.h"
+#include "peripheral/plib_coretimer.h"
 #include "interrupts.h"
 
 
