@@ -42,14 +42,6 @@
 #include "plib_gpio.h"
 #include "interrupts.h"
 
-/******************************************************************************
-  We have moved our GPIO initialization into our own source files, so this routine
-  now does nothing and need not be called anywhere.
-*******************************************************************************/
-void GPIO_Initialize ( void )
-{
-}
-
 /*****************************************************************************
  Function:
     uint32_t GPIO_PortRead ( GPIO_PORT port )

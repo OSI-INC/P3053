@@ -357,9 +357,6 @@ void SYS_Initialize (void* data)
 	PRECONbits.PFMWS = 3;
 	CFGCONbits.ECCCON = 3;
 	
-	// The Microchip GPIO configuration routine, which we have gutted.
-	GPIO_Initialize();
-
 	// The A3053A is all-digital. so we configure all pins as digital pins. We
 	// don't even bother to check the data sheet to see which pins can be
 	// non-digital, we just set them all to digital even if they are always
