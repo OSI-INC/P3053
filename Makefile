@@ -103,12 +103,12 @@ CFLAGS += -mprocessor=$(CPU) \
 	-DHAVE_CONFIG_H \
 	-DWOLFSSL_IGNORE_FILE_WARN \
 	-I"src" \
-	-I"src/config/$(CPU_FAMILY)" \
-	-I"src/config/$(CPU_FAMILY)/library" \
-	-I"src/config/$(CPU_FAMILY)/library/tcpip/src" \
-	-I"src/config/$(CPU_FAMILY)/library/tcpip/src/common" \
-	-I"src/third_party/wolfssl" \
-	-I"src/third_party/wolfssl/wolfssl" \
+	-I"src/config" \
+	-I"src/config/library" \
+	-I"src/config/library/tcpip/src" \
+	-I"src/config/library/tcpip/src/common" \
+	-I"src/wolfssl" \
+	-I"src/wolfssl/wolfssl" \
 	-Wno-error \
 	-Wno-unused-function \
 	-Wall
