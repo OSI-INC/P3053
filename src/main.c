@@ -1,20 +1,33 @@
-/*******************************************************************************
-  Main Source File
+/*
+	The Embedded Ethernet Module (EEM) Main Program. 
+	
+	This program implements a LWDAQ server in our A3053 family of EEMs.
 
-  Company:
-    Microchip Technology Inc.
+	This main program is part of the P3053 repository, which began as a copy of
+	a Microchip Harmony3 echo server example application. We consolidated and
+	dramatically simplified the build system. There is only one Makefile left.
+	We transformed the application code to create our own LWDAQ server. We have
+	consolidated all higher level functions int this one file, main.c. The lower
+	level source files remain, for the most part, untouched with their Microchip
+	copyright statements intact. We release this program under the GNU General
+	Public License, which is more strict than the Microsoft license.
+	
+	Copyright (C) 2018 Microchip Technology Inc. and its subsidiaries.
+	Copyright (C) 2025, Kevan Hashemi, Open Source Instruments Inc.
+	
+	This program is free software: you can redistribute it and/or modify
+	it under the terms of the GNU General Public License as published by
+	the Free Software Foundation, either version 3 of the License, or (at
+	your option) any later version.
 
-  File Name:
-    main.c
+	This program is distributed in the hope that it will be useful, but
+	WITHOUT ANY WARRANTY; without even the implied warranty of
+	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+	General Public License for more details.
 
-  Summary:
-    This file contains the "main" function for a project.
-
-  Description:
-    This file contains the "main" function for a project.  The
-    "main" function calls the "SYS_Initialize" function to initialize the state
-    machines of all modules in the system
- *******************************************************************************/
+	You should have received a copy of the GNU General Public License
+	along with this program.  If not, see <https://www.gnu.org/licenses/>.
+*/
 
 #include <stdio.h>
 #include <stdint.h>
@@ -24,8 +37,6 @@
 #include "configuration.h"
 #include "definitions.h"
 #include "tcpip/tcpip.h"
-
-#define SERVER_PORT 90
 
 typedef enum
 {
@@ -37,14 +48,66 @@ typedef enum
 	APP_TCPIP_CLOSING_CONNECTION,
 	APP_TCPIP_ERROR,
 } APP_STATES;
-
 typedef struct
 {
     APP_STATES state;
     TCP_SOCKET socket;
 } APP_DATA;
-
 APP_DATA appData;
+
+/*
+	General-Purpose Input-Output Initialization.
+*/
+void GPIO_Initialize (void)
+{
+	// The A3053A is all-digital. so we configure all pins as digital pins. We
+	// don't even bother to check the data sheet to see which pins can be
+	// non-digital, we just set them all to digital even if they are always
+	// digital.
+	ANSELA = 0x00000000;
+	ANSELB = 0x00000000;
+	ANSELC = 0x00000000;
+	ANSELD = 0x00000000;
+	ANSELE = 0x00000000;
+	ANSELF = 0x00000000;
+	ANSELG = 0x00000000;
+	
+    // We unlock access to the configuration registers by writing a sequence of
+    // three values to the SYSKEY register. These three key values work on all
+    // PIC32 microprocessors. 
+    SYSKEY = 0x00000000U;
+    SYSKEY = 0xAA996655U;
+    SYSKEY = 0x556699AAU;
+    
+    // Now that we have unlocked the configuration registers for writing, we
+    // write to the IOLOCK bit of the configuration control register to enable
+    // writing to the Peripheral Pin Selection (PPS) registers.
+    CFGCONbits.IOLOCK = 0U;
+
+	// Select RF8 as the source of UART2 RX. On the A3053A, RF8 is U1-58,
+	// connected to R11, which in turn feeds D4, the white test point LED.
+	U2RXR = 0b1011;
+	
+	// Select UART2 TX as the source of RF2. On the A3053A, RF2 is U1-57,
+	// connected to, R10, which in turn feeds D3, the blue test point LED.
+	RPF2R = 0b0010;
+	
+    // Lock the PPS registers.
+    CFGCONbits.IOLOCK = 1U;
+    
+    // Lock the configuration registers.
+    SYSKEY = 0x00000000U;
+    
+    // So far, on our A3053A, we have have D3 and D4 dedicated to UART2, but D2
+    // and D5 are available as test points. Pin U1-56 is RF3, so we want to set
+    // bit 3 of port F as an output. Pin U1-59 is RA2, so we want to set bit 2
+    // of port A as an output as well. The constants that hold the numerical
+    // port codes are defined in plib_gpio.h. To specify the bit, we provide a
+    // mask.
+   	GPIO_PortOutputEnable(GPIO_PORT_F,0x00000008);
+   	GPIO_PortOutputEnable(GPIO_PORT_A,0x00000004);
+   	GPIO_PortOutputEnable(GPIO_PORT_C,0x00008000);
+}
 
 /*
 	APP_Tasks is where we handle TCP/IP connections. Right now it is supposed to be
@@ -127,8 +190,10 @@ void APP_Tasks ( void )
             
         case APP_TCPIP_OPENING_SERVER:
         {
-            SYS_CONSOLE_PRINT("Waiting for Client Connection on port: %d\r\n", SERVER_PORT);
-            appData.socket = TCPIP_TCP_ServerOpen(IP_ADDRESS_TYPE_IPV4, SERVER_PORT, 0);
+            SYS_CONSOLE_PRINT("Waiting for Client Connection on port: %d\r\n",
+            	TCPIP_SERVER_PORT);
+            appData.socket = TCPIP_TCP_ServerOpen(IP_ADDRESS_TYPE_IPV4, 
+            	TCPIP_SERVER_PORT, 0);
             if (appData.socket == INVALID_SOCKET)
             {
                 SYS_CONSOLE_MESSAGE("Couldn't open server socket\r\n");
