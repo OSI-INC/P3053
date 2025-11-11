@@ -61,36 +61,23 @@
 #include "wolfssl/wolfcrypt/port/pic32/crypt_wolfcryptcb.h"
 #include "system/console/sys_console.h"
 #include "system/console/src/sys_console_uart_definitions.h"
-#include "app.h"
 
-/* Device Information */
+// Device Information
 #define DEVICE_NAME			 "PIC32MZ2048EFH100"
 #define DEVICE_ARCH			 "MIPS"
 #define DEVICE_FAMILY		 "PIC32MZEF"
 #define DEVICE_SERIES		 "PIC32MZ"
 
-/* CPU clock frequency in Hz */
+// CPU clock frequency in Hz
 #define CPU_CLOCK_FREQUENCY 200000000
 
+// Initialization routines we can call from our main program.
 void MA_Initialize (void);
 void GPIO_Initialize (void);
 void CONSOLE_Initialize (void);
 void TCPIP_Initialize (void);
 
-/*****************************************************************************
-System Objects
-
-Summary:
-    Structure holding the system's object handles
-
-Description:
-    This structure contains the object handles for all objects in the
-    MPLAB Harmony project's system configuration.
-
-Remarks:
-    These handles are returned from the "Initialize" functions for each module
-    and must be passed into the "Tasks" function for each module.
-*******************************************************************************/
+// A record containing handles to data objects used by various processes.
 typedef struct
 {
 	SYS_MODULE_OBJ  sysTime;
@@ -99,7 +86,6 @@ typedef struct
 	SYS_MODULE_OBJ  drvMiim_0;
 	SYS_MODULE_OBJ  sysDebug;
 } SYSTEM_OBJECTS;
-
 extern SYSTEM_OBJECTS sysObj;
 
 #endif

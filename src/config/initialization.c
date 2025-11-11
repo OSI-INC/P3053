@@ -428,7 +428,6 @@ void TCPIP_Initialize (void)
 	sysObj.tcpip = TCPIP_STACK_Init();
 	SYS_ASSERT(sysObj.tcpip != SYS_MODULE_OBJ_INVALID, "TCPIP_STACK_Init Failed" );
 	CRYPT_WCCB_Initialize();
-	APP_Initialize();
 	EVIC_Initialize();
 }
 
