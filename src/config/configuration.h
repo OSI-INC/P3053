@@ -44,7 +44,6 @@
 #ifndef CONFIGURATION_H
 #define CONFIGURATION_H
 
-#include "user.h"
 #include "device.h"
 
 /* TIME System Service Configuration Options */
