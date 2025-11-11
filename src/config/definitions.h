@@ -69,88 +69,13 @@
 #define DEVICE_FAMILY		 "PIC32MZEF"
 #define DEVICE_SERIES		 "PIC32MZ"
 
-/* CPU clock frequency */
+/* CPU clock frequency in Hz */
 #define CPU_CLOCK_FREQUENCY 200000000
 
-/*****************************************************************************
-  System Initialization Function
-
-Function:
-  void SYS_Initialize( void *data )
-
-Summary:
-  Function that initializes all modules in the system.
-
-Description:
-  This function initializes all modules in the system, including any drivers,
-  services, middleware, and applications.
-
-Precondition:
-  None.
-
-Parameters:
-  data            - Pointer to the data structure containing any data
-  				  necessary to initialize the module. This pointer may
-				  be null if no data is required and default initialization
-				  is to be used.
-
-Returns:
-  None.
-
-Example:
-  <code>
-  SYS_Initialize ( NULL );
-
-  while ( true )
-  {
-    SYS_Tasks ( );
-  }
-  </code>
-
-Remarks:
-  This function will only be called once, after system reset.
-*******************************************************************************/
-void SYS_Initialize( void *data );
-
-
-/*****************************************************************************
-System Tasks Function
-
-Function:
-    void SYS_Tasks ( void );
-
-Summary:
-    Function that performs all polled system tasks.
-
-Description:
-    This function performs all polled system tasks by calling the state machine
-    "tasks" functions for all polled modules in the system, including drivers,
-    services, middleware and applications.
-
-Precondition:
-    The SYS_Initialize function must have been called and completed.
-
-Parameters:
-    None.
-
-Returns:
-    None.
-
-Example:
-    <code>
-    SYS_Initialize ( NULL );
-
-    while ( true )
-    {
-        SYS_Tasks ( );
-    }
-    </code>
-
-Remarks:
-    If the module is interrupt driven, the system will call this routine from
-    an interrupt context.
-*******************************************************************************/
-void SYS_Tasks ( void );
+void MA_Initialize (void);
+void GPIO_Initialize (void);
+void CONSOLE_Initialize (void);
+void TCPIP_Initialize (void);
 
 /*****************************************************************************
 System Objects
@@ -174,7 +99,6 @@ typedef struct
 	SYS_MODULE_OBJ  drvMiim_0;
 	SYS_MODULE_OBJ  sysDebug;
 } SYSTEM_OBJECTS;
-
 
 extern SYSTEM_OBJECTS sysObj;
 

@@ -341,21 +341,26 @@ static const SYS_DEBUG_INIT debugInit =
 };
 
 /*
-	SYS_Initialize performs a series of initialization functions necessary when the
-	CPU boots up. We would like to move this code into our main program, but doing
-	so loses and abandons the static constants defined above that are required by
-	some of the intitialization routines that Microchip provides. So we are keeping
-	it here for now.
+	Memory Access Initialization.
 */
-void SYS_Initialize (void* data)
+void MA_Initialize (void)
 {
-	// Microchip-provided code, not yet understood.
-	(void)__builtin_disable_interrupts();	
-	CLK_Initialize();
+	// Prefetch Enable. Enable prefetch for both instructions and data.
 	PRECONbits.PREFEN = 3;
-	PRECONbits.PFMWS = 3;
-	CFGCONbits.ECCCON = 3;
 	
+	// Program Flash Memory Wait States. Choose for 200 MHz.
+	PRECONbits.PFMWS = 3;
+	
+	// Flash Error Correction Code Configuration. Force correction of single-bit
+	// errors, report double-bit errors
+	CFGCONbits.ECCCON = 3;
+}
+
+/*
+	General-Purpose Input-Output Initialization.
+*/
+void GPIO_Initialize (void)
+{
 	// The A3053A is all-digital. so we configure all pins as digital pins. We
 	// don't even bother to check the data sheet to see which pins can be
 	// non-digital, we just set them all to digital even if they are always
@@ -403,23 +408,13 @@ void SYS_Initialize (void* data)
    	GPIO_PortOutputEnable(GPIO_PORT_F,0x00000008);
    	GPIO_PortOutputEnable(GPIO_PORT_A,0x00000004);
    	GPIO_PortOutputEnable(GPIO_PORT_C,0x00008000);
+}
 
-	// Microchip-provided code, not yet understood.
-	NVM_Initialize();
-	CORETIMER_Initialize();
-
-	// Initialize and set up the UART2. We have already assigned its TX and RX
-	// signals to GPIO pins.
-	UART2_Initialize();
-	UART_SERIAL_SETUP uart2Setup = {
-		.baudRate = 115200,
-		.dataWidth = UART_DATA_8_BIT,
-		.parity = UART_PARITY_NONE,
-		.stopBits = UART_STOP_1_BIT
-	};
-    UART2_SerialSetup(&uart2Setup, 0);
-	
-	// Microchip-provided code, not yet understood.
+/*
+	Transmission Control Protocol / Internet Protocol Initialize.
+*/
+void TCPIP_Initialize (void)
+{
 	sysObj.drvMiim_0 = 
 		DRV_MIIM_OBJECT_BASE_Default.DRV_MIIM_Initialize(DRV_MIIM_DRIVER_INDEX_0,
 		(const SYS_MODULE_INIT *) &drvMiimInitData_0); 
@@ -435,7 +430,20 @@ void SYS_Initialize (void* data)
 	CRYPT_WCCB_Initialize();
 	APP_Initialize();
 	EVIC_Initialize();
-	(void)__builtin_enable_interrupts();
 }
 
-
+/*
+	Console Initialize. We set up the UART2. We should already have assigned its TX and
+	RX signals to GPIO pins in GPIO_Initialize.
+*/
+void CONSOLE_Initialize (void)
+{
+	UART2_Initialize();
+	UART_SERIAL_SETUP uart2Setup = {
+		.baudRate = 115200,
+		.dataWidth = UART_DATA_8_BIT,
+		.parity = UART_PARITY_NONE,
+		.stopBits = UART_STOP_1_BIT
+	};
+    UART2_SerialSetup(&uart2Setup, 0);
+}

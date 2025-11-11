@@ -17,7 +17,6 @@
     None.
  *******************************************************************************/
 
-//DOM-IGNORE-BEGIN
 /*******************************************************************************
 * Copyright (C) 2018 Microchip Technology Inc. and its subsidiaries.
 *
@@ -40,7 +39,6 @@
 * ANY WAY RELATED TO THIS SOFTWARE WILL NOT EXCEED THE AMOUNT OF FEES, IF ANY,
 * THAT YOU HAVE PAID DIRECTLY TO MICROCHIP FOR THIS SOFTWARE.
  *******************************************************************************/
-//DOM-IGNORE-END
 
 #ifndef SYSTEM_COMMON_H
 #define SYSTEM_COMMON_H
@@ -54,11 +52,6 @@
 
 #include <stdint.h>
 #include <assert.h>
-
-#ifdef __cplusplus
-    extern "C" {
-#endif
-
 
 //**************************************************************************
 /*
@@ -269,10 +262,6 @@ typedef enum
 
 #define SYS_VersionStrGet( void )   SYS_VERSION_STR
 
-
-#ifdef __cplusplus
-    }
-#endif
 
 #endif // SYSTEM_COMMON_H
 

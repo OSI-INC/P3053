@@ -29,13 +29,10 @@ static void uart2_putc(char c)
     while (UART2_Write((uint8_t*)&c, 1) == 0); 
 }
 
-
 static void uart2_puts(const char *s)
 {
     while (*s) uart2_putc(*s++);
 }
-
-
 
 static void uart2_puthex(uint32_t value)
 {
@@ -51,6 +48,29 @@ static void uart2_send_int(uint32_t value)
 	for (i = 0; i <= 3; i++) uart2_putc(((uint8_t*)&value)[i]);
 }
 
+/*
+	SYS_Initialize performs a series of initialization functions necessary when
+	the CPU boots up. It calls routines defined in initialize.c and elsewhere in
+	the configuration source code. The CLK routine intializes the clock. The MA
+	routine initializes memory access: wait states and error code correction.
+	The GPIO routine configures the MCU pins, including peripheral pin selection
+	(PPS). The NVM routine initializes the non-volatile flash memory. The
+	CORETIMER routine we have yet to investigate. The CONSOLE routine sets up
+	UART2 as a console to transmit reporting. The TCPIP routine initializes the
+	TCPIP stack.
+*/
+void SYS_Initialize (void* data)
+{
+	(void)__builtin_disable_interrupts();	
+	CLK_Initialize();
+	MA_Initialize();
+	GPIO_Initialize();
+	NVM_Initialize();
+	CORETIMER_Initialize();
+	CONSOLE_Initialize();
+    TCPIP_Initialize();
+	(void)__builtin_enable_interrupts();
+}
 
 int main ( void )
 {
