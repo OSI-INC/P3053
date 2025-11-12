@@ -17,6 +17,19 @@
 #
 
 #
+# Detect the build mode so that we can set flags before we get to the
+# target definition. We will look in the MAKECMDGOALS reservbed variable
+# for certain targets that dictate the build mode.
+#
+ifeq (debug,$(findstring debug,$(MAKECMDGOALS)))
+BUILD_MODE=debug
+else
+BUILD_MODE=production
+endif
+$(info BUILD_MODE = $(BUILD_MODE))
+
+
+#
 # Define the exact processor, its family, the location of its device pack, and
 # point to the linker script. We are using the linker script and device pack
 # that are provided by our Harmony3 repository.
@@ -47,32 +60,12 @@ MP_LD=$(MP_DIR)/xc32-ld
 MP_AR=$(MP_DIR)/xc32-ar
 
 #
-# Make sure the debug mode variable is defined as either "debug" or "production" to
-# control our compile, assemble, and link stages.
-#
-ifeq ($(BUILD_MODE),debug)
-BUILD_MODE=debug
-else
-BUILD_MODE=production
-endif
-
-#
 # Define the build and distribution directories, the final output file and the
 # map file names.
 #
 BUILD_DIR=build
 OUTPUT_FILE=$(BUILD_DIR)/$(BUILD_MODE).elf
 MAP_FILE=$(BUILD_DIR)/$(BUILD_MODE).map
-
-#
-# We will translate the output file into hexadecimal if this is a production
-# build.
-#
-ifeq ($(BUILD_MODE),debug)
-POST_LINK :=
-else
-POST_LINK := $(MP_BIN2HEX) $(OUTPUT_FILE)
-endif
 
 #
 # Get a list of all the sources in the source directory. These are C and
@@ -97,10 +90,10 @@ LDFLAGS=
 CFLAGS += -mprocessor=$(CPU) \
 	-ffunction-sections \
 	-fdata-sections \
-	-O1 \
 	-fno-common \
 	-DHAVE_CONFIG_H \
 	-DWOLFSSL_IGNORE_FILE_WARN \
+	-O2 \
 	-I"src" \
 	-I"src/config" \
 	-I"src/config/library" \
@@ -112,11 +105,9 @@ CFLAGS += -mprocessor=$(CPU) \
 	-Wno-unused-function \
 	-Wall
 ASFLAGS += -mprocessor=$(CPU)  \
-	-Wa,--defsym=__MPLAB_BUILD=1 \
 	-Wa,--gdwarf-2 \
 	-mdfp="$(DFP_DIR)"
 LDFLAGS += -mprocessor=$(CPU) \
-	-Wl,--defsym=__MPLAB_BUILD=1 \
 	-Wl,--script=$(CPULD) \
 	-Wl,--defsym=_min_heap_size=64960 \
 	-Wl,--gc-sections \
@@ -130,20 +121,9 @@ LDFLAGS += -mprocessor=$(CPU) \
 # Add flags depending upon whether this is a debug or production build.
 #
 ifeq ($(BUILD_MODE),debug)
-CFLAGS += -D__DEBUG \
-	-D__MPLAB_DEBUGGER_ICD4=1 \
-	-fframe-base-loclist
-ASFLAGS += -D__DEBUG \
-	-D__MPLAB_DEBUGGER_ICD4=1 \
-    -Wa,--defsym=__MPLAB_DEBUG=1 \
-    -Wa,--defsym=__MPLAB_DEBUGGER_ICD4=1 \
-    -Wa,--gdwarf-2
-LDFLAGS += -g -mdebugger \
-	-D__MPLAB_DEBUGGER_ICD4=1 \
-	-Wl,--defsym=__MPLAB_DEBUG=1 \
-	-Wl,--defsym=__DEBUG=1 \
-	-Wl,--defsym=__MPLAB_DEBUGGER_ICD4=1
-else
+CFLAGS += -D__DEBUG
+ASFLAGS += -D__DEBUG
+LDFLAGS += -Wl,--defsym=__DEBUG=1
 endif
 
 #
@@ -165,20 +145,26 @@ $(BUILD_DIR)/%.o : %.S
 	$(MP_CC) -x assembler-with-cpp -c $(ASFLAGS) -MP -MMD -MF "$@.d" -o $@ $<
 
 #
-# Recipe for linking all objects into the final output file. For production build, we
-# use the post-link tasks to create a hexadecimal version of our elf output.
+# Recipe for linking all objects into the final output file.
 #
 $(OUTPUT_FILE): $(OBJECTFILES) $(CPULD) Makefile
 	@mkdir -p $(BUILD_DIR)
 	@printf "$(BLUE)Linking $@ $(RESET)\n"
 	$(MP_CC) $(LDFLAGS) -o $@ $(OBJECTFILES)
-	$(POST_LINK)
+	$(MP_BIN2HEX) $(OUTPUT_FILE)
 
 #
 # When we build, we create the compiled hex or elf file that we can 
 # load into the processor.
 #
 build: $(OUTPUT_FILE)
+
+#
+# The debug target is the same as the build target, except we have added
+# some compiler, assembler, and linker flags earlier in the makefile, so
+# as to affect the build.
+#
+debug: build
 
 #
 # When we clean, we remove all files and directories in the object and
