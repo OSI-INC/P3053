@@ -15,9 +15,8 @@
     This header file defines the common debug definitions and interface macros
     (summary below) and prototypes used by MPLAB Harmony libraries to report
     errors and debug information to the user.
- *******************************************************************************/
+*******************************************************************************/
 
-//DOM-IGNORE-BEGIN
 /*******************************************************************************
 * Copyright (C) 2018 Microchip Technology Inc. and its subsidiaries.
 *
@@ -39,42 +38,22 @@
 * FULLEST EXTENT ALLOWED BY LAW, MICROCHIP'S TOTAL LIABILITY ON ALL CLAIMS IN
 * ANY WAY RELATED TO THIS SOFTWARE WILL NOT EXCEED THE AMOUNT OF FEES, IF ANY,
 * THAT YOU HAVE PAID DIRECTLY TO MICROCHIP FOR THIS SOFTWARE.
- *******************************************************************************/
-//DOM-IGNORE-END
+*******************************************************************************/
 
 #ifndef SYS_DEBUG_H
 #define SYS_DEBUG_H
 
-// *****************************************************************************
-// *****************************************************************************
-// Section: File includes
-// *****************************************************************************
-// *****************************************************************************
-
 #include <stdbool.h>
 #include "system/system.h"
 #include "configuration.h"
+
 #ifdef SYS_DEBUG_USE_CONSOLE
 #include "system/console/sys_console.h"
 #endif
 
 
-// DOM-IGNORE-BEGIN
-#ifdef __cplusplus  // Provide C++ Compatibility
-
-    extern "C" {
-
-#endif
-// DOM-IGNORE-END
-
-// *****************************************************************************
-// *****************************************************************************
-// Section: SYS DEBUG Data Types
-// *****************************************************************************
-// *****************************************************************************
-
-// *****************************************************************************
-/* SYS_ERROR_LEVEL enumeration
+/*******************************************************************************
+   SYS_ERROR_LEVEL enumeration
 
    Summary:
     System error message priority levels.
@@ -86,8 +65,7 @@
     Used by debug message macros to compare individual message priority against
     a global system-wide error message priority level to determine if an
     individual message should be displayed.
-*/
-
+*******************************************************************************/
 typedef enum
 {
     /* Errors that have the potential to cause a system crash. */
@@ -108,16 +86,14 @@ typedef enum
 } SYS_ERROR_LEVEL;
 
 
-// DOM-IGNORE-BEGIN
-
-// *****************************************************************************
-/* Do not use this variable directly.  Use SYS_DEBUG_ErrorLevelGet or
+/*******************************************************************************
+   Do not use this variable directly.  Use SYS_DEBUG_ErrorLevelGet or
    SYS_DEBUG_ErrorLevelSet functions to access this value.
-*/
+*******************************************************************************/
 extern SYS_ERROR_LEVEL gblErrLvl;
 
-// *****************************************************************************
-/* SYS Debug Initialize structure
+/*******************************************************************************
+   SYS Debug Initialize structure
 
   Summary:
     Defines the data required to initialize the debug system service.
@@ -128,8 +104,7 @@ extern SYS_ERROR_LEVEL gblErrLvl;
 
   Remarks:
     None.
-*/
-
+*******************************************************************************/
 typedef struct
 {
     /* System module initialization */
@@ -143,10 +118,8 @@ typedef struct
 
 } SYS_DEBUG_INIT;
 
-// DOM-IGNORE-END
-
-// *****************************************************************************
-/* SYS Debug Module Index Number
+/*******************************************************************************
+   SYS Debug Module Index Number
 
   Summary:
     Debug System Service index.
@@ -156,19 +129,12 @@ typedef struct
 
   Remarks:
     There can only be a single debug system service instance in the system.
-*/
-
+*******************************************************************************/
 #define SYS_DEBUG_INDEX_0           0
 
 
-// *****************************************************************************
-// *****************************************************************************
-// Section: SYS DEBUG Functions
-// *****************************************************************************
-// *****************************************************************************
-
-// *****************************************************************************
-/* Function:
+/*******************************************************************************
+   Function:
     SYS_MODULE_OBJ SYS_DEBUG_Initialize(
         const SYS_MODULE_INDEX index,
         const SYS_MODULE_INIT* const init
@@ -214,15 +180,14 @@ typedef struct
 
   Remarks:
     This routine should only be called once during system initialization.
-*/
-
+*******************************************************************************/
 SYS_MODULE_OBJ SYS_DEBUG_Initialize(
     const SYS_MODULE_INDEX index,
     const SYS_MODULE_INIT* const init
 );
 
-// *****************************************************************************
-/* Function:
+/*******************************************************************************
+   Function:
     SYS_STATUS SYS_DEBUG_Status ( SYS_MODULE_OBJ object )
 
   Summary:
@@ -270,19 +235,12 @@ SYS_MODULE_OBJ SYS_DEBUG_Initialize(
 
   Remarks:
     None.
-*/
-
+*******************************************************************************/
 SYS_STATUS SYS_DEBUG_Status ( SYS_MODULE_OBJ object );
 
 
-// *****************************************************************************
-// *****************************************************************************
-// Section: SYS DEBUG Console Functions
-// *****************************************************************************
-// *****************************************************************************
-
-// *****************************************************************************
-/* Function:
+/*******************************************************************************
+   Function:
     void SYS_DEBUG_ErrorLevelSet(SYS_ERROR_LEVEL level)
 
   Summary:
@@ -307,12 +265,11 @@ SYS_STATUS SYS_DEBUG_Status ( SYS_MODULE_OBJ object );
 
   Remarks:
     None.
-*/
-
+*******************************************************************************/
 void SYS_DEBUG_ErrorLevelSet(SYS_ERROR_LEVEL level);
 
-// *****************************************************************************
-/* Function:
+/*******************************************************************************
+   Function:
    SYS_ERROR_LEVEL SYS_DEBUG_ErrorLevelGet(void)
 
   Summary:
@@ -339,12 +296,11 @@ void SYS_DEBUG_ErrorLevelSet(SYS_ERROR_LEVEL level);
 
   Remarks:
     None.
-*/
-
+*******************************************************************************/
 SYS_ERROR_LEVEL SYS_DEBUG_ErrorLevelGet(void);
 
-// *****************************************************************************
-/* Function:
+/*******************************************************************************
+Function:
    bool SYS_DEBUG_Redirect(const SYS_MODULE_INDEX index)
 
   Summary:
@@ -375,11 +331,11 @@ SYS_ERROR_LEVEL SYS_DEBUG_ErrorLevelGet(void);
 
   Remarks:
     None.
-*/
+*******************************************************************************/
 bool SYS_DEBUG_Redirect(const SYS_MODULE_INDEX index);
 
-// *****************************************************************************
-/* Function:
+/*******************************************************************************
+Function:
    SYS_MODULE_INDEX SYS_DEBUG_ConsoleInstanceGet(void)
 
   Summary:
@@ -410,14 +366,8 @@ bool SYS_DEBUG_Redirect(const SYS_MODULE_INDEX index);
 */
 SYS_MODULE_INDEX SYS_DEBUG_ConsoleInstanceGet(void);
 
-// *****************************************************************************
-// *****************************************************************************
-// Section: SYS DEBUG Macros
-// *****************************************************************************
-// *****************************************************************************
-
-// *****************************************************************************
-/* Macro:
+/*******************************************************************************
+Macro:
     _SYS_DEBUG_MESSAGE( SYS_ERROR_LEVEL level, const char* message )
 
   Summary:
@@ -451,15 +401,22 @@ SYS_MODULE_INDEX SYS_DEBUG_ConsoleInstanceGet(void);
     function call from the source code. To access and utilize the message,
     define the SYS_DEBUG_USE_CONSOLE macro or override the definition of the
     SYS_DEBUG_MESSAGE macro.
-*/
+*******************************************************************************/
 #ifdef SYS_DEBUG_USE_CONSOLE
 #ifndef SYS_DEBUG_MESSAGE
-    #define SYS_DEBUG_MESSAGE(level, message)  do { if((level) <= SYS_DEBUG_ErrorLevelGet()) SYS_CONSOLE_Message(SYS_DEBUG_ConsoleInstanceGet(), message); }while(0)
+#define SYS_DEBUG_MESSAGE(level, message)                         \
+    do {                                                          \
+        if ((level) <= SYS_DEBUG_ErrorLevelGet()) {               \
+            SYS_CONSOLE_Message(                                  \
+                SYS_DEBUG_ConsoleInstanceGet(),                   \
+                message);                                         \
+        }                                                         \
+    } while (0)
 #endif
 #endif
 
-// *****************************************************************************
-/* Macro:
+/*******************************************************************************
+Macro:
     _SYS_DEBUG_PRINT( SYS_ERROR_LEVEL level, const char* format, ... )
 
   Summary:
@@ -503,30 +460,36 @@ SYS_MODULE_INDEX SYS_DEBUG_ConsoleInstanceGet(void);
     function call from the source code.  To access and utilize the message,
     define the SYS_DEBUG_USE_CONSOLE macro or override the definition of the
     SYS_DEBUG_PRINT macro.
-*/
+*******************************************************************************/
 #ifdef SYS_DEBUG_USE_CONSOLE
 #ifndef SYS_DEBUG_PRINT
-    #define SYS_DEBUG_PRINT(level, format, ...)    do { if((level) <= SYS_DEBUG_ErrorLevelGet()) SYS_CONSOLE_Print(SYS_DEBUG_ConsoleInstanceGet(), format, ##__VA_ARGS__); } while (0)
+#define SYS_DEBUG_PRINT(level, format, ...)                                  \
+    do {                                                                     \
+        if ((level) <= SYS_DEBUG_ErrorLevelGet()) {                          \
+            SYS_CONSOLE_Print(                                               \
+                SYS_DEBUG_ConsoleInstanceGet(),                              \
+                format, ##__VA_ARGS__);                                      \
+        }                                                                    \
+    } while (0)
 #endif
 #endif
 
-// DOM-IGNORE-BEGIN
-
-// *****************************************************************************
-/*  These definitions support the SYS_DEBUG_USE_CONSOLE build-time configuration
-    option.  Defining SYS_DEBUG_USE_CONSOLE in the system configuration
-    (configuration.h) will map the macros below to the appropriate system
-    console functions.
-*/
-
+/*******************************************************************************
+	These definitions support the SYS_DEBUG_USE_CONSOLE build-time configuration
+	option.  Defining SYS_DEBUG_USE_CONSOLE in the system configuration
+	(configuration.h) will map the macros below to the appropriate system
+	console functions.
+*******************************************************************************/
 #ifdef SYS_DEBUG_USE_CONSOLE
 
 #ifndef SYS_DEBUG_MESSAGE
-    #define SYS_DEBUG_MESSAGE(level, message)   _SYS_DEBUG_MESSAGE(level, message)
+    #define SYS_DEBUG_MESSAGE(level, message)   \
+    	_SYS_DEBUG_MESSAGE(level, message)
 #endif
 
 #ifndef SYS_DEBUG_PRINT
-    #define SYS_DEBUG_PRINT(level, fmt, ...)    _SYS_DEBUG_PRINT(level, fmt, ##__VA_ARGS__)
+    #define SYS_DEBUG_PRINT(level, fmt, ...)    \
+    	_SYS_DEBUG_PRINT(level, fmt, ##__VA_ARGS__)
 #endif
 
 #endif
@@ -539,12 +502,8 @@ SYS_MODULE_INDEX SYS_DEBUG_ConsoleInstanceGet(void);
     #define SYS_CONSOLE_MESSAGE(message)
 #endif
 
-
-// DOM-IGNORE-END
-
-
-// *****************************************************************************
-/* Macro:
+/*******************************************************************************
+Macro:
     SYS_DEBUG_MESSAGE(SYS_ERROR_LEVEL level, const char* message )
 
   Summary:
@@ -584,15 +543,14 @@ SYS_MODULE_INDEX SYS_DEBUG_ConsoleInstanceGet(void);
     This macro can be mapped to the system console service (along with other
     system debug macros) by defining SYS_DEBUG_USE_CONSOLE in the system
     configuration (configuration.h) instead of defining it individually.
-*/
-
+*******************************************************************************/
 #ifndef SYS_DEBUG_MESSAGE
     #define SYS_DEBUG_MESSAGE(level,message)
 #endif
 
 
-// *****************************************************************************
-/* Macro:
+/*******************************************************************************
+Macro:
     SYS_DEBUG_PRINT( SYS_ERROR_LEVEL level, const char* format, ... )
 
   Summary:
@@ -640,15 +598,14 @@ SYS_MODULE_INDEX SYS_DEBUG_ConsoleInstanceGet(void);
     This macro can be mapped to the system console service (along with other
     system debug macros) by defining SYS_DEBUG_USE_CONSOLE in the system
     configuration (configuration.h) instead of defining it individually.
-*/
-
+*******************************************************************************/
 #ifndef SYS_DEBUG_PRINT
     #define SYS_DEBUG_PRINT(level, fmt, ...)
 #endif
 
 
-// *****************************************************************************
-/* Macro:
+/*******************************************************************************
+  Macro:
     SYS_DEBUG_BreakPoint( void )
 
   Summary:
@@ -677,9 +634,7 @@ SYS_MODULE_INDEX SYS_DEBUG_ConsoleInstanceGet(void);
 
   Remarks:
     Compiles out if not built for debugging.
-*/
-
-
+*******************************************************************************/
 #if defined(__DEBUG)
 #define SYS_DEBUG_BreakPoint()  __asm__ volatile (" sdbbp 0")
 #else
@@ -687,15 +642,9 @@ SYS_MODULE_INDEX SYS_DEBUG_ConsoleInstanceGet(void);
 #endif
 
 
-// *****************************************************************************
-// *****************************************************************************
-// Section: SYS DEBUG Deprecated Macros
-// *****************************************************************************
-// *****************************************************************************
-/* Do not use these macros for new development.
-*/
-
-//DOM-IGNORE-BEGIN
+/*****************************************************************************
+	Deprecated macros: do not use for new software.
+******************************************************************************/
 #ifndef SYS_DEBUG
     #define SYS_DEBUG(level,message)    SYS_DEBUG_MESSAGE(level,message)
 #endif
@@ -707,15 +656,5 @@ SYS_MODULE_INDEX SYS_DEBUG_ConsoleInstanceGet(void);
 #ifndef SYS_ERROR_PRINT
     #define SYS_ERROR_PRINT(level,fmt, ...)   SYS_DEBUG_PRINT(level,fmt, ##__VA_ARGS__)
 #endif
-//DOM-IGNORE-END
-
-
-//DOM-IGNORE-BEGIN
-#ifdef __cplusplus
-
-    }
 
 #endif
-//DOM-IGNORE-END
-
-#endif // SYS_DEBUG_H

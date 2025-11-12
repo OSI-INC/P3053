@@ -40,7 +40,12 @@
 #include "definitions.h"
 #include "device.h"
 
-/*** DEVCFG0 ***/
+// In the following "pragma config" directives, we set the value of PIC32MZ
+// internal configuration bits directly, by writing to non-volatile memory.
+// These values will be the values that are deployed after reset, and before our
+// softwarwe starts running.
+
+// DEVCFG0
 #pragma config DEBUG =      OFF
 #pragma config JTAGEN =     OFF
 #pragma config ICESEL =     ICS_PGx2
@@ -57,7 +62,7 @@
 #pragma config EJTAGBEN =   NORMAL
 #pragma config CP =         OFF
 
-/*** DEVCFG1 ***/
+// DEVCFG1
 #pragma config FNOSC =      SPLL
 #pragma config DMTINTV =    WIN_127_128
 #pragma config FSOSCEN =    OFF
@@ -73,7 +78,7 @@
 #pragma config DMTCNT =     DMT31
 #pragma config FDMTEN =     OFF
 
-/*** DEVCFG2 ***/
+// DEVCFG2
 #pragma config FPLLIDIV =   DIV_1
 #pragma config FPLLRNG =    RANGE_5_10_MHZ
 #pragma config FPLLICLK =   PLL_FRC
@@ -81,7 +86,7 @@
 #pragma config FPLLODIV =   DIV_2
 #pragma config UPLLFSEL =   FREQ_24MHZ
 
-/*** DEVCFG3 ***/
+// DEVCFG3
 #pragma config USERID =     0xffff
 #pragma config FMIIEN =     OFF
 #pragma config FETHIO =     ON
@@ -90,20 +95,28 @@
 #pragma config IOL1WAY =    ON
 #pragma config FUSBIDIO =   ON
 
-/*** BF1SEQ0 ***/
+// BF1SEQ0
 #pragma config TSEQ =       0xffff
 #pragma config CSEQ =       0x0
 
-/* Forward declaration of MAC initialization data */
+// Forward declaration of MAC initialization data
 const TCPIP_MODULE_MAC_PIC32INT_CONFIG tcpipMACPIC32INTInitData;
 
-/* Forward declaration of MIIM 0 initialization data */
+// Forward declaration of MIIM 0 initialization data
 static const DRV_MIIM_INIT drvMiimInitData_0;
 
-/* Forward declaration of PHY initialization data */
+// Forward declaration of PHY initialization data
 const DRV_ETHPHY_INIT tcpipPhyInitData_LAN8740;
 
-
+// The global system object is a set of unsigned integers, each dedicated to a
+// system process. Example processes are: sysTime, sysConsole0, tcpip,
+// drvMiim_0, and sysDebug. These processes all have access to the sysObj
+// declared below. They will store a value in their own sysObj integer field.
+// This value might be a pointer to a data block, it might be an index to an
+// array, or it could be a set of flags that describe fully the state of the
+// process. Routines that provide information about the process will take as one
+// of their agruments the value of this dedicated integer and use the integer to
+// provide their result or perform their operations.
 SYSTEM_OBJECTS sysObj;
 
 const TCPIP_MODULE_MAC_PIC32INT_CONFIG tcpipMACPIC32INTInitData =
@@ -211,7 +224,7 @@ const size_t TCPIP_HOSTS_CONFIGURATION_SIZE =
 
 const TCPIP_STACK_MODULE_CONFIG TCPIP_STACK_MODULE_CONFIG_TBL [] =
 {
-    {TCPIP_MODULE_IPV4,             &tcpipIPv4InitData},
+    {TCPIP_MODULE_IPV4,             &tcpipIPv4InitData},            // Pointer to Init Data
     {TCPIP_MODULE_ICMP,             0},                             // TCPIP_MODULE_ICMP
     {TCPIP_MODULE_ARP,              &tcpipARPInitData},             // TCPIP_MODULE_ARP
     {TCPIP_MODULE_UDP,              &tcpipUDPInitData},             // TCPIP_MODULE_UDP
@@ -219,17 +232,18 @@ const TCPIP_STACK_MODULE_CONFIG TCPIP_STACK_MODULE_CONFIG_TBL [] =
     {TCPIP_MODULE_DHCP_CLIENT,      &tcpipDHCPInitData},            // TCPIP_MODULE_DHCP_CLIENT
     {TCPIP_MODULE_DNS_CLIENT,       &tcpipDNSClientInitData},       // TCPIP_MODULE_DNS_CLIENT
     {TCPIP_MODULE_COMMAND,          0},                             // TCPIP_MODULE_COMMAND,
-    { TCPIP_MODULE_MANAGER,         &tcpipHeapConfig },             // TCPIP_MODULE_MANAGER
+    {TCPIP_MODULE_MANAGER,          &tcpipHeapConfig },             // TCPIP_MODULE_MANAGER
     {TCPIP_MODULE_MAC_PIC32INT,     &tcpipMACPIC32INTInitData},     // TCPIP_MODULE_MAC_PIC32INT
 
 };
-
 const size_t TCPIP_STACK_MODULE_CONFIG_TBL_SIZE = 
-	sizeof (TCPIP_STACK_MODULE_CONFIG_TBL) / sizeof (*TCPIP_STACK_MODULE_CONFIG_TBL);
+	sizeof (TCPIP_STACK_MODULE_CONFIG_TBL) 
+	/ sizeof (*TCPIP_STACK_MODULE_CONFIG_TBL);
 
 
-/*********************************************************************
- * Function:        SYS_MODULE_OBJ TCPIP_STACK_Init()
+/*
+	TCPIP_STACK_Init must be called before we use the TCP/IP stack. It starts
+	initialization and returns a  
  *
  * PreCondition:    None
  *
@@ -251,13 +265,11 @@ const size_t TCPIP_STACK_MODULE_CONFIG_TBL_SIZE =
 SYS_MODULE_OBJ TCPIP_STACK_Init(void)
 {
     TCPIP_STACK_INIT    tcpipInit;
-
     tcpipInit.pNetConf = TCPIP_HOSTS_CONFIGURATION;
     tcpipInit.nNets = TCPIP_HOSTS_CONFIGURATION_SIZE;
     tcpipInit.pModConfig = TCPIP_STACK_MODULE_CONFIG_TBL;
     tcpipInit.nModules = TCPIP_STACK_MODULE_CONFIG_TBL_SIZE;
     tcpipInit.initCback = 0;
-
     return TCPIP_STACK_Initialize(0, &tcpipInit.moduleInit);
 }
 
@@ -341,23 +353,19 @@ static const SYS_DEBUG_INIT debugInit =
 };
 
 /*
-	Memory Access Initialization.
+	Memory Access Initialization. We enable prefetch for instructions and data.
+	We set the flash memory number of access wait states to suit our clock
+	speed. We configure the flash memory error correction code configuration. 
 */
 void MA_Initialize (void)
 {
-	// Prefetch Enable. Enable prefetch for both instructions and data.
 	PRECONbits.PREFEN = 3;
-	
-	// Program Flash Memory Wait States. Choose for 200 MHz.
 	PRECONbits.PFMWS = 3;
-	
-	// Flash Error Correction Code Configuration. Force correction of single-bit
-	// errors, report double-bit errors
 	CFGCONbits.ECCCON = 3;
 }
 
 /*
-	Transmission Control Protocol / Internet Protocol Initialize.
+	Transmission Control Protocol and Internet Protocol (TCP/IP) Initialize.
 */
 void TCPIP_Initialize (void)
 {
@@ -384,8 +392,8 @@ void TCPIP_Initialize (void)
 }
 
 /*
-	Console Initialize. We set up the UART2. We should already have assigned its TX and
-	RX signals to GPIO pins in GPIO_Initialize.
+	Console Initialize. We set up the UART2. We should already have assigned its
+	TX and RX signals to GPIO pins in GPIO_Initialize.
 */
 void CONSOLE_Initialize (void)
 {

@@ -16,7 +16,6 @@
     manage the timing requests supported by the system.
 *******************************************************************************/
 
-//DOM-IGNORE-BEGIN
 /*******************************************************************************
 * Copyright (C) 2018 Microchip Technology Inc. and its subsidiaries.
 *
@@ -39,17 +38,10 @@
 * ANY WAY RELATED TO THIS SOFTWARE WILL NOT EXCEED THE AMOUNT OF FEES, IF ANY,
 * THAT YOU HAVE PAID DIRECTLY TO MICROCHIP FOR THIS SOFTWARE.
 *******************************************************************************/
-//DOM-IGNORE-END
 
 #ifndef SYS_CONSOLE_H
 #define SYS_CONSOLE_H
 
-
-// *****************************************************************************
-// *****************************************************************************
-// Section: Included Files
-// *****************************************************************************
-// *****************************************************************************
 #include <stdint.h>
 #include <stdlib.h>
 #include <stdbool.h>
@@ -59,22 +51,8 @@
 #include "driver/driver.h"
 #include "system/console/src/sys_console_local.h"
 
-// DOM-IGNORE-BEGIN
-#ifdef __cplusplus
-
-    extern "C" {
-
-#endif
-// DOM-IGNORE-END
-
-// *****************************************************************************
-// *****************************************************************************
-// Section: SYS CONSOLE Data Types
-// *****************************************************************************
-// *****************************************************************************
-
-// *****************************************************************************
-/*  Console Standard File Numbers
+/*****************************************************************************
+  Console Standard File Numbers
 
   Summary:
     Standard Input/Output/Error File Number Macros
@@ -84,15 +62,14 @@
     aligned to unistd.h
 
   Remarks:
-    None.
-*/
-/* These are in unistd.h */
+    These values are in unistd.h.
+******************************************************************************/
 #define STDIN_FILENO     0
 #define STDOUT_FILENO    1
 #define STDERR_FILENO    2
 
-// *****************************************************************************
-/*  Console Default Instance Constant
+/*****************************************************************************
+  Console Default Instance Constant
 
   Summary:
     System Console defualt instance
@@ -103,11 +80,11 @@
 
   Remarks:
     None.
-*/
+******************************************************************************/
 #define SYS_CONSOLE_DEFAULT_INSTANCE    0
 
-// *****************************************************************************
-/*  Console Print Constant
+/*****************************************************************************
+  Console Print Constant
 
   Summary:
     Prints formatted message on the default console instance
@@ -118,18 +95,18 @@
 
   Remarks:
     None.
-*/
-
-/* MISRA C-2012 Rule 20.5 deviated:2 Deviation record ID -  H3_MISRAC_2012_R_20_5_DR_1 */
+******************************************************************************/
 #ifdef SYS_CONSOLE_PRINT
     #undef SYS_CONSOLE_PRINT
-    #define SYS_CONSOLE_PRINT(fmt, ...)                 SYS_CONSOLE_Print(SYS_CONSOLE_DEFAULT_INSTANCE, fmt, ##__VA_ARGS__)
+    #define SYS_CONSOLE_PRINT(fmt, ...) \
+    	SYS_CONSOLE_Print(SYS_CONSOLE_DEFAULT_INSTANCE, fmt, ##__VA_ARGS__)
 #else
-    #define SYS_CONSOLE_PRINT(fmt, ...)                 SYS_CONSOLE_Print(SYS_CONSOLE_DEFAULT_INSTANCE, fmt, ##__VA_ARGS__)
+    #define SYS_CONSOLE_PRINT(fmt, ...) \
+    	SYS_CONSOLE_Print(SYS_CONSOLE_DEFAULT_INSTANCE, fmt, ##__VA_ARGS__)
 #endif
 
-// *****************************************************************************
-/*  Console Message Constant
+/*****************************************************************************
+  Console Message Constant
 
   Summary:
     Prints message on the default console instance
@@ -140,18 +117,18 @@
 
   Remarks:
     None.
-*/
+******************************************************************************/
 #ifdef SYS_CONSOLE_MESSAGE
     #undef SYS_CONSOLE_MESSAGE
-    #define SYS_CONSOLE_MESSAGE(message)                SYS_CONSOLE_Message(SYS_CONSOLE_DEFAULT_INSTANCE, message)
+    #define SYS_CONSOLE_MESSAGE(message) \
+    	SYS_CONSOLE_Message(SYS_CONSOLE_DEFAULT_INSTANCE, message)
 #else
-    #define SYS_CONSOLE_MESSAGE(message)                SYS_CONSOLE_Message(SYS_CONSOLE_DEFAULT_INSTANCE, message)
+    #define SYS_CONSOLE_MESSAGE(message) \
+    	SYS_CONSOLE_Message(SYS_CONSOLE_DEFAULT_INSTANCE, message)
 #endif
 
-/* MISRAC 2012 deviation block end */
-
-// *****************************************************************************
-/*  Console Status enumeration
+/*****************************************************************************
+  Console Status enumeration
 
   Summary:
     System Console Status.
@@ -161,21 +138,17 @@
 
   Remarks:
     None.
-*/
+******************************************************************************/
 typedef enum
 {
     SYS_CONSOLE_STATUS_NOT_CONFIGURED,
-
     SYS_CONSOLE_STATUS_CONFIGURED,
-
     SYS_CONSOLE_STATUS_BUSY,
-
     SYS_CONSOLE_STATUS_ERROR
-
 } SYS_CONSOLE_STATUS;
 
-// *****************************************************************************
-/*  Console device enumeration
+/*****************************************************************************
+  Console device enumeration
 
   Summary:
     Lists the available console devices.
@@ -187,7 +160,7 @@ typedef enum
 
   Remarks:
     None.
-*/
+******************************************************************************/
 typedef enum
 {
     SYS_CONSOLE_DEV_USART,
@@ -198,8 +171,8 @@ typedef enum
 
 } SYS_CONSOLE_DEVICE;
 
-// *****************************************************************************
-/* Console System Service Instance Handle
+/*****************************************************************************
+  Console System Service Instance Handle
 
   Summary:
     Handle to an instance of the console system service.
@@ -212,12 +185,11 @@ typedef enum
     (much like a void *).  Do not make any assumptions about base type as it
     may change in the future or about the value stored in a variable of this
     type.
-*/
-
+******************************************************************************/
 typedef uintptr_t SYS_CONSOLE_HANDLE;
 
-// *****************************************************************************
-/* Console System Service Handle Invalid
+/*****************************************************************************
+  Console System Service Handle Invalid
 
   Summary:
     Invalid console handle
@@ -228,14 +200,11 @@ typedef uintptr_t SYS_CONSOLE_HANDLE;
   Remarks:
     Do not rely on the actual value of this constant.  It may change in future
     implementations.
-*/
-
+******************************************************************************/
 #define SYS_CONSOLE_HANDLE_INVALID      ((SYS_CONSOLE_HANDLE) -1 )
 
-// DOM-IGNORE-BEGIN
-
-// *****************************************************************************
-/*  Console device descriptor function prototypes
+/*****************************************************************************
+  Console device descriptor function prototypes
 
   Summary:
     Function prototype for the device descriptor expected by the system console.
@@ -246,30 +215,20 @@ typedef uintptr_t SYS_CONSOLE_HANDLE;
 
   Remarks:
     None.
-*/
-
+******************************************************************************/
 typedef void (*SYS_CONSOLE_INIT_FPTR) (uint32_t index, const void* initData);
-
 typedef ssize_t (*SYS_CONSOLE_READ_FPTR) (uint32_t index, void* buf, size_t count);
-
 typedef ssize_t (*SYS_CONSOLE_READ_FREE_BUFF_COUNT_GET_FPTR) (uint32_t index);
-
 typedef ssize_t (*SYS_CONSOLE_READ_COUNT_GET_FPTR) (uint32_t index);
-
 typedef ssize_t (*SYS_CONSOLE_WRITE_FPTR) (uint32_t index, const void* buf, size_t count);
-
 typedef ssize_t (*SYS_CONSOLE_WRITE_FREE_BUFF_COUNT_GET_FPTR) (uint32_t index);
-
 typedef ssize_t (*SYS_CONSOLE_WRITE_COUNT_GET_FPTR) (uint32_t index);
-
 typedef void (*SYS_CONSOLE_TASK_FPTR) (uint32_t index, SYS_MODULE_OBJ object);
-
 typedef SYS_CONSOLE_STATUS (*SYS_CONSOLE_STATUS_FPTR) (uint32_t index);
-
 typedef bool (*SYS_CONSOLE_FLUSH_FPTR) (uint32_t index);
 
-// *****************************************************************************
-/*  Console device descriptor
+/*****************************************************************************
+  Console device descriptor
 
   Summary:
     The console device must provide the implementation for the APIs described in
@@ -282,37 +241,25 @@ typedef bool (*SYS_CONSOLE_FLUSH_FPTR) (uint32_t index);
 
   Remarks:
     None.
-*/
+******************************************************************************/
 typedef struct
 {
     SYS_CONSOLE_DEVICE consoleDevice;
-
     DRV_IO_INTENT intent;
-
     SYS_CONSOLE_INIT_FPTR init;
-
     SYS_CONSOLE_READ_FPTR read_t;
-
     SYS_CONSOLE_READ_COUNT_GET_FPTR readCountGet;
-
     SYS_CONSOLE_READ_FREE_BUFF_COUNT_GET_FPTR readFreeBufferCountGet;
-
     SYS_CONSOLE_WRITE_FPTR write_t;
-
     SYS_CONSOLE_WRITE_COUNT_GET_FPTR writeCountGet;
-
     SYS_CONSOLE_WRITE_FREE_BUFF_COUNT_GET_FPTR writeFreeBufferCountGet;
-
     SYS_CONSOLE_TASK_FPTR task;
-
     SYS_CONSOLE_STATUS_FPTR status;
-
     SYS_CONSOLE_FLUSH_FPTR flush;
-
 } SYS_CONSOLE_DEV_DESC;
 
-// *****************************************************************************
-/* SYS CONSOLE OBJECT INSTANCE structure
+/*****************************************************************************
+  SYS CONSOLE OBJECT INSTANCE structure
 
   Summary
     System Console object instance structure.
@@ -322,23 +269,17 @@ typedef struct
 
   Remarks:
     None.
-*/
-
+******************************************************************************/
 typedef struct
 {
-    /* State of this instance */
     SYS_STATUS status;
-
     const SYS_CONSOLE_DEV_DESC* devDesc;
-
     CONSOLE_DEVICE_INDEX devIndex;
-
 } SYS_CONSOLE_OBJECT_INSTANCE;
 
 
-// *****************************************************************************
-//
-/* SYS Console Initialize structure
+/*******************************************************************************
+  SYS Console Initialize structure
 
   Summary:
     Identifies the system console initialize structure.
@@ -348,32 +289,18 @@ typedef struct
 
   Remarks:
     None.
-*/
-
+******************************************************************************/
 typedef struct
 {
-    /* Initialization data for the underlying device */
     const void* deviceInitData;
-
     const SYS_CONSOLE_DEV_DESC* consDevDesc;
-
     uint32_t deviceIndex;
-
 } SYS_CONSOLE_INIT;
-
-// DOM-IGNORE-END
-
-// *****************************************************************************
-// *****************************************************************************
-// Section: SYS CONSOLE CONTROL Routines
-// *****************************************************************************
-// *****************************************************************************
-
 
 extern const SYS_CONSOLE_DEV_DESC sysConsoleUARTDevDesc;
 
-// *****************************************************************************
-/* Function:
+/*****************************************************************************
+  Function:
     SYS_MODULE_OBJ SYS_CONSOLE_Initialize(
         const SYS_MODULE_INDEX index,
         const SYS_MODULE_INIT* const init
@@ -423,15 +350,14 @@ extern const SYS_CONSOLE_DEV_DESC sysConsoleUARTDevDesc;
 
   Remarks:
     This routine should only be called once during system initialization.
-*/
-
+******************************************************************************/
 SYS_MODULE_OBJ SYS_CONSOLE_Initialize(
     const SYS_MODULE_INDEX index,
     const SYS_MODULE_INIT* const init
 );
 
-// *****************************************************************************
-/* Function:
+/*****************************************************************************
+  Function:
     void SYS_CONSOLE_Tasks ( SYS_MODULE_OBJ object )
 
   Summary:
@@ -465,12 +391,11 @@ SYS_MODULE_OBJ SYS_CONSOLE_Initialize(
     This function is normally not called directly by an application.  It is
     called by the system's Tasks routine (SYS_Tasks) or by the appropriate raw
     ISR.
-*/
-
+******************************************************************************/
 void SYS_CONSOLE_Tasks ( SYS_MODULE_OBJ object );
 
-// *****************************************************************************
-/* Function:
+/*****************************************************************************
+  Function:
     SYS_STATUS SYS_CONSOLE_Status ( SYS_MODULE_OBJ object )
 
   Summary:
@@ -517,12 +442,11 @@ void SYS_CONSOLE_Tasks ( SYS_MODULE_OBJ object );
   Remarks:
     Application must ensure that the SYS_CONSOLE_Status returns SYS_STATUS_READY
     before performing console read/write.
-*/
-
+******************************************************************************/
 SYS_STATUS SYS_CONSOLE_Status( SYS_MODULE_OBJ object );
 
-// *****************************************************************************
-/* Function:
+/*****************************************************************************
+  Function:
     SYS_CONSOLE_HANDLE SYS_CONSOLE_HandleGet( const SYS_MODULE_INDEX index)
 
   Summary:
@@ -554,11 +478,11 @@ SYS_STATUS SYS_CONSOLE_Status( SYS_MODULE_OBJ object );
 
   Remarks:
     None.
-*/
+******************************************************************************/
 SYS_CONSOLE_HANDLE SYS_CONSOLE_HandleGet( const SYS_MODULE_INDEX index);
 
-// *****************************************************************************
-/* Function:
+/*****************************************************************************
+  Function:
     SYS_CONSOLE_DEVICE SYS_CONSOLE_DeviceGet( const SYS_CONSOLE_HANDLE handle)
 
   Summary:
@@ -588,11 +512,11 @@ SYS_CONSOLE_HANDLE SYS_CONSOLE_HandleGet( const SYS_MODULE_INDEX index);
 
   Remarks:
     None.
-*/
+******************************************************************************/
 SYS_CONSOLE_DEVICE SYS_CONSOLE_DeviceGet( const SYS_CONSOLE_HANDLE handle);
 
-// *****************************************************************************
-/* Function:
+/*****************************************************************************
+  Function:
     ssize_t SYS_CONSOLE_Read(
         const SYS_CONSOLE_HANDLE handle,
         void* buf,
@@ -643,12 +567,11 @@ SYS_CONSOLE_DEVICE SYS_CONSOLE_DeviceGet( const SYS_CONSOLE_HANDLE handle);
 
   Remarks:
     None
-*/
-
+******************************************************************************/
 ssize_t SYS_CONSOLE_Read( const SYS_CONSOLE_HANDLE handle, void* buf, size_t count );
 
-// *****************************************************************************
-/* Function:
+/*****************************************************************************
+  Function:
     ssize_t SYS_CONSOLE_Write(
         const SYS_CONSOLE_HANDLE handle,
         const void* buf,
@@ -696,12 +619,11 @@ ssize_t SYS_CONSOLE_Read( const SYS_CONSOLE_HANDLE handle, void* buf, size_t cou
   Remarks:
     Application may check the free space available in the transmit buffer by
     calling the SYS_CONSOLE_WriteFreeBufferCountGet() API.
-*/
-
+******************************************************************************/
 ssize_t SYS_CONSOLE_Write( const SYS_CONSOLE_HANDLE handle, const void* buf, size_t count );
 
-// *****************************************************************************
-/* Function:
+/*****************************************************************************
+  Function:
     bool SYS_CONSOLE_Flush(const SYS_CONSOLE_HANDLE handle)
 
   Summary:
@@ -736,12 +658,11 @@ ssize_t SYS_CONSOLE_Write( const SYS_CONSOLE_HANDLE handle, const void* buf, siz
 
   Remarks:
     This API may do nothing and return true, where the read and write are not buffered.
-*/
-
+******************************************************************************/
 bool SYS_CONSOLE_Flush(const SYS_CONSOLE_HANDLE handle);
 
-// *****************************************************************************
-/* Function:
+/*****************************************************************************
+  Function:
     ssize_t SYS_CONSOLE_ReadFreeBufferCountGet(const SYS_CONSOLE_HANDLE handle)
 
   Summary:
@@ -777,12 +698,11 @@ bool SYS_CONSOLE_Flush(const SYS_CONSOLE_HANDLE handle);
 
   Remarks:
     None.
-*/
-
+******************************************************************************/
 ssize_t SYS_CONSOLE_ReadFreeBufferCountGet(const SYS_CONSOLE_HANDLE handle);
 
-// *****************************************************************************
-/* Function:
+/*****************************************************************************
+  Function:
     ssize_t SYS_CONSOLE_ReadCountGet(const SYS_CONSOLE_HANDLE handle)
 
   Summary:
@@ -820,12 +740,11 @@ ssize_t SYS_CONSOLE_ReadFreeBufferCountGet(const SYS_CONSOLE_HANDLE handle);
 
   Remarks:
     None.
-*/
-
+******************************************************************************/
 ssize_t SYS_CONSOLE_ReadCountGet(const SYS_CONSOLE_HANDLE handle);
 
-// *****************************************************************************
-/* Function:
+/*****************************************************************************
+  Function:
     ssize_t SYS_CONSOLE_WriteFreeBufferCountGet(const SYS_CONSOLE_HANDLE handle)
 
   Summary:
@@ -864,11 +783,11 @@ ssize_t SYS_CONSOLE_ReadCountGet(const SYS_CONSOLE_HANDLE handle);
 
   Remarks:
     None.
-*/
+******************************************************************************/
 ssize_t SYS_CONSOLE_WriteFreeBufferCountGet(const SYS_CONSOLE_HANDLE handle);
 
-// *****************************************************************************
-/* Function:
+/*****************************************************************************
+  Function:
     ssize_t SYS_CONSOLE_WriteCountGet(const SYS_CONSOLE_HANDLE handle)
 
   Summary:
@@ -908,11 +827,11 @@ ssize_t SYS_CONSOLE_WriteFreeBufferCountGet(const SYS_CONSOLE_HANDLE handle);
 
   Remarks:
     None.
-*/
+******************************************************************************/
 ssize_t SYS_CONSOLE_WriteCountGet(const SYS_CONSOLE_HANDLE handle);
 
-// *****************************************************************************
-/* Function:
+/*****************************************************************************
+  Function:
     void SYS_CONSOLE_Print(const SYS_CONSOLE_HANDLE handle, const char *format, ...)
 
   Summary:
@@ -953,12 +872,11 @@ ssize_t SYS_CONSOLE_WriteCountGet(const SYS_CONSOLE_HANDLE handle);
   Remarks:
     The format string and arguments follow the printf convention.
     Call SYS_CONSOLE_PRINT macro to print on the default console instance 0
-*/
-
+******************************************************************************/
 void SYS_CONSOLE_Print(const SYS_CONSOLE_HANDLE handle, const char *format, ...);
 
-// *****************************************************************************
-/* Function:
+/*****************************************************************************
+  Function:
     void SYS_CONSOLE_Message(const SYS_CONSOLE_HANDLE handle, const char *message)
 
   Summary:
@@ -992,17 +910,7 @@ void SYS_CONSOLE_Print(const SYS_CONSOLE_HANDLE handle, const char *format, ...)
 
   Remarks:
     Call SYS_CONSOLE_MESSAGE macro to print on the default console instance 0
-*/
+******************************************************************************/
 void SYS_CONSOLE_Message(const SYS_CONSOLE_HANDLE handle, const char *message);
 
-// DOM-IGNORE-BEGIN
-#ifdef __cplusplus
-}
 #endif
-// DOM-IGNORE-END
-
-#endif //SYS_CONSOLE_H
-
-/*******************************************************************************
- End of File
-*/
