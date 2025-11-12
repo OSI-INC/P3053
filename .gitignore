@@ -1,3 +1,4 @@
 /**/.DS_Store
-/dist
-/build
+/build/src
+/build/production.map
+/build/production.elf
