@@ -55,7 +55,6 @@ typedef struct
 } APP_DATA;
 APP_DATA appData;
 
-
 /*
 	General-Purpose Input-Output Initialization.
 */

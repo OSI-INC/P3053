@@ -17,6 +17,7 @@
     None.
  *******************************************************************************/
 
+//DOM-IGNORE-BEGIN
 /*******************************************************************************
 * Copyright (C) 2018 Microchip Technology Inc. and its subsidiaries.
 *
@@ -39,15 +40,28 @@
 * ANY WAY RELATED TO THIS SOFTWARE WILL NOT EXCEED THE AMOUNT OF FEES, IF ANY,
 * THAT YOU HAVE PAID DIRECTLY TO MICROCHIP FOR THIS SOFTWARE.
  *******************************************************************************/
+//DOM-IGNORE-END
 
 #ifndef SYSTEM_MODULE_H
 #define SYSTEM_MODULE_H
 
+
+// *****************************************************************************
+// *****************************************************************************
+// Section: Included Files
+// *****************************************************************************
+// *****************************************************************************
+
 #include "system_common.h"
 
 
-/******************************************************************************
-  System Module Index
+#ifdef __cplusplus
+    extern "C" {
+#endif
+
+
+// *****************************************************************************
+/* System Module Index
 
   Summary:
     Identifies which instance of a system module should be initialized or opened.
@@ -59,12 +73,13 @@
   Remarks:
     Each individual module will usually define macro names for the index values
     it supports (e.g., DRV_TMR_INDEX_1, DRV_TMR_INDEX_2, ...).
-*******************************************************************************/
+*/
+
 typedef unsigned short int SYS_MODULE_INDEX;
 
 
-/******************************************************************************
-  System Module Object
+// *****************************************************************************
+/* System Module Object
 
   Summary:
     Handle to an instance of a system module.
@@ -78,12 +93,13 @@ typedef unsigned short int SYS_MODULE_INDEX;
     (much like a void *).  Do not make any assumptions about base type as it
     may change in the future or about the value stored in a variable of this
     type.
-*******************************************************************************/
+*/
+
 typedef uintptr_t SYS_MODULE_OBJ;
 
 
-/******************************************************************************
-  System Module Object Invalid
+// *****************************************************************************
+/* System Module Object Invalid
 
   Summary:
     Object handle value returned if unable to initialize the requested instance
@@ -96,12 +112,13 @@ typedef uintptr_t SYS_MODULE_OBJ;
   Remarks:
     Do not rely on the actual value of this constant.  It may change in future
     implementations.
-*******************************************************************************/
+*/
+
 #define SYS_MODULE_OBJ_INVALID      ((SYS_MODULE_OBJ) -1 )
 
 
-/******************************************************************************
-  System Module Object Static
+// *****************************************************************************
+/* System Module Object Static
 
   Summary:
     Object handle value returned by static modules.
@@ -112,12 +129,13 @@ typedef uintptr_t SYS_MODULE_OBJ;
   Remarks:
     Do not rely on the actual value of this constant.  It may change in future
     implementations.
-*******************************************************************************/
+*/
+
 #define SYS_MODULE_OBJ_STATIC       ((SYS_MODULE_OBJ) 0 )
 
 
-/******************************************************************************
-  System Module Status
+// *****************************************************************************
+/* System Module Status
 
   Summary:
     Identifies the current status/state of a system module (including device
@@ -130,7 +148,8 @@ typedef uintptr_t SYS_MODULE_OBJ;
   Remarks:
     This enumeration is the return type for the system-level status routine
     defined by each device driver or system module (for example, DRV_I2C_Status).
-*******************************************************************************/
+*/
+
 typedef enum
 {
     // Indicates that a non-system defined error has occurred.  The caller
@@ -155,36 +174,50 @@ typedef enum
     // The caller must call the extended status routine for the module in
     // question to identify the state.
     SYS_STATUS_READY_EXTENDED   = 10
+
 } SYS_STATUS;
 
 
-/******************************************************************************
-  System Module Init
+// *****************************************************************************
+/* System Module Init
 
   Summary:
-    A structure used in the initialization of a module, such as a device driver,
-    as requested by the system.
+    Initializes a module (including device drivers) as requested by the system.
 
   Description:
-    This structure provides the necessary data to initialize or reinitialize a
-    module (including device drivers). The structure can be extended in a module
-    specific way as to carry module specific initialization data.
+    This structure provides the necessary data to initialize or reinitialize
+    a module (including device drivers).
+    The structure can be extended in a module specific way as to carry
+    module specific initialization data.
 
   Remarks:
     This structure is used in the device driver routines DRV_<module>_Initialize
     and DRV_<module>_Reinitialize that are defined by each device driver.
-*******************************************************************************/
+
+*/
+/* MISRA C-2012 Rule 6.1 deviated:1 Deviation record ID -  H3_MISRAC_2012_R_6_1_DR_1 */
+
 typedef union
 {
     uint8_t         value;
+
     struct
     {
+        // Module-definable field, module-specific usage
         uint8_t     reserved    : 4;
-    } sys;
+    }sys;
+
 } SYS_MODULE_INIT;
 
-/******************************************************************************
-  System Module Initialization Routine Pointer
+/* MISRAC 2012 deviation block end */
+// *****************************************************************************
+// *****************************************************************************
+// Section:  Pointers to System Module Routines
+// *****************************************************************************
+// *****************************************************************************
+
+// *****************************************************************************
+/* System Module Initialization Routine Pointer
 
   Function:
     SYS_MODULE_OBJ (* SYS_MODULE_INITIALIZE_ROUTINE) (
@@ -218,14 +251,15 @@ typedef union
 
   Remarks:
     This function will only be called once during system initialization.
-*******************************************************************************/
-typedef SYS_MODULE_OBJ (* SYS_MODULE_INITIALIZE_ROUTINE) 
-	(const SYS_MODULE_INDEX index,
-	const SYS_MODULE_INIT * const init);
+*/
+
+typedef SYS_MODULE_OBJ (* SYS_MODULE_INITIALIZE_ROUTINE) ( const SYS_MODULE_INDEX index,
+                                                           const SYS_MODULE_INIT * const init );
 
 
-/******************************************************************************
-  System Module Reinitialization Routine Pointer
+
+// *****************************************************************************
+/* System Module Reinitialization Routine Pointer
 
   Function:
     void (* SYS_MODULE_REINITIALIZE_ROUTINE) ( SYS_MODULE_OBJ object,
@@ -267,13 +301,14 @@ typedef SYS_MODULE_OBJ (* SYS_MODULE_INITIALIZE_ROUTINE)
     state has been refreshed.
 
     This function can be called multiple times to reinitialize the module.
-*******************************************************************************/
-typedef void (* SYS_MODULE_REINITIALIZE_ROUTINE) 
-	( SYS_MODULE_OBJ object,
-	const SYS_MODULE_INIT * const init );
+*/
+
+typedef void (* SYS_MODULE_REINITIALIZE_ROUTINE) ( SYS_MODULE_OBJ object,
+                                                   const SYS_MODULE_INIT * const init );
 
 
-/******************************************************************************
+//*************************************************************************
+/*
   Function:
     void (* SYS_MODULE_DEINITIALIZE_ROUTINE) (  SYS_MODULE_OBJ object )
 
@@ -303,13 +338,13 @@ typedef void (* SYS_MODULE_REINITIALIZE_ROUTINE)
   Remarks:
     If the module instance has to be used again, the module's "initialize"
     function must first be called.
-*******************************************************************************/
-typedef void (* SYS_MODULE_DEINITIALIZE_ROUTINE)
-	(SYS_MODULE_OBJ object);
+*/
+
+typedef void (* SYS_MODULE_DEINITIALIZE_ROUTINE) (  SYS_MODULE_OBJ object );
 
 
-/******************************************************************************
-  System Module Status Routine Pointer
+// *****************************************************************************
+/* System Module Status Routine Pointer
 
   Function:
     SYS_STATUS (* SYS_MODULE_STATUS_ROUTINE) (  SYS_MODULE_OBJ object )
@@ -357,13 +392,13 @@ typedef void (* SYS_MODULE_DEINITIALIZE_ROUTINE)
     calling the reinitialize operation. If that fails, the deinitialize
     operation will need to be called, followed by the initialize operation to
     return to normal operations.
-*******************************************************************************/
-typedef SYS_STATUS (* SYS_MODULE_STATUS_ROUTINE)
-	(SYS_MODULE_OBJ object);
+*/
+
+typedef SYS_STATUS (* SYS_MODULE_STATUS_ROUTINE) (  SYS_MODULE_OBJ object );
 
 
-/******************************************************************************
-  System Module Tasks Routine Pointer
+// *****************************************************************************
+/* System Module Tasks Routine Pointer
 
   Function:
     void (* SYS_MODULE_TASKS_ROUTINE) ( SYS_MODULE_OBJ object )
@@ -395,8 +430,17 @@ typedef SYS_STATUS (* SYS_MODULE_STATUS_ROUTINE)
   Remarks:
     If the module is interrupt driven, the system will call this routine from
     an interrupt context.
-*******************************************************************************/
-typedef void (* SYS_MODULE_TASKS_ROUTINE) 
-	(SYS_MODULE_OBJ object);
+*/
 
-#endif 
+typedef void (* SYS_MODULE_TASKS_ROUTINE) ( SYS_MODULE_OBJ object );
+
+
+#ifdef __cplusplus
+    }
+#endif
+
+#endif // SYSTEM_MODULE_H
+
+/*******************************************************************************
+ End of File
+*/
