@@ -340,7 +340,8 @@ static void uart2_send_int(uint32_t value)
 	(PPS). The NVM routine initializes the non-volatile flash memory. The
 	CORETIMER routine we have yet to investigate. The CONSOLE routine sets up
 	UART2 as a console to transmit reporting. The TCPIP routine initializes the
-	TCPIP stack.
+	TCPIP stack. We set our own appData.state to wait for TCP/IP initialization
+	to complete.
 */
 void SYS_Initialize (void* data)
 {
