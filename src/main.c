@@ -411,7 +411,7 @@ void SYS_Initialize (void* data)
 int main ( void )
 {
 	int i;
-	
+
 	// Call the system initialization routine, which is defined above.
 	SYS_Initialize(NULL);
 	

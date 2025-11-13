@@ -103,7 +103,7 @@ static const DRV_MIIM_INIT drvMiimInitData_0;
 /* Forward declaration of PHY initialization data */
 const DRV_ETHPHY_INIT tcpipPhyInitData_LAN8740;
 
-
+/* Global variable that holds handles to the system process data structures. */
 SYSTEM_OBJECTS sysObj;
 
 const TCPIP_MODULE_MAC_PIC32INT_CONFIG tcpipMACPIC32INTInitData =
@@ -228,26 +228,6 @@ const size_t TCPIP_STACK_MODULE_CONFIG_TBL_SIZE =
 	sizeof (TCPIP_STACK_MODULE_CONFIG_TBL) / sizeof (*TCPIP_STACK_MODULE_CONFIG_TBL);
 
 
-/*********************************************************************
- * Function:        SYS_MODULE_OBJ TCPIP_STACK_Init()
- *
- * PreCondition:    None
- *
- * Input:
- *
- * Output:          valid system module object if Stack and its componets are initialized
- *                  SYS_MODULE_OBJ_INVALID otherwise
- *
- * Overview:        The function starts the initialization of the stack.
- *                  If an error occurs, the SYS_ERROR() is called
- *                  and the function de-initialize itself and will return false.
- *
- * Side Effects:    None
- *
- * Note:            This function must be called before any of the
- *                  stack or its component routines are used.
- *
- ********************************************************************/
 SYS_MODULE_OBJ TCPIP_STACK_Init(void)
 {
     TCPIP_STACK_INIT    tcpipInit;
@@ -302,30 +282,6 @@ static const SYS_TIME_INIT sysTimeInitData =
     .hwTimerIntNum = 0,
 };
 
-static const SYS_CONSOLE_UART_PLIB_INTERFACE sysConsole0UARTPlibAPI =
-{
-    .read_t = (SYS_CONSOLE_UART_PLIB_READ)UART2_Read,
-    .readCountGet = (SYS_CONSOLE_UART_PLIB_READ_COUNT_GET)UART2_ReadCountGet,
-    .readFreeBufferCountGet =
-    (SYS_CONSOLE_UART_PLIB_READ_FREE_BUFFFER_COUNT_GET)UART2_ReadFreeBufferCountGet,
-    .write_t = (SYS_CONSOLE_UART_PLIB_WRITE)UART2_Write,
-    .writeCountGet = (SYS_CONSOLE_UART_PLIB_WRITE_COUNT_GET)UART2_WriteCountGet,
-    .writeFreeBufferCountGet =
-    (SYS_CONSOLE_UART_PLIB_WRITE_FREE_BUFFER_COUNT_GET)UART2_WriteFreeBufferCountGet,
-};
-
-static const SYS_CONSOLE_UART_INIT_DATA sysConsole0UARTInitData =
-{
-    .uartPLIB = &sysConsole0UARTPlibAPI,
-};
-
-static const SYS_CONSOLE_INIT sysConsole0Init =
-{
-    .deviceInitData = (const void*)&sysConsole0UARTInitData,
-    .consDevDesc = &sysConsoleUARTDevDesc,
-    .deviceIndex = 0,
-};
-
 const SYS_CMD_INIT sysCmdInit =
 {
     .moduleInit = {0},
@@ -369,16 +325,12 @@ void UTILS_Initialize (void)
 		SYS_TIME_Initialize(
 			SYS_TIME_INDEX_0,
 			(SYS_MODULE_INIT *)&sysTimeInitData);
-	sysObj.sysConsole0 = SYS_CONSOLE_Initialize(
-		SYS_CONSOLE_INDEX_0,
-		(SYS_MODULE_INIT *)&sysConsole0Init);
 	SYS_CMD_Initialize(
 		(SYS_MODULE_INIT*)&sysCmdInit);
 	sysObj.sysDebug = SYS_DEBUG_Initialize(
 		SYS_DEBUG_INDEX_0,
 		(SYS_MODULE_INIT*)&debugInit);
 }
-
 
 /*
 	Initialize the TCP/IP stack.

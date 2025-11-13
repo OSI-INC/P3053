@@ -60,7 +60,6 @@
 #include "driver/miim/drv_miim.h"
 #include "wolfssl/wolfcrypt/port/pic32/crypt_wolfcryptcb.h"
 #include "system/console/sys_console.h"
-#include "system/console/src/sys_console_uart_definitions.h"
 
 // Device Information
 #define DEVICE_NAME			 "PIC32MZ2048EFH100"
@@ -82,7 +81,6 @@ void TCPIP_Initialize (void);
 typedef struct
 {
 	SYS_MODULE_OBJ  sysTime;
-	SYS_MODULE_OBJ  sysConsole0;
 	SYS_MODULE_OBJ  tcpip;
 	SYS_MODULE_OBJ  drvMiim_0;
 	SYS_MODULE_OBJ  sysDebug;
