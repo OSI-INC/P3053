@@ -2,15 +2,15 @@
 # The P3053A Makefile. 
 #
 # This makefile uses GNUMake to compile a hexadecimail programming file from all
-# the source files in the local src directory. If we specify BUILD_MODE equal to
-# "debug", the build produces a debugger "elf" output file. If we do not specify
-# BUILD_MODE, or we specify "production", the build produces a non-debug elf
-# binary and a hexadecimal version of the binary file that we can use to program
-# a PIC microprocessor. We developed the makefile for a PIC32MZ2048EFH100, with
-# TCP/IP and WOLFSSL code for our Embedded Ethernet Module (A3053A), but we
-# trust that the same structure can be used to compile arbitrary projects from
-# the command line for any PIC processor. The build uses an installation of the
-# xc32 compiler, as well as a Harmony3 repository, where it finds the CPU device
+# the source files in the local src directory. The "build" target adds some
+# debugging flags to the compile, assemble, and link. We want to turn on the
+# debugging console for debug builds, but disable it for production builds. The
+# build produces a hex output file we can use to program a PIC32MZ
+# microprocessor. We developed the makefile for a PIC32MZ2048EFH100, with TCP/IP
+# and WOLFSSL code for our Embedded Ethernet Module (A3053A), but we trust that
+# the same structure can be used to compile arbitrary projects from the command
+# line for any PIC processor. The build uses an installation of the xc32
+# compiler, as well as a Harmony3 repository, where it finds the CPU device
 # package.
 #
 # Kevan Hashemi, Open Source Instruments Inc., 2025.

@@ -1,6 +1,6 @@
 /*
-	The Embedded Ethernet Module (EEM) Main Program. 
-	
+	The Embedded Ethernet Module (EEM) Main Program.
+
 	This program implements a LWDAQ server in our A3053 family of EEMs.
 
 	This main program is part of the P3053 repository, which began as a copy of
@@ -11,22 +11,22 @@
 	level source files remain, for the most part, untouched with their Microchip
 	copyright statements intact. We release this program under the GNU General
 	Public License, which is more strict than the Microsoft license.
-	
-	Copyright (C) 2018 Microchip Technology Inc. and its subsidiaries.
-	Copyright (C) 2025, Kevan Hashemi, Open Source Instruments Inc.
-	
-	This program is free software: you can redistribute it and/or modify
-	it under the terms of the GNU General Public License as published by
-	the Free Software Foundation, either version 3 of the License, or (at
-	your option) any later version.
 
-	This program is distributed in the hope that it will be useful, but
-	WITHOUT ANY WARRANTY; without even the implied warranty of
-	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-	General Public License for more details.
+	Copyright (C) 2018 Microchip Technology Inc. and its subsidiaries. Copyright
+	(C) 2025, Kevan Hashemi, Open Source Instruments Inc.
 
-	You should have received a copy of the GNU General Public License
-	along with this program.  If not, see <https://www.gnu.org/licenses/>.
+	This program is free software: you can redistribute it and/or modify it
+	under the terms of the GNU General Public License as published by the Free
+	Software Foundation, either version 3 of the License, or (at your option)
+	any later version.
+
+	This program is distributed in the hope that it will be useful, but WITHOUT
+	ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+	FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+	more details.
+
+	You should have received a copy of the GNU General Public License along with
+	this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
 #include <stdio.h>
@@ -126,77 +126,59 @@ void APP_Tasks ( void )
     switch (appData.state)
     {
         case APP_TCPIP_WAIT_INIT:
+        {
             tcpipStat = TCPIP_STACK_Status(sysObj.tcpip);
-            if (tcpipStat < 0)
-            {   
-            	// Some error occurred
-                SYS_CONSOLE_MESSAGE(" APP: TCP/IP stack initialization failed!\r\n");
+            if (tcpipStat < 0) {   
+                SYS_CONSOLE_MESSAGE("TCP/IP stack initialization failed.\r\n");
                 appData.state = APP_TCPIP_ERROR;
-            }
-            else if(tcpipStat == SYS_STATUS_READY)
-            {
-                // Now that the stack is ready we can check the
-                // available interfaces
+            } else if (tcpipStat == SYS_STATUS_READY) {
                 nNets = TCPIP_STACK_NumberOfNetworksGet();
-                for(i = 0; i < nNets; i++)
-                {
-
+                for(i = 0; i < nNets; i++) {
                     netH = TCPIP_STACK_IndexToNet(i);
                     netName = TCPIP_STACK_NetNameGet(netH);
                     netBiosName = TCPIP_STACK_NetBIOSName(netH);
-
-#if defined(TCPIP_STACK_USE_NBNS)
-                    SYS_CONSOLE_PRINT("    Interface %s on host %s - NBNS enabled\r\n", 
-                    	netName, netBiosName);
-#else
-                    SYS_CONSOLE_PRINT("    Interface %s on host %s - NBNS disabled\r\n", 
-                    	netName, netBiosName);
-#endif 
-                    (void)netName;          // avoid compiler warning 
-                    (void)netBiosName;      // if SYS_CONSOLE_PRINT is null macro
-
+                    SYS_CONSOLE_PRINT(
+                    	"Interface %s on host %s awaiting initialization.\r\n",
+                    	netName,
+                    	netBiosName);
                 }
                 appData.state = APP_TCPIP_WAIT_FOR_IP;
-
             }
-            break;
+        }
+        break;
 
         case APP_TCPIP_WAIT_FOR_IP:
-
-            // If the IP address of an interface has changed
-            // display the new value on the system console.
+        {
             nNets = TCPIP_STACK_NumberOfNetworksGet();
-
-            for (i = 0; i < nNets; i++)
-            {
+            for (i = 0; i < nNets; i++) {
                 netH = TCPIP_STACK_IndexToNet(i);
-                if(!TCPIP_STACK_NetIsReady(netH))
-                {
+                if(!TCPIP_STACK_NetIsReady(netH)) {
                     return;
                 }
                 ipAddr.Val = TCPIP_STACK_NetAddress(netH);
-                if (dwLastIP[i].Val != ipAddr.Val)
-                {
+                if (dwLastIP[i].Val != ipAddr.Val) {
                     dwLastIP[i].Val = ipAddr.Val;
-
-                    SYS_CONSOLE_MESSAGE(TCPIP_STACK_NetNameGet(netH));
-                    SYS_CONSOLE_MESSAGE(" IP Address: ");
-                    SYS_CONSOLE_PRINT("%d.%d.%d.%d \r\n", ipAddr.v[0], 
-                    	ipAddr.v[1], ipAddr.v[2], ipAddr.v[3]);
+                     SYS_CONSOLE_PRINT(
+                    	"Interface %s assigned IP address %d.%d.%d.%d.\r\n", 
+                    	TCPIP_STACK_NetNameGet(netH),
+                    	ipAddr.v[0], 
+                    	ipAddr.v[1],
+                    	ipAddr.v[2],
+                    	ipAddr.v[3]);
                 }
                 appData.state = APP_TCPIP_OPENING_SERVER;
             }
-            break;
+        }
+        break;
             
         case APP_TCPIP_OPENING_SERVER:
         {
-            SYS_CONSOLE_PRINT("Waiting for Client Connection on port: %d\r\n",
+            SYS_CONSOLE_PRINT("Waiting for connection on port %d.\r\n",
             	TCPIP_SERVER_PORT);
             appData.socket = TCPIP_TCP_ServerOpen(IP_ADDRESS_TYPE_IPV4, 
             	TCPIP_SERVER_PORT, 0);
-            if (appData.socket == INVALID_SOCKET)
-            {
-                SYS_CONSOLE_MESSAGE("Couldn't open server socket\r\n");
+            if (appData.socket == INVALID_SOCKET) {
+                SYS_CONSOLE_MESSAGE("Could not open server socket.\r\n");
                 break;
             }
             appData.state = APP_TCPIP_WAIT_FOR_CONNECTION;
@@ -205,14 +187,11 @@ void APP_Tasks ( void )
 
         case APP_TCPIP_WAIT_FOR_CONNECTION:
         {
-            if (!TCPIP_TCP_IsConnected(appData.socket))
-            {
+            if (!TCPIP_TCP_IsConnected(appData.socket)) {
                 return;
-            }
-            else
-            {
+            } else {
                 appData.state = APP_TCPIP_SERVING_CONNECTION;
-                SYS_CONSOLE_MESSAGE("Received a connection\r\n");
+                SYS_CONSOLE_MESSAGE("Received connection.\r\n");
             }
         }
         break;
@@ -220,10 +199,9 @@ void APP_Tasks ( void )
         case APP_TCPIP_SERVING_CONNECTION:
         {
             if (!TCPIP_TCP_IsConnected(appData.socket) 
-            	|| TCPIP_TCP_WasDisconnected(appData.socket))
-            {
+            	|| TCPIP_TCP_WasDisconnected(appData.socket)) {
                 appData.state = APP_TCPIP_CLOSING_CONNECTION;
-                SYS_CONSOLE_MESSAGE("Connection was closed\r\n");
+                SYS_CONSOLE_MESSAGE("Connection closed.\r\n");
                 break;
             }
             int16_t wMaxGet, wMaxPut, wCurrentChunk;
@@ -244,8 +222,7 @@ void APP_Tasks ( void )
             // memory usage while maximizing performance.  Single byte Gets and
             // Puts are a lot slower than multibyte GetArrays and PutArrays.
             wCurrentChunk = sizeof(AppBuffer) -1;
-            for (w = 0; w < wMaxGet; w += sizeof(AppBuffer) - 1)
-            {
+            for (w = 0; w < wMaxGet; w += sizeof(AppBuffer) - 1) {
 				// Make sure the last chunk, which will likely be smaller than
 				// sizeof(AppBuffer), is treated correctly.
 				if (w + sizeof(AppBuffer) - 1 > wMaxGet) wCurrentChunk = wMaxGet - w;
@@ -255,20 +232,18 @@ void APP_Tasks ( void )
                 TCPIP_TCP_ArrayGet(appData.socket, AppBuffer, wCurrentChunk);
 
                 // Perform the "ToUpper" operation on each data byte
-                for (w2 = 0; w2 < wCurrentChunk; w2++)
-                {
+                for (w2 = 0; w2 < wCurrentChunk; w2++) {
                     i = AppBuffer[w2];
-                    if (i == '\x1b')   // escape
-                    {
+                    if (i == '\x1b') {
                         appData.state = APP_TCPIP_CLOSING_CONNECTION;
-                        SYS_CONSOLE_MESSAGE("Connection was closed\r\n");
+                        SYS_CONSOLE_MESSAGE("Connection closed.\r\n");
                     }
                 }
                 AppBuffer[w2] = 0;  // end the console string properly
 
                 // Transfer the data out of our local processing buffer and into
                 // the TCP TX FIFO.
-                SYS_CONSOLE_PRINT("Server Sending %s\r\n", AppBuffer);
+                SYS_CONSOLE_PRINT("Transmit: %s\r\n", AppBuffer);
                 TCPIP_TCP_ArrayPut(appData.socket, AppBuffer, wCurrentChunk);
 
                 // No need to perform any flush. TCP data in TX FIFO will
@@ -279,14 +254,15 @@ void APP_Tasks ( void )
             }
         }
         break;
+        
         case APP_TCPIP_CLOSING_CONNECTION:
         {
-            // Close the socket connection.
             TCPIP_TCP_Close(appData.socket);
             appData.socket = INVALID_SOCKET;
             appData.state = APP_TCPIP_WAIT_FOR_IP;
         }
         break;
+        
         default:
         break;
     }
@@ -363,7 +339,10 @@ int main ( void )
 	
 	// Call the system initialization routine.
 	SYS_Initialize(NULL);
-	
+	SYS_CONSOLE_MESSAGE("\r\n");
+	SYS_CONSOLE_MESSAGE("===================================================\r\n");
+	SYS_CONSOLE_MESSAGE("System initialization routine has completed.\r\n");
+
 	// Turn on the red and green lamps.
    	GPIO_PortSet(GPIO_PORT_A,0x00000004);
    	GPIO_PortSet(GPIO_PORT_C,0x00008000);
