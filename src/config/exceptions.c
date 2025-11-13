@@ -40,7 +40,6 @@
 *******************************************************************************/
 
 #include "configuration.h"
-#include "device.h"
 #include "definitions.h"
 #include <stdio.h>
 

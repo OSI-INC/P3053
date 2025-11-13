@@ -44,7 +44,9 @@
 #ifndef CONFIGURATION_H
 #define CONFIGURATION_H
 
-#include "device.h"
+#include <xc.h>
+#include <sys/attribs.h>
+#include "toolchain_specifics.h"
 
 /* TIME System Service Configuration Options */
 #define SYS_TIME_INDEX_0                            (0)

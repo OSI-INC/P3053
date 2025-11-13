@@ -1,7 +1,17 @@
+/*
+	sys_console.h declares the SYS_CONSOLE_* routines that are called by
+	Harmony's debug reporting system. We have deleted the sys_console.c file and
+	all the Harmony sys_console source files. We provide the SYS_CONSOLE_*
+	routines in our own higher-level source file, so the routines listed below
+	will be resolved at link-time.
+	
+	[13-NOV-25] Kevan Hashemi, Open Source Instruments Inc.
+*/
+
 #ifndef SYS_CONSOLE_H
 #define SYS_CONSOLE_H
 
-#include "system/system_module.h"
+#include "config/system/system_module.h"
 
 typedef struct
 {

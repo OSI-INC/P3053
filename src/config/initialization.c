@@ -38,7 +38,6 @@
 
 #include "configuration.h"
 #include "definitions.h"
-#include "device.h"
 
 /*** DEVCFG0 ***/
 #pragma config DEBUG =      OFF
@@ -297,18 +296,15 @@ static const SYS_DEBUG_INIT debugInit =
 };
 
 /*
-	Memory Access Initialization.
+	Memory Access Initialization. We enable pre-fetch for both instructions and
+	data. We set the number of program flash memory wait states to a value
+	suited to our clock frequency. We configure flash memory error correction to
+	force correction of single-bit errors and report double-bit errors.
 */
-void MA_Initialize (void)
+void ACCESS_Initialize (void)
 {
-	// Prefetch Enable. Enable prefetch for both instructions and data.
 	PRECONbits.PREFEN = 3;
-	
-	// Program Flash Memory Wait States. Choose for 200 MHz.
 	PRECONbits.PFMWS = 3;
-	
-	// Flash Error Correction Code Configuration. Force correction of single-bit
-	// errors, report double-bit errors
 	CFGCONbits.ECCCON = 3;
 }
 

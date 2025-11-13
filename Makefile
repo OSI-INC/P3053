@@ -95,6 +95,7 @@ CFLAGS += -mprocessor=$(CPU) \
 	-DWOLFSSL_IGNORE_FILE_WARN \
 	-O2 \
 	-I"src" \
+	-I"src/shim" \
 	-I"src/config" \
 	-I"src/config/library" \
 	-I"src/config/library/tcpip/src" \
