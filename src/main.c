@@ -34,26 +34,102 @@
 #include <stddef.h>                  
 #include <stdbool.h>
 #include <stdlib.h>
+#include <stdarg.h>
 #include "configuration.h"
 #include "definitions.h"
-#include "tcpip/tcpip.h"
 
-typedef enum
+/*
+	Configuration constants.
+*/
+#define TCPIP_SERVER_PORT 90
+
+/*
+	console_putc writes one character to the console. It calls UART2_Write,
+	which is defined in plib_uart2.c. We are using UART2 for our console. The
+	UART2_Write routine returns zero if the character write failes, so we wait
+	until it returns non-zero, and at that point we know the character write has
+	succeeded. Thus console_putc blocks until completed.
+*/
+static void console_putc (char c)
 {
-	APP_TCPIP_WAIT_INIT,
-	APP_TCPIP_WAIT_FOR_IP,	
-	APP_TCPIP_OPENING_SERVER,
-	APP_TCPIP_WAIT_FOR_CONNECTION,
-	APP_TCPIP_SERVING_CONNECTION,
-	APP_TCPIP_CLOSING_CONNECTION,
-	APP_TCPIP_ERROR,
-} APP_STATES;
-typedef struct
+    while (UART2_Write((uint8_t*)&c, 1) == 0); 
+}
+
+/*
+	console_puts writes an entire null-terminated string of characters to the
+	console.
+*/
+static void console_puts (const char *s)
 {
-    APP_STATES state;
-    TCP_SOCKET socket;
-} APP_DATA;
-APP_DATA appData;
+    while (*s) console_putc(*s++);
+}
+
+/*
+	console_printf takes a string that may or may not contain format codes, and
+	then gathers variables to match the format codes, and so creates a string
+	that it writes to the console. The routine uses the machinery provided by
+	stdarg.h: va_start, va_list, and va_end.
+*/
+static void console_printf(const char* fmt, ...)
+{
+    char buf[256];
+    va_list args;
+    va_start(args, fmt);
+    vsnprintf(buf, sizeof(buf), fmt, args);
+    va_end(args);
+    console_puts(buf);
+}
+
+/*
+	console_puthex takes a thirty-two bit integer, which is eight nibbles, and
+	prints it a hexadecimal value, most significant nibble first, to the
+	console.
+*/
+static void console_puthex(uint32_t value)
+{
+    const char hex[] = "0123456789ABCDEF";
+    for (int shift = 28; shift >= 0; shift -= 4)
+        console_putc(hex[(value >> shift) & 0xF]);
+}
+
+/*
+	console_putint is not an ASCII-reporting routine. It is designed to allow
+	us to view thirty-two bit integers on an oscilloscope attached to our
+	console TX signel. It takes an integer value and transmits it, least
+	significant byte first, over the UART. Because the UART sends the least
+	significant bit first, we will see the bits on our oscilloscope trace of
+	UART2's TX line as bit 0 to 32, with a stop bit (1) and a start bit (0)
+	between each of the bytes. We can use it to broadcast raw register values,
+	as in:
+
+	console_send_int(RPF3R);
+	console_send_int(LATF);
+	console_send_int(PORTF);
+	console_send_int(ODCF);
+	console_send_int(RPF3R);
+
+	By this means, we do not need a UART-to-USB bridge to see raw register
+	contents, and we can view register bits toggling more easily.		
+*/
+static void console_putint(uint32_t value)
+{
+	int i;
+	for (i = 0; i <= 3; i++) console_putc(((uint8_t*)&value)[i]);
+}
+
+/*
+	console_getchar reads one character from the console. It uses the UART2_Read
+	routine, defined in plib_uart2.c. It returns either a character or the value
+	minus one, which indicates no character was read. This routine can be
+	polled, so that when it returns characters, we keep reading until we get a
+	minus one.
+*/
+int console_getchar(void)
+{
+    uint8_t c;
+    if (UART2_Read(&c, 1) == 1) return c;
+    return -1; 
+}
 
 /*
 	General-Purpose Input-Output Initialization.
@@ -110,11 +186,36 @@ void GPIO_Initialize (void)
 }
 
 /*
-	APP_Tasks is where we handle TCP/IP connections. Right now it is supposed to be
-	an echo server, but it's not working yet. The code is a direct copy from the
-	echo server example in Harmony3.
+	Define state names for our data acquisition (DAQ) state machine. 
 */
-void APP_Tasks ( void )
+typedef enum
+{
+	DAQ_TCPIP_WAIT_INIT,
+	DAQ_TCPIP_WAIT_FOR_IP,	
+	DAQ_TCPIP_OPENING_SERVER,
+	DAQ_TCPIP_WAIT_FOR_CONNECTION,
+	DAQ_TCPIP_SERVING_CONNECTION,
+	DAQ_TCPIP_CLOSING_CONNECTION,
+	DAQ_TCPIP_ERROR,
+} daq_states;
+
+/*
+	Define a varaiable that contains DAQ state, as enumerated above, and a single
+	socket that the state machine is dealing with. The TCP_SOCKET type is defined
+	as a sixteen-bit signed integer in tcp.h.
+*/
+typedef struct
+{
+    daq_states state;
+    TCP_SOCKET socket;
+} daq_data_type;
+daq_data_type daq_data;
+
+/*
+	DAQ_Tasks is where we handle TCP/IP connections. Right now it's an echo server
+	that handles only one socket at a time.
+*/
+void DAQ_Tasks (void) 
 {
     SYS_STATUS          tcpipStat;
     const char          *netName, *netBiosName;
@@ -123,31 +224,31 @@ void APP_Tasks ( void )
     int                 i, nNets;
     TCPIP_NET_HANDLE    netH;
 
-    switch (appData.state)
+    switch (daq_data.state)
     {
-        case APP_TCPIP_WAIT_INIT:
+        case DAQ_TCPIP_WAIT_INIT:
         {
             tcpipStat = TCPIP_STACK_Status(sysObj.tcpip);
             if (tcpipStat < 0) {   
-                SYS_CONSOLE_MESSAGE("TCP/IP stack initialization failed.\r\n");
-                appData.state = APP_TCPIP_ERROR;
+                console_printf("TCP/IP stack initialization failed.\r\n");
+                daq_data.state = DAQ_TCPIP_ERROR;
             } else if (tcpipStat == SYS_STATUS_READY) {
                 nNets = TCPIP_STACK_NumberOfNetworksGet();
                 for(i = 0; i < nNets; i++) {
                     netH = TCPIP_STACK_IndexToNet(i);
                     netName = TCPIP_STACK_NetNameGet(netH);
                     netBiosName = TCPIP_STACK_NetBIOSName(netH);
-                    SYS_CONSOLE_PRINT(
+                    console_printf(
                     	"Interface %s on host %s awaiting initialization.\r\n",
                     	netName,
                     	netBiosName);
                 }
-                appData.state = APP_TCPIP_WAIT_FOR_IP;
+                daq_data.state = DAQ_TCPIP_WAIT_FOR_IP;
             }
         }
         break;
 
-        case APP_TCPIP_WAIT_FOR_IP:
+        case DAQ_TCPIP_WAIT_FOR_IP:
         {
             nNets = TCPIP_STACK_NumberOfNetworksGet();
             for (i = 0; i < nNets; i++) {
@@ -158,7 +259,7 @@ void APP_Tasks ( void )
                 ipAddr.Val = TCPIP_STACK_NetAddress(netH);
                 if (dwLastIP[i].Val != ipAddr.Val) {
                     dwLastIP[i].Val = ipAddr.Val;
-                     SYS_CONSOLE_PRINT(
+                     console_printf(
                     	"Interface %s assigned IP address %d.%d.%d.%d.\r\n", 
                     	TCPIP_STACK_NetNameGet(netH),
                     	ipAddr.v[0], 
@@ -166,56 +267,61 @@ void APP_Tasks ( void )
                     	ipAddr.v[2],
                     	ipAddr.v[3]);
                 }
-                appData.state = APP_TCPIP_OPENING_SERVER;
+                daq_data.state = DAQ_TCPIP_OPENING_SERVER;
             }
         }
         break;
             
-        case APP_TCPIP_OPENING_SERVER:
+        case DAQ_TCPIP_OPENING_SERVER:
         {
-            SYS_CONSOLE_PRINT("Waiting for connection on port %d.\r\n",
+            console_printf("Waiting for connection on port %d.\r\n",
             	TCPIP_SERVER_PORT);
-            appData.socket = TCPIP_TCP_ServerOpen(IP_ADDRESS_TYPE_IPV4, 
+            daq_data.socket = TCPIP_TCP_ServerOpen(
+            	IP_ADDRESS_TYPE_IPV4, 
             	TCPIP_SERVER_PORT, 0);
-            if (appData.socket == INVALID_SOCKET) {
-                SYS_CONSOLE_MESSAGE("Could not open server socket.\r\n");
+            if (daq_data.socket == INVALID_SOCKET) {
+                console_printf("Could not open server socket.\r\n");
                 break;
             }
-            appData.state = APP_TCPIP_WAIT_FOR_CONNECTION;
+            daq_data.state = DAQ_TCPIP_WAIT_FOR_CONNECTION;
         }
         break;
 
-        case APP_TCPIP_WAIT_FOR_CONNECTION:
+        case DAQ_TCPIP_WAIT_FOR_CONNECTION:
         {
-            if (!TCPIP_TCP_IsConnected(appData.socket)) {
+            if (!TCPIP_TCP_IsConnected(daq_data.socket)) {
                 return;
             } else {
-                appData.state = APP_TCPIP_SERVING_CONNECTION;
-                SYS_CONSOLE_MESSAGE("Received connection.\r\n");
+                daq_data.state = DAQ_TCPIP_SERVING_CONNECTION;
+                console_printf("Received connection.\r\n");
             }
         }
         break;
 
-        case APP_TCPIP_SERVING_CONNECTION:
+        case DAQ_TCPIP_SERVING_CONNECTION:
         {
-            if (!TCPIP_TCP_IsConnected(appData.socket) 
-            	|| TCPIP_TCP_WasDisconnected(appData.socket)) {
-                appData.state = APP_TCPIP_CLOSING_CONNECTION;
-                SYS_CONSOLE_MESSAGE("Connection closed.\r\n");
+            if (!TCPIP_TCP_IsConnected(daq_data.socket) 
+            	|| TCPIP_TCP_WasDisconnected(daq_data.socket)) {
+                daq_data.state = DAQ_TCPIP_CLOSING_CONNECTION;
+                console_printf("Connection closed.\r\n");
                 break;
             }
             int16_t wMaxGet, wMaxPut, wCurrentChunk;
             uint16_t w, w2;
             uint8_t AppBuffer[32 + 1];
             
-            // Figure out how many bytes have been received and how many we can transmit.
-            wMaxGet = TCPIP_TCP_GetIsReady(appData.socket);	// Get TCP RX FIFO byte count
-            wMaxPut = TCPIP_TCP_PutIsReady(appData.socket);	// Get TCP TX FIFO free space
+            // Figure out how many bytes have been received and how many we can
+            // transmit. The GetIsReady function returns the number of bytes
+            // available to read, while the PutIsReady function returns how many
+            // bytes we can write to the output buffer before it is full.
+            wMaxGet = TCPIP_TCP_GetIsReady(daq_data.socket);
+            wMaxPut = TCPIP_TCP_PutIsReady(daq_data.socket);
 
             // Make sure we don't take more bytes out of the RX FIFO than we can
             // put into the TX FIFO
-            if (wMaxPut < wMaxGet)
-                    wMaxGet = wMaxPut;
+            if (wMaxPut < wMaxGet) {
+                wMaxGet = wMaxPut;
+            }
 
             // Process all bytes that we can. This is implemented as a loop,
             // processing up to sizeof(AppBuffer) bytes at a time. This limits
@@ -224,27 +330,27 @@ void APP_Tasks ( void )
             wCurrentChunk = sizeof(AppBuffer) -1;
             for (w = 0; w < wMaxGet; w += sizeof(AppBuffer) - 1) {
 				// Make sure the last chunk, which will likely be smaller than
-				// sizeof(AppBuffer), is treated correctly.
+				// our buffer, is treated correctly.
 				if (w + sizeof(AppBuffer) - 1 > wMaxGet) wCurrentChunk = wMaxGet - w;
 
                 // Transfer the data out of the TCP RX FIFO and into our local
                 // processing buffer.
-                TCPIP_TCP_ArrayGet(appData.socket, AppBuffer, wCurrentChunk);
+                TCPIP_TCP_ArrayGet(daq_data.socket, AppBuffer, wCurrentChunk);
 
                 // Perform the "ToUpper" operation on each data byte
                 for (w2 = 0; w2 < wCurrentChunk; w2++) {
                     i = AppBuffer[w2];
                     if (i == '\x1b') {
-                        appData.state = APP_TCPIP_CLOSING_CONNECTION;
-                        SYS_CONSOLE_MESSAGE("Connection closed.\r\n");
+                        daq_data.state = DAQ_TCPIP_CLOSING_CONNECTION;
+                        console_printf("Connection closed.\r\n");
                     }
                 }
                 AppBuffer[w2] = 0;  // end the console string properly
 
                 // Transfer the data out of our local processing buffer and into
                 // the TCP TX FIFO.
-                SYS_CONSOLE_PRINT("Transmit: %s\r\n", AppBuffer);
-                TCPIP_TCP_ArrayPut(appData.socket, AppBuffer, wCurrentChunk);
+                console_printf("Transmit: %s\r\n", AppBuffer);
+                TCPIP_TCP_ArrayPut(daq_data.socket, AppBuffer, wCurrentChunk);
 
                 // No need to perform any flush. TCP data in TX FIFO will
                 // automatically transmit itself after it accumulates for a
@@ -255,11 +361,11 @@ void APP_Tasks ( void )
         }
         break;
         
-        case APP_TCPIP_CLOSING_CONNECTION:
+        case DAQ_TCPIP_CLOSING_CONNECTION:
         {
-            TCPIP_TCP_Close(appData.socket);
-            appData.socket = INVALID_SOCKET;
-            appData.state = APP_TCPIP_WAIT_FOR_IP;
+            TCPIP_TCP_Close(daq_data.socket);
+            daq_data.socket = INVALID_SOCKET;
+            daq_data.state = DAQ_TCPIP_WAIT_FOR_IP;
         }
         break;
         
@@ -269,44 +375,6 @@ void APP_Tasks ( void )
 }
 
 
-static void uart2_putc(char c)
-{
-    while (UART2_Write((uint8_t*)&c, 1) == 0); 
-}
-
-static void uart2_puts(const char *s)
-{
-    while (*s) uart2_putc(*s++);
-}
-
-static void uart2_puthex(uint32_t value)
-{
-    const char hex[] = "0123456789ABCDEF";
-    for (int shift = 28; shift >= 0; shift -= 4)
-        uart2_putc(hex[(value >> shift) & 0xF]);
-}
-
-/*
-	uart2_send_int takes an integer value and transmits it, least significant
-	byte first, over UART2. We can use it to broadcast raw register values, as
-	in:
-
-	uart2_send_int(RPF3R);
-	uart2_send_int(LATF);
-	uart2_send_int(PORTF);
-	uart2_send_int(ODCF);
-	uart2_send_int(RPF3R);
-
-	Because the UART sends the least significant bit first, we will see the bits
-	on our oscilloscope trace of UART2's TX line as bit 0 to 32, with a stop bit
-	(1) and a start bit (0) between each of the bytes.	
-*/
-static void uart2_send_int(uint32_t value)
-{
-	int i;
-	for (i = 0; i <= 3; i++) uart2_putc(((uint8_t*)&value)[i]);
-}
-
 /*
 	SYS_Initialize performs a sequence of functions necessary when the CPU boots
 	up. It calls routines defined in initialize.c and elsewhere in the
@@ -314,9 +382,9 @@ static void uart2_send_int(uint32_t value)
 	routine initializes memory access: wait states and error code correction.
 	The GPIO routine configures the MCU pins, including peripheral pin selection
 	(PPS). The NVM routine initializes the non-volatile flash memory. The
-	CORETIMER routine we have yet to investigate. The CONSOLE routine sets up
-	UART2 as a console to transmit reporting. The TCPIP routine initializes the
-	TCPIP stack.
+	CORETIMER routine we have yet to investigate. We initialize the UART2
+	interface directly in the routine. The TCPIP routine initializes the TCPIP
+	stack.
 */
 void SYS_Initialize (void* data)
 {
@@ -326,43 +394,52 @@ void SYS_Initialize (void* data)
 	GPIO_Initialize();
 	NVM_Initialize();
 	CORETIMER_Initialize();
-	CONSOLE_Initialize();
-    TCPIP_Initialize();
-	appData.state = APP_TCPIP_WAIT_INIT;
+	UART2_Initialize();
+	UART_SERIAL_SETUP uart2Setup = {
+		.baudRate = 115200,
+		.dataWidth = UART_DATA_8_BIT,
+		.parity = UART_PARITY_NONE,
+		.stopBits = UART_STOP_1_BIT
+	};
+    UART2_SerialSetup(&uart2Setup, 0);
+	UTILS_Initialize();
+	TCPIP_Initialize();
+	daq_data.state = DAQ_TCPIP_WAIT_INIT;
 	(void)__builtin_enable_interrupts();
 }
 
 int main ( void )
 {
-	// Variables.
 	int i;
 	
-	// Call the system initialization routine.
+	// Call the system initialization routine, which is defined above.
 	SYS_Initialize(NULL);
-	SYS_CONSOLE_MESSAGE("\r\n");
-	SYS_CONSOLE_MESSAGE("===================================================\r\n");
-	SYS_CONSOLE_MESSAGE("System initialization routine has completed.\r\n");
+	
+	// Print messages now that our UART console is ready.
+	console_printf("\r\n");
+	console_printf("===================================================\r\n");
+	console_printf("System initialization routine has completed.\r\n");
 
 	// Turn on the red and green lamps.
    	GPIO_PortSet(GPIO_PORT_A,0x00000004);
    	GPIO_PortSet(GPIO_PORT_C,0x00008000);
    	
-   	// A while loop with a counter to control the state of our LEDs. It calls SYS_Tasks,
-   	// which is supposed to maintain the TCP/IP server.
+   	// A while loop with a counter to control the state of our LEDs. 
    	i=0;
     while (true) {
-		/* Maintain system services */
+		// Attend to the system command console.
 		SYS_CMD_Tasks();
 	
-		/* Maintain Device Drivers */
+		// Maintain the RMII interface with the PHY.
 		DRV_MIIM_OBJECT_BASE_Default.DRV_MIIM_Tasks(sysObj.drvMiim_0);
 	
-		/* Maintain Middleware & Other Libraries */
+		// Maintain the TCP/IP stack.
 		TCPIP_STACK_Task(sysObj.tcpip);
 	
-		/* Maintain the application's state machine. */
-		APP_Tasks();
+		// Maintain our own data acquisition state machine.
+		DAQ_Tasks();
 		
+		// Maintain the indicator lamps.
 		i = i+1;
 		if (i % 100 == 0)
 		{
@@ -378,7 +455,6 @@ int main ( void )
 		}
     }
     
-    // The only reason to return is because of an error. We must pass back a value
-    // of the correct type, as given by 
+    // Return an error code of the correct type if we get here.
     return (EXIT_FAILURE);
 }

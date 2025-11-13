@@ -357,9 +357,9 @@ void MA_Initialize (void)
 }
 
 /*
-	Transmission Control Protocol / Internet Protocol Initialize.
+	Initialize various system utilities.
 */
-void TCPIP_Initialize (void)
+void UTILS_Initialize (void)
 {
 	sysObj.drvMiim_0 = 
 		DRV_MIIM_OBJECT_BASE_Default.DRV_MIIM_Initialize(
@@ -377,24 +377,17 @@ void TCPIP_Initialize (void)
 	sysObj.sysDebug = SYS_DEBUG_Initialize(
 		SYS_DEBUG_INDEX_0,
 		(SYS_MODULE_INIT*)&debugInit);
+}
+
+
+/*
+	Initialize the TCP/IP stack.
+*/
+void TCPIP_Initialize (void)
+{
 	sysObj.tcpip = TCPIP_STACK_Init();
 	SYS_ASSERT(sysObj.tcpip != SYS_MODULE_OBJ_INVALID, "TCPIP_STACK_Init Failed" );
 	CRYPT_WCCB_Initialize();
 	EVIC_Initialize();
 }
 
-/*
-	Console Initialize. We set up the UART2. We should already have assigned its TX and
-	RX signals to GPIO pins in GPIO_Initialize.
-*/
-void CONSOLE_Initialize (void)
-{
-	UART2_Initialize();
-	UART_SERIAL_SETUP uart2Setup = {
-		.baudRate = 115200,
-		.dataWidth = UART_DATA_8_BIT,
-		.parity = UART_PARITY_NONE,
-		.stopBits = UART_STOP_1_BIT
-	};
-    UART2_SerialSetup(&uart2Setup, 0);
-}

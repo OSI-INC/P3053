@@ -75,6 +75,7 @@
 void MA_Initialize (void);
 void GPIO_Initialize (void);
 void CONSOLE_Initialize (void);
+void UTILS_Initialize (void);
 void TCPIP_Initialize (void);
 
 // A record containing handles to data objects used by various processes.
