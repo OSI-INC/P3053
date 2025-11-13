@@ -229,3 +229,22 @@ static const SYS_CMD_API cmdUartApi =
 
 SYS_CMDIO_ADD(&cmdUartApi, NULL, 0);
 
+#define SYS_CONSOLE_PRINT(...)  console_printf(__VA_ARGS__)
+#define SYS_CONSOLE_MESSAGE(msg) console_printf("%s", msg)
+#define SYS_DEBUG_PRINT(level, ...) console_printf(__VA_ARGS__)
+#define SYS_DEBUG_PRINT(level, ...) \
+    do { if ((level) <= DEBUG_LEVEL) console_printf(__VA_ARGS__); } while (0)
+
+
+#ifdef STACK_DEBUG
+    #define SYS_CONSOLE_PRINT(...)  console_printf(__VA_ARGS__)
+    #define SYS_CONSOLE_MESSAGE(msg) console_printf("%s", msg)
+    #define SYS_DEBUG_PRINT(level, ...) console_printf(__VA_ARGS__)
+#else
+    #define SYS_CONSOLE_PRINT(...)
+    #define SYS_CONSOLE_MESSAGE(...)
+    #define SYS_DEBUG_PRINT(...)
+#endif
+
+
+
