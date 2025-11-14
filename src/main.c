@@ -144,7 +144,7 @@ void DAQ_Tasks (void)
         {
             tcpipStat = TCPIP_STACK_Status(sysObj.tcpip);
             if (tcpipStat < 0) {   
-                console_printf("TCP/IP stack initialization failed.\r\n");
+                console_print("TCP/IP stack initialization failed.\r\n");
                 daq_data.state = DAQ_TCPIP_ERROR;
             } else if (tcpipStat == SYS_STATUS_READY) {
                 nNets = TCPIP_STACK_NumberOfNetworksGet();
@@ -152,7 +152,7 @@ void DAQ_Tasks (void)
                     netH = TCPIP_STACK_IndexToNet(i);
                     netName = TCPIP_STACK_NetNameGet(netH);
                     netBiosName = TCPIP_STACK_NetBIOSName(netH);
-                    console_printf(
+                    console_print(
                     	"Interface %s on host %s awaiting initialization.\r\n",
                     	netName,
                     	netBiosName);
@@ -173,7 +173,7 @@ void DAQ_Tasks (void)
                 ipAddr.Val = TCPIP_STACK_NetAddress(netH);
                 if (dwLastIP[i].Val != ipAddr.Val) {
                     dwLastIP[i].Val = ipAddr.Val;
-                     console_printf(
+                     console_print(
                     	"Interface %s assigned IP address %d.%d.%d.%d.\r\n", 
                     	TCPIP_STACK_NetNameGet(netH),
                     	ipAddr.v[0], 
@@ -188,13 +188,13 @@ void DAQ_Tasks (void)
             
         case DAQ_TCPIP_OPENING_SERVER:
         {
-            console_printf("Waiting for connection on port %d.\r\n",
+            console_print("Waiting for connection on port %d.\r\n",
             	TCPIP_SERVER_PORT);
             daq_data.socket = TCPIP_TCP_ServerOpen(
             	IP_ADDRESS_TYPE_IPV4, 
             	TCPIP_SERVER_PORT, 0);
             if (daq_data.socket == INVALID_SOCKET) {
-                console_printf("Could not open server socket.\r\n");
+                console_print("Could not open server socket.\r\n");
                 break;
             }
             daq_data.state = DAQ_TCPIP_WAIT_FOR_CONNECTION;
@@ -207,7 +207,7 @@ void DAQ_Tasks (void)
                 return;
             } else {
                 daq_data.state = DAQ_TCPIP_SERVING_CONNECTION;
-                console_printf("Received connection.\r\n");
+                console_print("Received connection.\r\n");
             }
         }
         break;
@@ -217,7 +217,7 @@ void DAQ_Tasks (void)
             if (!TCPIP_TCP_IsConnected(daq_data.socket) 
             	|| TCPIP_TCP_WasDisconnected(daq_data.socket)) {
                 daq_data.state = DAQ_TCPIP_CLOSING_CONNECTION;
-                console_printf("Connection closed.\r\n");
+                console_print("Connection closed.\r\n");
                 break;
             }
             int16_t wMaxGet, wMaxPut, wCurrentChunk;
@@ -256,14 +256,14 @@ void DAQ_Tasks (void)
                     i = AppBuffer[w2];
                     if (i == '\x1b') {
                         daq_data.state = DAQ_TCPIP_CLOSING_CONNECTION;
-                        console_printf("Connection closed.\r\n");
+                        console_print("Connection closed.\r\n");
                     }
                 }
                 AppBuffer[w2] = 0;  // end the console string properly
 
                 // Transfer the data out of our local processing buffer and into
                 // the TCP TX FIFO.
-                console_printf("Transmit: %s\r\n", AppBuffer);
+                console_print("Transmit: %s\r\n", AppBuffer);
                 TCPIP_TCP_ArrayPut(daq_data.socket, AppBuffer, wCurrentChunk);
 
                 // No need to perform any flush. TCP data in TX FIFO will
@@ -330,9 +330,10 @@ int main ( void )
 	SYS_Initialize(NULL);
 	
 	// Print messages now that our UART console is ready.
-	console_printf("\r\n");
-	console_printf("===================================================\r\n");
-	console_printf("System initialization routine has completed.\r\n");
+	SYS_CONSOLE_MESSAGE("Testing SYS_CONSOLE_MESSAGE.");
+	console_print("\r\n");
+	console_print("===================================================\r\n");
+	console_print("System initialization routine has completed.\r\n");
 
 	// Turn on the red and green lamps.
    	GPIO_PortSet(GPIO_PORT_A,0x00000004);

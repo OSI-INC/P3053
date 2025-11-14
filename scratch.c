@@ -202,7 +202,7 @@ static void cmd_uart_putc(const void* unused, char c)
 // Simple message function
 static void cmd_uart_msg(const void* unused, const char* str)
 {
-    console_puts(str);
+    console_write(str);
 }
 
 // Formatted printf function
@@ -215,7 +215,7 @@ static void cmd_uart_print(const void* unused, const char* fmt, ...)
     vsnprintf(buf, sizeof(buf), fmt, ap);
     va_end(ap);
 
-    console_puts(buf);
+    console_write(buf);
 }
 
 static const SYS_CMD_API cmdUartApi =
@@ -247,4 +247,100 @@ SYS_CMDIO_ADD(&cmdUartApi, NULL, 0);
 #endif
 
 
+#include <stdarg.h>
+#include <stdio.h>
+#include "console.h"
+
+/*******************************************
+ * SYS_CONSOLE: Minimal Console Redirection
+ *******************************************/
+
+/* -----------------------------------------
+   SYS_CONSOLE_Print()
+   Formatted print (like printf)
+   ----------------------------------------- */
+void SYS_CONSOLE_Print(int index, const char* fmt, ...)
+{
+    (void)index;   // Only one console instance in your system
+
+    char buffer[256];
+
+    va_list ap;
+    va_start(ap, fmt);
+    vsnprintf(buffer, sizeof(buffer), fmt, ap);
+    va_end(ap);
+
+    console_write(buffer);
+}
+
+/* -----------------------------------------
+   SYS_CONSOLE_Message()
+   Simple string output
+   ----------------------------------------- */
+void SYS_CONSOLE_Message(int index, const char* msg)
+{
+    (void)index;
+    console_write(msg);
+}
+
+/* -----------------------------------------
+   SYS_CONSOLE_Write()
+   Raw byte buffer output
+   ----------------------------------------- */
+void SYS_CONSOLE_Write(int index, const void* buff, size_t size)
+{
+    (void)index;
+
+    const uint8_t* p = (const uint8_t*)buff;
+    for (size_t i = 0; i < size; i++)
+    {
+        console_putchar(p[i]);
+    }
+}
+
+/* -----------------------------------------
+   SYS_CONSOLE_Read()
+   Read up to size bytes into buff
+   ----------------------------------------- */
+void SYS_CONSOLE_Read(int index, void* buff, size_t size)
+{
+    (void)index;
+
+    uint8_t* p = (uint8_t*)buff;
+    for (size_t i = 0; i < size; i++)
+    {
+        if (console_read_ready() == 0)
+            return;     // no more available
+
+        p[i] = console_getchar();
+    }
+}
+
+/* -----------------------------------------
+   SYS_CONSOLE_ReadCountGet()
+   Returns number of characters available
+   ----------------------------------------- */
+int SYS_CONSOLE_ReadCountGet(int index)
+{
+    (void)index;
+    return console_read_ready();   // this should return count or 0/1 — either is fine for SYS_CMD
+}
+
+/* -----------------------------------------
+   SYS_CONSOLE_Tasks()
+   SYS_CONSOLE_Task()
+   Harmony expects these, but your console
+   does not require background polling.
+   ----------------------------------------- */
+void SYS_CONSOLE_Tasks(int index)
+{
+    (void)index;
+    // No background tasks required
+}
+
+void SYS_CONSOLE_Task(int index)
+{
+    (void)index;
+    // No background tasks required
+}
 
