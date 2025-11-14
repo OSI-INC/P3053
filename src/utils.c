@@ -14,6 +14,10 @@
 #include <string.h>
 #include "configuration.h"
 #include "definitions.h"
+#include "console.h"
+#include "tcpip/tcpip.h"
+#include "tcpip/src/tcpip_private.h"
+#include "tcpip/icmp.h"
 
 /*
 	string_trim takes a pointer to a null-terminated string and returns a pointer
@@ -55,3 +59,56 @@ void eem_reset(void) {
     (void) RSWRST;
     while(1);
 }
+
+void force_gateway_arp(void)
+{
+    TCPIP_NET_HANDLE netH = TCPIP_STACK_IndexToNet(0);
+    IPV4_ADDR gwAddr;
+
+    netH = TCPIP_STACK_IndexToNet(0);
+    gwAddr.Val = TCPIP_STACK_NetAddressGateway(netH);
+	console_print("Manufacturing ARP for gateway %d.%d.%d.%d... ",
+		gwAddr.v[0], gwAddr.v[1], gwAddr.v[2], gwAddr.v[3]);
+    TCPIP_MAC_ADDR fakeMac = { .v = { 0x02, 0x00, 0x00, 0x00, 0x00, 0x01 } };
+	TCPIP_ARP_RESULT res = TCPIP_ARP_EntrySet(netH, &gwAddr, &fakeMac, true);
+    if (res >= 0) {
+    	console_message("Succeeded.\r\n");
+    } else {
+    	console_print(" Failed with error code %u\r\n", res);
+    }
+}
+
+void ping_gateway(void)
+{
+    TCPIP_NET_HANDLE netH;
+    IPV4_ADDR gwAddr;
+    TCPIP_ICMP_ECHO_REQUEST echoReq;
+    TCPIP_ICMP_REQUEST_HANDLE reqHandle;
+    ICMP_ECHO_RESULT res;
+
+    netH = TCPIP_STACK_IndexToNet(0);
+    gwAddr.Val = TCPIP_STACK_NetAddressGateway(netH);
+    console_print("Pinging gateway at %d.%d.%d.%d...",
+        gwAddr.v[0], gwAddr.v[1], gwAddr.v[2], gwAddr.v[3]);
+    memset(&echoReq, 0, sizeof(echoReq));
+    echoReq.netH            = netH;
+    echoReq.targetAddr      = gwAddr;
+    echoReq.sequenceNumber  = 1;
+    echoReq.identifier      = 0xBEEF;    // arbitrary
+    echoReq.pData           = NULL;      // no payload
+    echoReq.dataSize        = 0;
+    echoReq.callback        = NULL;      // polling mode
+    echoReq.param           = NULL;
+    res = TCPIP_ICMP_EchoRequest(&echoReq, &reqHandle);
+
+    if (res == ICMP_ECHO_OK) {
+    	console_message(" Succeeded.\r\n");
+	} else {
+    	console_print(" Failed with error code %u\r\n", res);
+    }
+}
+
+
+
+
+

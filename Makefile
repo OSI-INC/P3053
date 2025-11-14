@@ -10,8 +10,8 @@
 # and WOLFSSL code for our Embedded Ethernet Module (A3053A), but we trust that
 # the same structure can be used to compile arbitrary projects from the command
 # line for any PIC processor. The build uses an installation of the xc32
-# compiler, as well as a Harmony3 repository, where it finds the CPU device
-# package.
+# compiler, as well as a Microchip Device Package repository, where it finds
+# the CPU device package.
 #
 # Kevan Hashemi, Open Source Instruments Inc., 2025.
 #
@@ -32,11 +32,11 @@ $(info BUILD_MODE = $(BUILD_MODE))
 #
 # Define the exact processor, its family, the location of its device pack, and
 # point to the linker script. We are using the linker script and device pack
-# that are provided by our Harmony3 repository.
+# that are provided by our Microchip Device Package repository.
 #
 CPU=32MZ2048EFH100
 CPU_FAMILY=pic32mz_ef_sk
-DFP_DIR=/Users/kevan/Code/Harmony3/dev_packs/Microchip/PIC32MZ-EF_DFP/1.3.58
+DFP_DIR=/Users/kevan/Code/Microchip/PIC32MZ-EF_DFP/1.3.58
 CPULD=$(DFP_DIR)/xc32/$(CPU)/p$(CPU).ld
 
 #

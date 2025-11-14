@@ -189,6 +189,8 @@ void DAQ_Tasks (void)
             
         case DAQ_TCPIP_OPENING_SERVER:
         {
+        	force_gateway_arp();
+        	ping_gateway();
             console_print("Waiting for connection on port %d.\r\n",
             	TCPIP_SERVER_PORT);
             daq_data.socket = TCPIP_TCP_ServerOpen(

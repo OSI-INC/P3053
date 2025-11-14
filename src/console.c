@@ -266,25 +266,30 @@ void CMD_Tasks(void)
 				switch (cmd) {
 					case 'h':
 						console_message("Commands:\r\n");
-						console_message("  h - help\r\n");
-						console_message("  r - reset\r\n");
+						console_message("  h - print help\r\n");
+						console_message("  p - ping gateway\r\n");
+						console_message("  r - software reset\r\n");
+						break;
+					
+					case 'p':
+						ping_gateway();
 						break;
 					
 					case 'r':
-						console_message("Resetting...\r\n");
+						console_message("Resetting... \r\n");
 						console_flush();
 						eem_reset();
 						break;
 					
 					default:
-						console_print("Unknown command '%c'\r\n", cmd);
+						console_print("ERROR: Unknown command '%c'.\r\n", cmd);
 						break;
 				}
 			} else if (cmd_len > 1) {
-				console_message("Only single-letter commands supported\r\n");
+				console_message("ERROR: Only single-letter commands supported.\r\n");
 			}
 		cmd_len = 0;
-		console_message("> ");
+		console_message("EEM$ ");
 		continue;
 		}
 		if (c == '\b' || c == 0x7F) {

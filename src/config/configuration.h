@@ -97,7 +97,13 @@
 
 /*** ICMPv4 Server Configuration ***/
 #define TCPIP_STACK_USE_ICMP_SERVER
+#define TCPIP_STACK_USE_ICMP_CLIENT
 #define TCPIP_ICMP_ECHO_ALLOW_BROADCASTS			false
+#define TCPIP_STACK_MAX_CLIENT_ECHO_REQUESTS        4
+#define TCPIP_ICMP_TASK_TICK_RATE                   33   // ms
+#define TCPIP_ICMP_ECHO_REQUEST_TIMEOUT             1000 // ms
+#define TCPIP_ICMP_CLIENT_RX_MESSAGE_SIZE           64   // bytes
+#define TCPIP_ICMP_CLIENT_TX_MESSAGE_SIZE           64   // bytes
 
 /*** TCPIP MAC Configuration ***/
 #define TCPIP_EMAC_TX_DESCRIPTORS				    8

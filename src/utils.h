@@ -13,4 +13,8 @@ const char* string_trim(const char *s);
 // Management of the PIC32MZ.
 void eem_reset(void);
 
+// TCP/IP procedures.
+void force_gateway_arp(void);
+void ping_gateway(void);
+
 #endif
