@@ -281,13 +281,6 @@ static const SYS_TIME_INIT sysTimeInitData =
     .hwTimerIntNum = 0,
 };
 
-const SYS_CMD_INIT sysCmdInit =
-{
-    .moduleInit = {0},
-    .consoleCmdIOParam = SYS_CMD_SINGLE_CHARACTER_READ_CONSOLE_IO_PARAM,
-	.consoleIndex = 0,
-};
-
 static const SYS_DEBUG_INIT debugInit =
 {
     .moduleInit = {0},
@@ -321,8 +314,6 @@ void UTILS_Initialize (void)
 		SYS_TIME_Initialize(
 			SYS_TIME_INDEX_0,
 			(SYS_MODULE_INIT *)&sysTimeInitData);
-	SYS_CMD_Initialize(
-		(SYS_MODULE_INIT*)&sysCmdInit);
 	sysObj.sysDebug = SYS_DEBUG_Initialize(
 		SYS_DEBUG_INDEX_0,
 		(SYS_MODULE_INIT*)&debugInit);

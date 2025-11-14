@@ -38,6 +38,7 @@
 #include "configuration.h"
 #include "definitions.h"
 #include "console.h"
+#include "utils.h"
 
 /*
 	Configuration constants.
@@ -317,9 +318,11 @@ void SYS_Initialize (void* data)
 	};
     UART2_SerialSetup(&uart2Setup, 0);
 	UTILS_Initialize();
+	CMD_Initialize();
 	TCPIP_Initialize();
 	daq_data.state = DAQ_TCPIP_WAIT_INIT;
 	(void)__builtin_enable_interrupts();
+	console_print("System initialization routine has completed.\r\n");
 }
 
 int main ( void )
@@ -329,11 +332,6 @@ int main ( void )
 	// Call the system initialization routine, which is defined above.
 	SYS_Initialize(NULL);
 	
-	// Print messages now that our UART console is ready.
-	console_print("\r\n");
-	console_print("===================================================\r\n");
-	console_print("System initialization routine has completed.\r\n");
-
 	// Turn on the red and green lamps.
    	GPIO_PortSet(GPIO_PORT_A,0x00000004);
    	GPIO_PortSet(GPIO_PORT_C,0x00008000);
@@ -341,9 +339,6 @@ int main ( void )
    	// A while loop with a counter to control the state of our LEDs. 
    	i=0;
     while (true) {
-		// Attend to the system command console.
-		SYS_CMD_Tasks();
-	
 		// Maintain the RMII interface with the PHY.
 		DRV_MIIM_OBJECT_BASE_Default.DRV_MIIM_Tasks(sysObj.drvMiim_0);
 	
@@ -352,6 +347,7 @@ int main ( void )
 	
 		// Maintain our own data acquisition state machine.
 		DAQ_Tasks();
+		CMD_Tasks();
 		
 		// Maintain the indicator lamps.
 		i = i+1;

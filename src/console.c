@@ -17,17 +17,30 @@
 #include "configuration.h"
 #include "definitions.h"
 #include "console.h"
+#include "utils.h"
 
 /*
-	console_putchar writes one character to the console. It calls UART2_Write,
-	which is defined in plib_uart2.c. We are using UART2 for our console. The
-	UART2_Write routine returns zero if the character write failes, so we wait
-	until it returns non-zero, and at that point we know the character write has
-	succeeded. Thus console_putchar blocks until completed.
+	console_putchar writes one character to the UART2 transmit buffer. It calls
+	UART2_Write from plib_uart2.c, which returns zero if the transmit buffer is
+	full. We wait until the routine returns non-zeo, at which point we know our
+	character was written to the transmit buffer. Thus console_putchar blocks
+	until we are able to write to the buffer, but note that it does not block
+	waiting for the character to be transmitted by the UART. If we want to wait
+	for all characters to be transmitted, we use our flush procedure.
 */
-void console_putchar(char c) 
-{
+void console_putchar(char c) {
     while (UART2_Write((uint8_t*)&c, 1) == 0); 
+}
+
+/*
+	console_flush waits until the UART2 has transmitted all pending characters. It first
+	waits for the software ring buffer to empty, then waits until the UART's internal
+	buffer is empty, then waits until the UART's transmit shift register is empty.
+*/
+void console_flush(void) {
+    while (UART2_WriteCountGet() != 0) { ; }
+    while (U2STAbits.UTXBF == 1) { ; }
+    while (U2STAbits.TRMT == 0) { ; }
 }
 
 /*
@@ -35,8 +48,7 @@ void console_putchar(char c)
 	prints it a hexadecimal value, most significant nibble first, to the
 	console.
 */
-void console_puthex(uint32_t value) 
-{
+void console_puthex(uint32_t value) {
     const char hex[] = "0123456789ABCDEF";
     for (int shift = 28; shift >= 0; shift -= 4)
         console_putchar(hex[(value >> shift) & 0xF]);
@@ -55,8 +67,7 @@ void console_puthex(uint32_t value)
 	at the bits on an oscilloscope, we do not need a functioning UART-to-USB
 	bridge, and we can view register bits toggling more easily.		
 */
-void console_putint(uint32_t value) 
-{
+void console_putint(uint32_t value) {
 	int i;
 	for (i = 0; i <= 3; i++) console_putchar(((uint8_t*)&value)[i]);
 }
@@ -80,8 +91,7 @@ void console_write(const void* buff, size_t size) {
 	characters from the string and writing them to the console until it reaches
 	a null character, which it does not write.
 */
-void console_message(const char *s) 
-{
+void console_message(const char *s) {
     while (*s) console_putchar(*s++);
 }
 
@@ -98,8 +108,7 @@ void console_message(const char *s)
 	specficiations and literal arguments. This machinery is: va_start, va_list,
 	vsnprintf, and va_end.
 */
-void console_print(const char* fmt, ...) 
-{
+void console_print(const char* fmt, ...) {
     char buf[256];
     va_list args;
     va_start(args, fmt);
@@ -112,8 +121,7 @@ void console_print(const char* fmt, ...)
 	console_readcount returns the number of bytes available for reading in the
 	console receive buffer.
 */
-int console_readcount(void)
-{
+int console_readcount(void) {
     return UART2_ReadCountGet();
 }
 
@@ -124,8 +132,7 @@ int console_readcount(void)
 	polled, so that when it returns characters, we keep reading until we get a
 	minus one.
 */
-int console_getchar(void) 
-{
+int console_getchar(void) {
     uint8_t c;
     if (UART2_Read(&c, 1) == 1) return c;
     return -1; 
@@ -138,8 +145,7 @@ int console_getchar(void)
 	We pass it an index to select a console, which in our case we ignore. We
 	pass it a pointer to the byte array and we specify the size of the array.
 */
-void SYS_CONSOLE_Write(int index, const void* buff, size_t size) 
-{
+void SYS_CONSOLE_Write(int index, const void* buff, size_t size) {
     console_write(buff,size);
 }
 
@@ -150,8 +156,7 @@ void SYS_CONSOLE_Write(int index, const void* buff, size_t size)
 	ignore the index. The next argument is a pointer to a null-terminated
 	string. We pas that pointer to our own console_message routine.
 */
-void SYS_CONSOLE_Message(int index, const char* msg) 
-{
+void SYS_CONSOLE_Message(int index, const char* msg) {
     (void) index;
     console_message(msg);
 }
@@ -167,8 +172,7 @@ void SYS_CONSOLE_Message(int index, const char* msg)
 	it the string and arguments. We must repeat our console_print instructions,
 	using the stdarg.h machinery.
 */
-void SYS_CONSOLE_Print(int index, const char* fmt, ...) 
-{
+void SYS_CONSOLE_Print(int index, const char* fmt, ...) {
 	(void) index;
 	char buffer[256];
 	va_list ap;
@@ -183,8 +187,7 @@ void SYS_CONSOLE_Print(int index, const char* fmt, ...)
 	It returns the number of bytes available for reading in the console receive
 	buffer. We pass it a console index, but here we ignore that index.
 */
-int SYS_CONSOLE_ReadCountGet(int index)
-{
+int SYS_CONSOLE_ReadCountGet(int index) {
     (void) index;
     return console_readcount();
 }
@@ -201,8 +204,7 @@ int SYS_CONSOLE_ReadCountGet(int index)
 	available bytes. The routine transfers the bytes from the console receive
 	buffer into the buffer.
 */
-void SYS_CONSOLE_Read(int index, void* buff, size_t size) 
-{
+void SYS_CONSOLE_Read(int index, void* buff, size_t size) {
     (void) index;
     uint8_t* p = (uint8_t*) buff;
     for (size_t i = 0; i < size; i++) {
@@ -218,8 +220,7 @@ void SYS_CONSOLE_Read(int index, void* buff, size_t size)
 	intended to perform a polling task. We are not going to do any polling for
 	the Harmony processes, so our implementation of the routine does nothing.
 */
-void SYS_CONSOLE_Tasks(int index) 
-{
+void SYS_CONSOLE_Tasks(int index) {
 }
 
 /*
@@ -227,29 +228,79 @@ void SYS_CONSOLE_Tasks(int index)
 	intended to perform polling tasks. We are not going to do any polling for
 	the Harmony processes, so our implementation of the routine does nothing.
 */
-void SYS_CONSOLE_Task(int index) 
-{
+void SYS_CONSOLE_Task(int index) {
 }
 
 /*
-	string_trim takes a pointer to a null-terminated string and returns a pointer
-	to another null-terminated string that is the same as the original but with all
-	whitespace removed from the beginning and the end.
-*/
-const char* string_trim(const char *s)
-{
-    static char buf[256];
-    const char *start = s;
-    const char *end;
-    size_t len;
 
-    if (s == NULL) return "";
-    while (*start && isspace((unsigned char)*start)) start++;
-    end = start + strlen(start);
-    while (end > start && isspace((unsigned char)*(end - 1))) end--;
-    len = end - start;
-    if (len >= sizeof(buf)) len = sizeof(buf) - 1;
-    memcpy(buf, start, len);
-    buf[len] = '\0';
-    return buf;
+
+*/
+#define CMD_MAX_LEN 64
+static char cmd_buffer[CMD_MAX_LEN];
+static unsigned cmd_len = 0;
+
+static inline bool is_printable(char c) {
+    return (c >= 32 && c <= 126);
+}
+
+void CMD_Initialize(void)
+{
+    cmd_len = 0;
+	console_print("\r\n\r\n");
+	console_print("===========================================================\r\n");
+	console_print("=========    Embedded Ethernet Module (A3053)     =========\r\n");
+	console_print("===========================================================\r\n");
+	console_print("Command interface running, 'h' for help, 'r' for reset.\r\n");
+}
+
+void CMD_Tasks(void)
+{
+    char c;
+
+	while (console_readcount() > 0) {
+		c = console_getchar();
+		if (c == '\r' || c == '\n') {
+			console_message("\r\n");
+			if (cmd_len == 1) {
+				char cmd = cmd_buffer[0];
+				switch (cmd) {
+					case 'h':
+						console_message("Commands:\r\n");
+						console_message("  h - help\r\n");
+						console_message("  r - reset\r\n");
+						break;
+					
+					case 'r':
+						console_message("Resetting...\r\n");
+						console_flush();
+						eem_reset();
+						break;
+					
+					default:
+						console_print("Unknown command '%c'\r\n", cmd);
+						break;
+				}
+			} else if (cmd_len > 1) {
+				console_message("Only single-letter commands supported\r\n");
+			}
+		cmd_len = 0;
+		console_message("> ");
+		continue;
+		}
+		if (c == '\b' || c == 0x7F) {
+			if (cmd_len > 0) {
+			cmd_len--;
+			console_message("\b \b");
+			}
+			continue;
+		}
+		if (!is_printable(c)) continue;
+		console_print("%c", c);
+		if (cmd_len < CMD_MAX_LEN) {
+			cmd_buffer[cmd_len++] = c;
+		} else {
+			cmd_len = 0;
+			console_message("\r\nError: command too long\r\n> ");
+		}
+	}
 }
