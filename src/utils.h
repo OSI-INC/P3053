@@ -16,5 +16,6 @@ void eem_reset(void);
 // TCP/IP procedures.
 void force_gateway_arp(void);
 void ping_gateway(void);
+void net_info(void);
 
 #endif

@@ -108,6 +108,34 @@ void ping_gateway(void)
     }
 }
 
+void net_info(void)
+{
+    TCPIP_NET_HANDLE netH;
+    TCPIP_NET_IF* pNetIf;
+    IPV4_ADDR ip, mask, gw;
+    uint8_t* mac;
+
+    netH = TCPIP_STACK_IndexToNet(0);
+    pNetIf = _TCPIPStackHandleToNet(netH);
+
+    ip.Val  = pNetIf->netIPAddr.Val;
+    mask.Val = pNetIf->netMask.Val;
+    gw.Val   = pNetIf->netGateway.Val;
+    mac = pNetIf->netMACAddr.v;
+
+    console_message("\r\nNetwork Info:\r\n");
+    console_print("IP      : %u.%u.%u.%u\r\n",
+        ip.v[0], ip.v[1], ip.v[2], ip.v[3]);
+    console_print("Mask    : %u.%u.%u.%u\r\n",
+        mask.v[0], mask.v[1], mask.v[2], mask.v[3]);
+    console_print("Gateway : %u.%u.%u.%u\r\n",
+        gw.v[0], gw.v[1], gw.v[2], gw.v[3]);
+    console_print("MAC     : %02X:%02X:%02X:%02X:%02X:%02X\r\n",
+        mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+    console_print("Link    : %s\r\n",
+        (TCPIP_STACK_NetIsLinked(netH) ? "UP" : "DOWN"));
+    console_message("\r\n");
+}
 
 
 

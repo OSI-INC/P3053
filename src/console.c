@@ -19,6 +19,10 @@
 #include "console.h"
 #include "utils.h"
 
+static inline bool is_printable(char c) {
+    return (c >= 32 && c <= 126);
+}
+
 /*
 	console_putchar writes one character to the UART2 transmit buffer. It calls
 	UART2_Write from plib_uart2.c, which returns zero if the transmit buffer is
@@ -138,6 +142,29 @@ int console_getchar(void) {
     return -1; 
 }
 
+int console_readln(char* buf, int maxlen)
+{
+    int idx = 0;
+
+	while (1) {
+        char c = console_getchar();
+        if (c == '\r' || c == '\n') {
+            console_message("\r\n");
+            buf[idx] = '\0';
+            return idx;
+        } else if (c == '\b' || c == 0x7F) {
+            if (idx > 0) {
+                idx--;
+                console_message("\b \b");
+            }
+        } else if (idx < maxlen - 1) {
+        	if (!is_printable(c)) continue;
+			console_putchar(c);
+			buf[idx++] = c;
+        }
+    }
+}
+
 /*
 	SYS_CONSOLE_Write is a routine used by the Harmony system processes. It
 	writes a raw byte array write to the console, with no regard to the contents
@@ -239,10 +266,6 @@ void SYS_CONSOLE_Task(int index) {
 static char cmd_buffer[CMD_MAX_LEN];
 static unsigned cmd_len = 0;
 
-static inline bool is_printable(char c) {
-    return (c >= 32 && c <= 126);
-}
-
 void CMD_Initialize(void)
 {
     cmd_len = 0;
@@ -256,6 +279,7 @@ void CMD_Initialize(void)
 void CMD_Tasks(void)
 {
     char c;
+    char buff[20];
 
 	while (console_readcount() > 0) {
 		c = console_getchar();
@@ -266,9 +290,21 @@ void CMD_Tasks(void)
 				switch (cmd) {
 					case 'h':
 						console_message("Commands:\r\n");
+						console_message("  a - new ip addr\r\n");
 						console_message("  h - print help\r\n");
+						console_message("  n - net info\r\n");
 						console_message("  p - ping gateway\r\n");
 						console_message("  r - software reset\r\n");
+						break;
+						
+					case 'a':
+						console_message("New IP Address: ");
+						console_readln(buff,sizeof(buff));
+						console_print("%s\r\n",buff);
+						break;
+						
+					case 'n':
+						net_info();
 						break;
 					
 					case 'p':
