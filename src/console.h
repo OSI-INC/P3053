@@ -4,6 +4,7 @@
 #include "config/system/system_module.h"
 #include "config/system/console/sys_console.h"
 
+// Procedures that read from and write to the UART2 console.
 void console_putchar(char c);
 void console_puthex(uint32_t value);
 void console_putint(uint32_t value);
@@ -12,5 +13,8 @@ void console_message(const char *s);
 void console_print(const char* fmt, ...);
 int console_readcount(void);
 int console_getchar(void);
+
+// String manipulation procedures.
+const char* string_trim(const char *s);
 
 #endif

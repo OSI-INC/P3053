@@ -155,7 +155,7 @@ void DAQ_Tasks (void)
                     console_print(
                     	"Interface %s on host %s awaiting initialization.\r\n",
                     	netName,
-                    	netBiosName);
+                    	string_trim(netBiosName));
                 }
                 daq_data.state = DAQ_TCPIP_WAIT_FOR_IP;
             }
@@ -330,7 +330,6 @@ int main ( void )
 	SYS_Initialize(NULL);
 	
 	// Print messages now that our UART console is ready.
-	SYS_CONSOLE_MESSAGE("Testing SYS_CONSOLE_MESSAGE.");
 	console_print("\r\n");
 	console_print("===================================================\r\n");
 	console_print("System initialization routine has completed.\r\n");

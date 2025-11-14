@@ -54,9 +54,12 @@ static inline SYS_STATUS SYS_CONSOLE_Status(int index) {
 #define SYS_CONSOLE_DEFAULT_INSTANCE 0
 
 /*
-	Most Harmony routines use an all-caps version of the above routines. The all-caps
-	version does not specify the console index. Here we define all-caps macros that 
-	transform into the above routines with index zero specified.
+	Most Harmony routines use an all-caps version of the above routines. The
+	all-caps version does not specify the console index. Here we define all-caps
+	macros that transform into the above routines with index zero specified. The
+	double-hash symbol before __VA_ARGS__ tells the compiler to tolerate and
+	manage calls of the macro in which the code provides no conversion
+	specifiers.
 */
 #define SYS_CONSOLE_WRITE(buff, size) SYS_CONSOLE_Write(0, buff, size)
 #define SYS_CONSOLE_MESSAGE(msg) SYS_CONSOLE_Message(0, msg)
