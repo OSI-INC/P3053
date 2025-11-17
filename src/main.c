@@ -44,6 +44,19 @@
 	Configuration constants.
 */
 #define TCPIP_SERVER_PORT 90
+#define TCP_BUFF_SIZE 2048
+#define CONFIG_LENGTH 1024 // bytes for config file buffer
+#define SEPCHARS " :\n,;=" // separator characters in config file
+
+/*
+	Global variables.
+*/
+char logged_in;
+int ip_port,tcp_timeout,security_level;
+char password[32];
+char configuration[CONFIG_LENGTH];
+uint8_t tcp_buffer[TCP_BUFF_SIZE];
+int tcp_first,tcp_available;
 
 
 /*
@@ -127,68 +140,57 @@ typedef struct
 daq_data_type daq_data;
 
 /*
-	DAQ_Tasks is where we handle TCP/IP connections. Right now it's an echo server
-	that handles only one socket at a time.
+	DAQ_Tasks is where we handle TCP/IP connections. Right now the code accepts a
+	telnet socket connection and prints what it receives from the socket to the
+	console. It responds to ping too.
 */
 void DAQ_Tasks (void) 
 {
-    SYS_STATUS          tcpipStat;
-    const char          *netName, *netBiosName;
-    static IPV4_ADDR    dwLastIP[2] = { {-1}, {-1} };
-    IPV4_ADDR           ipAddr;
-    int                 i, nNets;
-    TCPIP_NET_HANDLE    netH;
+    SYS_STATUS          tcpip_status;
+    const char          *interface_name, *host_name;
+    IPV4_ADDR           ip_addr;
+    TCP_SOCKET_INFO		sock_info;
+    TCPIP_NET_HANDLE    net_hdl;
+	int16_t 			num_readable, num_writable;
 
-    switch (daq_data.state)
-    {
-        case DAQ_TCPIP_WAIT_INIT:
-        {
-            tcpipStat = TCPIP_STACK_Status(sysObj.tcpip);
-            if (tcpipStat < 0) {   
+    switch (daq_data.state) {
+        case DAQ_TCPIP_WAIT_INIT: {
+            tcpip_status = TCPIP_STACK_Status(sysObj.tcpip);
+            if (tcpip_status < 0) {   
                 console_print("TCP/IP stack initialization failed.\r\n");
                 daq_data.state = DAQ_TCPIP_ERROR;
-            } else if (tcpipStat == SYS_STATUS_READY) {
-                nNets = TCPIP_STACK_NumberOfNetworksGet();
-                for(i = 0; i < nNets; i++) {
-                    netH = TCPIP_STACK_IndexToNet(i);
-                    netName = TCPIP_STACK_NetNameGet(netH);
-                    netBiosName = TCPIP_STACK_NetBIOSName(netH);
-                    console_print(
-                    	"Interface %s on host %s awaiting initialization.\r\n",
-                    	netName,
-                    	string_trim(netBiosName));
-                }
+            } else if (tcpip_status == SYS_STATUS_READY) {
+				net_hdl = TCPIP_STACK_IndexToNet(0);
+				interface_name = TCPIP_STACK_NetNameGet(net_hdl);
+				host_name = TCPIP_STACK_NetBIOSName(net_hdl);
+				console_print(
+					"Interface %s on host %s awaiting initialization.\r\n",
+					interface_name,
+					string_trim(host_name));
                 daq_data.state = DAQ_TCPIP_WAIT_FOR_IP;
             }
         }
         break;
 
-        case DAQ_TCPIP_WAIT_FOR_IP:
-        {
-            nNets = TCPIP_STACK_NumberOfNetworksGet();
-            for (i = 0; i < nNets; i++) {
-                netH = TCPIP_STACK_IndexToNet(i);
-                if(!TCPIP_STACK_NetIsReady(netH)) {
-                    return;
-                }
-                ipAddr.Val = TCPIP_STACK_NetAddress(netH);
-                if (dwLastIP[i].Val != ipAddr.Val) {
-                    dwLastIP[i].Val = ipAddr.Val;
-                     console_print(
-                    	"Interface %s assigned IP address %d.%d.%d.%d.\r\n", 
-                    	TCPIP_STACK_NetNameGet(netH),
-                    	ipAddr.v[0], 
-                    	ipAddr.v[1],
-                    	ipAddr.v[2],
-                    	ipAddr.v[3]);
-                }
-                daq_data.state = DAQ_TCPIP_OPENING_SERVER;
-            }
+        case DAQ_TCPIP_WAIT_FOR_IP: {
+			net_hdl = TCPIP_STACK_IndexToNet(0);
+			if(!TCPIP_STACK_NetIsReady(net_hdl)) {
+				return;
+			}
+			ip_addr.Val = TCPIP_STACK_NetAddress(net_hdl);
+			interface_name = TCPIP_STACK_NetNameGet(net_hdl);
+			 console_print(
+				"Interface %s assigned IP address %d.%d.%d.%d.\r\n", 
+				interface_name,
+				ip_addr.v[0], 
+				ip_addr.v[1],
+				ip_addr.v[2],
+				ip_addr.v[3]);
+			daq_data.state = DAQ_TCPIP_OPENING_SERVER;
         }
         break;
             
-        case DAQ_TCPIP_OPENING_SERVER:
-        {
+        case DAQ_TCPIP_OPENING_SERVER: {
         	force_gateway_arp();
         	ping_gateway();
             console_print("Waiting for connection on port %d.\r\n",
@@ -204,82 +206,46 @@ void DAQ_Tasks (void)
         }
         break;
 
-        case DAQ_TCPIP_WAIT_FOR_CONNECTION:
-        {
+        case DAQ_TCPIP_WAIT_FOR_CONNECTION: {
             if (!TCPIP_TCP_IsConnected(daq_data.socket)) {
                 return;
             } else {
-                daq_data.state = DAQ_TCPIP_SERVING_CONNECTION;
-                console_print("Received connection.\r\n");
+				if(TCPIP_TCP_SocketInfoGet(daq_data.socket, &sock_info)) {
+					IPV4_ADDR ip = sock_info.remoteIPaddress.v4Add;
+					console_print("Received connection from %u.%u.%u.%u\r\n",
+						ip.v[0], ip.v[1], ip.v[2], ip.v[3]);
+				} else {
+					console_print("Received connection, unknown peer.");
+				}
+				daq_data.state = DAQ_TCPIP_SERVING_CONNECTION;
             }
         }
         break;
 
-        case DAQ_TCPIP_SERVING_CONNECTION:
-        {
+        case DAQ_TCPIP_SERVING_CONNECTION: {
             if (!TCPIP_TCP_IsConnected(daq_data.socket) 
             	|| TCPIP_TCP_WasDisconnected(daq_data.socket)) {
                 daq_data.state = DAQ_TCPIP_CLOSING_CONNECTION;
                 console_print("Connection closed.\r\n");
                 break;
             }
-            int16_t wMaxGet, wMaxPut, wCurrentChunk;
-            uint16_t w, w2;
-            uint8_t AppBuffer[32 + 1];
             
-            // Figure out how many bytes have been received and how many we can
-            // transmit. The GetIsReady function returns the number of bytes
-            // available to read, while the PutIsReady function returns how many
-            // bytes we can write to the output buffer before it is full.
-            wMaxGet = TCPIP_TCP_GetIsReady(daq_data.socket);
-            wMaxPut = TCPIP_TCP_PutIsReady(daq_data.socket);
+            num_readable = TCPIP_TCP_GetIsReady(daq_data.socket);
+            num_writable = TCPIP_TCP_PutIsReady(daq_data.socket);
+			if (num_readable <= 0) {return;}
+			console_print("Readable: %u, Writeable: %u.\r\n",num_readable,num_writable);
 
-            // Make sure we don't take more bytes out of the RX FIFO than we can
-            // put into the TX FIFO
-            if (wMaxPut < wMaxGet) {
-                wMaxGet = wMaxPut;
-            }
+			if (num_readable > TCP_BUFF_SIZE-1) {
+				num_readable = TCP_BUFF_SIZE-1;
+			}			
+			TCPIP_TCP_ArrayGet(daq_data.socket, tcp_buffer, num_readable);
+			tcp_buffer[num_readable] = 0;
+            console_print("Transmit: %s", tcp_buffer);
 
-            // Process all bytes that we can. This is implemented as a loop,
-            // processing up to sizeof(AppBuffer) bytes at a time. This limits
-            // memory usage while maximizing performance.  Single byte Gets and
-            // Puts are a lot slower than multibyte GetArrays and PutArrays.
-            wCurrentChunk = sizeof(AppBuffer) -1;
-            for (w = 0; w < wMaxGet; w += sizeof(AppBuffer) - 1) {
-				// Make sure the last chunk, which will likely be smaller than
-				// our buffer, is treated correctly.
-				if (w + sizeof(AppBuffer) - 1 > wMaxGet) wCurrentChunk = wMaxGet - w;
-
-                // Transfer the data out of the TCP RX FIFO and into our local
-                // processing buffer.
-                TCPIP_TCP_ArrayGet(daq_data.socket, AppBuffer, wCurrentChunk);
-
-                // Perform the "ToUpper" operation on each data byte
-                for (w2 = 0; w2 < wCurrentChunk; w2++) {
-                    i = AppBuffer[w2];
-                    if (i == '\x1b') {
-                        daq_data.state = DAQ_TCPIP_CLOSING_CONNECTION;
-                        console_print("Connection closed.\r\n");
-                    }
-                }
-                AppBuffer[w2] = 0;  // end the console string properly
-
-                // Transfer the data out of our local processing buffer and into
-                // the TCP TX FIFO.
-                console_print("Transmit: %s\r\n", AppBuffer);
-                TCPIP_TCP_ArrayPut(daq_data.socket, AppBuffer, wCurrentChunk);
-
-                // No need to perform any flush. TCP data in TX FIFO will
-                // automatically transmit itself after it accumulates for a
-                // while. If you want to decrease latency at the expense of
-                // wasting network bandwidth on TCP overhead, perform an
-                // explicit flush via the TCPFlush() API.
-            }
         }
         break;
         
-        case DAQ_TCPIP_CLOSING_CONNECTION:
-        {
+        case DAQ_TCPIP_CLOSING_CONNECTION: {
             TCPIP_TCP_Close(daq_data.socket);
             daq_data.socket = INVALID_SOCKET;
             daq_data.state = DAQ_TCPIP_WAIT_FOR_IP;
