@@ -40,17 +40,17 @@
 #include "console.h"
 #include "utils.h"
 
-/*
-	Configuration constants.
-*/
+// Configuration constants.
 #define TCPIP_SERVER_PORT 90
-#define TCP_BUFF_SIZE 2048
+#define ETH_MTU 1514
+#define BUFF_SIZE (ETH_MTU-40)
+#define RAM_BUFF_SIZE (6*BUFF_SIZE)
+#define TCP_BUFF_SIZE (6*BUFF_SIZE)
+#define CHECK_TCP_COUNT 1000
 #define CONFIG_LENGTH 1024 // bytes for config file buffer
 #define SEPCHARS " :\n,;=" // separator characters in config file
 
-/*
-	Global variables.
-*/
+// Global variables.
 char logged_in;
 int ip_port,tcp_timeout,security_level;
 char password[32];
@@ -58,11 +58,208 @@ char configuration[CONFIG_LENGTH];
 uint8_t tcp_buffer[TCP_BUFF_SIZE];
 int tcp_first,tcp_available;
 
+// LWDAQ messages
+#define START_CODE 0xA5 // correct value for start code
+#define CLOSE_CODE 0x04 // close connection character
+#define END_CODE 0x5A // correct value for end code
+#define START_OFFSET 0
+#define ID_OFFSET 1
+#define CLEN_OFFSET 5
+#define CONTENT_OFFSET 9
+#define FRAME_SIZE 10
+
+// Message Identifiers
+#define VERSION_READ	0
+#define BYTE_READ 		1
+#define BYTE_WRITE 		2
+#define STREAM_READ		3
+#define DATA_RETURN		4
+#define BYTE_POLL		5
+#define LOGIN			6
+#define CONFIG_READ		7
+#define CONFIG_WRITE	8
+#define MAC_READ		9
+#define STREAM_DELETE	10
+#define ECHO			11
+#define STREAM_WRITE	12
+#define REBOOT			13
+
+// Data acquisition state names and variable. The TCP_SOCKET type is defined as
+// a sixteen-bit signed integer in tcp.h.
+typedef enum {
+	DAQ_TCPIP_WAIT_INIT,
+	DAQ_TCPIP_WAIT_FOR_IP,	
+	DAQ_TCPIP_OPENING_SERVER,
+	DAQ_TCPIP_WAIT_FOR_CONNECTION,
+	DAQ_TCPIP_SERVING_CONNECTION,
+	DAQ_TCPIP_CLOSING_CONNECTION,
+	DAQ_TCPIP_ERROR,
+} daq_states;
+typedef struct {
+    daq_states state;
+    TCP_SOCKET socket;
+} daq_data_type;
+daq_data_type daq_data;
+
+
+/*
+	tcp_tick maintains the system and returns 1 if socket is still alive.
+*/
+int tcp_tick(void) {
+	DRV_MIIM_OBJECT_BASE_Default.DRV_MIIM_Tasks(sysObj.drvMiim_0);
+	TCPIP_STACK_Task(sysObj.tcpip);
+	CMD_Tasks();
+    if (!TCPIP_TCP_IsConnected(daq_data.socket) 
+        || TCPIP_TCP_WasDisconnected(daq_data.socket)) {
+     	return 0;
+    } else {
+    	return 1;
+    }
+}
+
+/*
+flip_bytes reverses the order of four bytes in a thirty-two bit
+variable, so as to convert little-endian to big-endian byte order,
+and visa-versa.
+*/
+int flip_bytes(int original) {
+	char *a,*b;
+	int result;
+	a=((char *) &original);
+	b=((char *) &result)+3;
+	*b=*a;
+	a=a+1;b=b+(-1);*b=*a;
+	a=a+1;b=b+(-1);*b=*a;
+	a=a+1;b=b+(-1);*b=*a;
+	return result;
+}
+
+/*
+	buffered_socket_read takes available bytes from the socket buffer and places
+	them in a ram buffer so that we can execute commands consecutively without
+	having to call the sock_fastread or sock_read routines. Each of these takes
+	a couple of milliseconds to return, whether we read one byte or a thousand
+	bytes. The routine returns the number of bytes it read. If the routine
+	cannot supply the requested number of bytes, perhaps because the socket is
+	closed or broken, it returns value -1. With the socket buffer empty, the
+	routine calls tcp_tick. If the socket is still open, the routine returns 0.
+	If the socket is closed, broken, or if the ram buffer is overflowing with
+	un-used data, the routine returns a value less than 0.
+*/
+int buffered_socket_read(uint8_t* dp, int len) {
+	int tcp_remaining;
+	uint8_t* tcp_destination;
+
+	if (tcp_available>=len) {
+		memcpy(dp,&tcp_buffer[tcp_first],len);
+		tcp_first=tcp_first+len;
+		tcp_available=tcp_available-len;
+	} else {
+		tcp_remaining=len;
+		tcp_destination=dp;
+		if (tcp_available>0) {
+			memcpy(tcp_destination,&tcp_buffer[tcp_first],tcp_available);
+			tcp_remaining=tcp_remaining-tcp_available;
+			tcp_destination=tcp_destination+tcp_available;
+			console_print("Read last %d available, need %d more.\n",
+				tcp_available,tcp_remaining);
+		}
+		tcp_available=0;
+		tcp_first=-1;
+		while (tcp_remaining>0) {
+			console_print("Waiting for %d bytes...\r\n",tcp_remaining);
+			while (tcp_available==0) {
+				tcp_available=TCPIP_TCP_GetIsReady(daq_data.socket);
+				if (tcp_available>0) {
+					TCPIP_TCP_ArrayGet(daq_data.socket,tcp_buffer,tcp_available);	
+				} 
+				if (!tcp_tick()) {
+	                console_print("Connection broken.\r\n");
+ 					return -1;
+				}
+			}
+			console_print("Received %d bytes.\r\n",tcp_available);
+			if (tcp_available>=tcp_remaining) {
+				memcpy(tcp_destination,tcp_buffer,tcp_remaining);
+				tcp_first=tcp_remaining;
+				tcp_available=tcp_available-tcp_remaining;
+				tcp_remaining=0;
+			} else {
+				memcpy(tcp_destination,tcp_buffer,tcp_available);
+				tcp_destination=tcp_destination+tcp_available;
+				tcp_remaining=tcp_remaining-tcp_available;
+				tcp_available=0;
+			}
+		}
+	}
+	return len;
+}
+
+/*
+	receive_message reads data from a socket until an entire message has been
+	received. It saves the message id to *id and the content to *content. It
+	reports the length of the content in *len. The routine assumes the LWDAQ
+	Message Protocol.
+*/
+int receive_message(int* id, int* len, uint8_t* content) {
+	uint8_t code;
+
+	// We read the start code. If it's incorrect, we close the socket and return
+	// with an error code.
+	buffered_socket_read(&code,sizeof(code));
+	if (code!=START_CODE) {
+		if (code==CLOSE_CODE) {
+			console_print("Close code received, closing socket.\r\n");
+		} else {
+			console_print("Invalid start code, closing socket.\r\n");
+		}
+		TCPIP_TCP_Close(daq_data.socket);
+		return -1;
+	}
+	
+	// We read the message identifier and content length.
+	buffered_socket_read((uint8_t*)id,sizeof(*id));
+	buffered_socket_read((uint8_t*)len,sizeof(*len));
+	
+	// We flip the big-endian integer bytes around to make them little-endian.
+	*id=flip_bytes(*id);
+	*len=flip_bytes(*len);
+	
+	// We are limited in the size of a single message by the length of our input
+	// buffer, so we check to see if the contents length specified in the
+	// message header exceeds the length of our buffer. If so, we close the
+	// socket.
+	if (*len>BUFF_SIZE) {
+		console_print("Message content too long, closing socket.\n");
+		TCPIP_TCP_Close(daq_data.socket);
+		return -1;
+	}
+	
+	// We read the content itself into a buffer. At the end of the content we
+	// write a null character so we can pass the content buffer to
+	// string-handling routines.
+	if (*len>0) {
+	buffered_socket_read(content,(int) *len);
+		content[(int) *len]=0x00;
+	} else {
+		content[0]=0x00;
+	}
+	
+	// Read the end code.
+	buffered_socket_read(&code,sizeof(code));
+	if (code!=END_CODE) {
+		console_print("Invalid end code, closing socket.\n");
+		TCPIP_TCP_Close(daq_data.socket);
+		return -1;
+	}
+	
+	return 0;
+}
 
 /*
 	General-Purpose Input-Output Initialization.
 */
-void GPIO_Initialize (void)
+void hardware_configure (void)
 {
 	// The A3053A is all-digital. so we configure all pins as digital pins. We
 	// don't even bother to check the data sheet to see which pins can be
@@ -114,34 +311,8 @@ void GPIO_Initialize (void)
 }
 
 /*
-	Define state names for our data acquisition (DAQ) state machine. 
-*/
-typedef enum
-{
-	DAQ_TCPIP_WAIT_INIT,
-	DAQ_TCPIP_WAIT_FOR_IP,	
-	DAQ_TCPIP_OPENING_SERVER,
-	DAQ_TCPIP_WAIT_FOR_CONNECTION,
-	DAQ_TCPIP_SERVING_CONNECTION,
-	DAQ_TCPIP_CLOSING_CONNECTION,
-	DAQ_TCPIP_ERROR,
-} daq_states;
-
-/*
-	Define a varaiable that contains DAQ state, as enumerated above, and a single
-	socket that the state machine is dealing with. The TCP_SOCKET type is defined
-	as a sixteen-bit signed integer in tcp.h.
-*/
-typedef struct
-{
-    daq_states state;
-    TCP_SOCKET socket;
-} daq_data_type;
-daq_data_type daq_data;
-
-/*
-	DAQ_Tasks is where we handle TCP/IP connections. Right now the code accepts a
-	telnet socket connection and prints what it receives from the socket to the
+	DAQ_Tasks handles TCP/IP connections. Right now the code accepts a telnet
+	socket connection and prints what it receives from the socket to the
 	console. It responds to ping too.
 */
 void DAQ_Tasks (void) 
@@ -151,7 +322,8 @@ void DAQ_Tasks (void)
     IPV4_ADDR           ip_addr;
     TCP_SOCKET_INFO		sock_info;
     TCPIP_NET_HANDLE    net_hdl;
-	int16_t 			num_readable, num_writable;
+	static uint8_t 		in_buffer[BUFF_SIZE];
+	int 				id, len;
 
     switch (daq_data.state) {
         case DAQ_TCPIP_WAIT_INIT: {
@@ -187,12 +359,12 @@ void DAQ_Tasks (void)
 				ip_addr.v[2],
 				ip_addr.v[3]);
 			daq_data.state = DAQ_TCPIP_OPENING_SERVER;
-        }
+         	force_gateway_arp();
+        	ping_gateway();
+       }
         break;
             
         case DAQ_TCPIP_OPENING_SERVER: {
-        	force_gateway_arp();
-        	ping_gateway();
             console_print("Waiting for connection on port %d.\r\n",
             	TCPIP_SERVER_PORT);
             daq_data.socket = TCPIP_TCP_ServerOpen(
@@ -230,25 +402,19 @@ void DAQ_Tasks (void)
                 break;
             }
             
-            num_readable = TCPIP_TCP_GetIsReady(daq_data.socket);
-            num_writable = TCPIP_TCP_PutIsReady(daq_data.socket);
-			if (num_readable <= 0) {return;}
-			console_print("Readable: %u, Writeable: %u.\r\n",num_readable,num_writable);
-
-			if (num_readable > TCP_BUFF_SIZE-1) {
-				num_readable = TCP_BUFF_SIZE-1;
-			}			
-			TCPIP_TCP_ArrayGet(daq_data.socket, tcp_buffer, num_readable);
-			tcp_buffer[num_readable] = 0;
-            console_print("Transmit: %s", tcp_buffer);
-
+            if (receive_message(&id,&len,in_buffer)<0) {
+            	daq_data.state = DAQ_TCPIP_CLOSING_CONNECTION;
+            	break;
+            }
+            
+            console_print("id=%u, len=%u, %s\r\n",id,len,in_buffer);
         }
         break;
         
         case DAQ_TCPIP_CLOSING_CONNECTION: {
             TCPIP_TCP_Close(daq_data.socket);
             daq_data.socket = INVALID_SOCKET;
-            daq_data.state = DAQ_TCPIP_WAIT_FOR_IP;
+            daq_data.state = DAQ_TCPIP_OPENING_SERVER;
         }
         break;
         
@@ -257,24 +423,16 @@ void DAQ_Tasks (void)
     }
 }
 
-
-/*
-	SYS_Initialize performs a sequence of functions necessary when the CPU boots
-	up. It calls routines defined in initialize.c and elsewhere in the
-	configuration source code. The CLK routine intializes the clock. The MA
-	routine initializes memory access: wait states and error code correction.
-	The GPIO routine configures the MCU pins, including peripheral pin selection
-	(PPS). The NVM routine initializes the non-volatile flash memory. The
-	CORETIMER routine we have yet to investigate. We initialize the UART2
-	interface directly in the routine. The TCPIP routine initializes the TCPIP
-	stack.
-*/
-void SYS_Initialize (void* data)
+int main ( void )
 {
+	int i;
+
+	// Disable interrupts for initialization.
 	(void)__builtin_disable_interrupts();	
+	
 	CLK_Initialize();
 	ACCESS_Initialize();
-	GPIO_Initialize();
+	hardware_configure();
 	NVM_Initialize();
 	CORETIMER_Initialize();
 	UART2_Initialize();
@@ -289,16 +447,10 @@ void SYS_Initialize (void* data)
 	CMD_Initialize();
 	TCPIP_Initialize();
 	daq_data.state = DAQ_TCPIP_WAIT_INIT;
+	
+	// Re-enable interrupts and report initialization complete.
 	(void)__builtin_enable_interrupts();
-	console_print("System initialization routine has completed.\r\n");
-}
-
-int main ( void )
-{
-	int i;
-
-	// Call the system initialization routine, which is defined above.
-	SYS_Initialize(NULL);
+	console_print("Initialization complete, systems starting up.\r\n");
 	
 	// Turn on the red and green lamps.
    	GPIO_PortSet(GPIO_PORT_A,0x00000004);
@@ -336,3 +488,5 @@ int main ( void )
     // Return an error code of the correct type if we get here.
     return (EXIT_FAILURE);
 }
+
+
