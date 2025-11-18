@@ -60,26 +60,15 @@ void eem_reset(void) {
     while(1);
 }
 
-void force_gateway_arp(void)
-{
-    TCPIP_NET_HANDLE netH = TCPIP_STACK_IndexToNet(0);
-    IPV4_ADDR gwAddr;
-
-    netH = TCPIP_STACK_IndexToNet(0);
-    gwAddr.Val = TCPIP_STACK_NetAddressGateway(netH);
-	console_print("Manufacturing ARP for gateway %d.%d.%d.%d... ",
-		gwAddr.v[0], gwAddr.v[1], gwAddr.v[2], gwAddr.v[3]);
-    TCPIP_MAC_ADDR fakeMac = { .v = { 0x02, 0x00, 0x00, 0x00, 0x00, 0x01 } };
-	TCPIP_ARP_RESULT res = TCPIP_ARP_EntrySet(netH, &gwAddr, &fakeMac, true);
-    if (res >= 0) {
-    	console_message("Succeeded.\r\n");
-    } else {
-    	console_print(" Failed with error code %u\r\n", res);
-    }
-}
-
-void ping_gateway(void)
-{
+/*
+	ping_gateway sends a ping echo request to the default gateway address. In
+	order to be sure of generating a ping, we fake an ARP table entry for the
+	gatewayt, becauyse if there is no such entry in the local network's ARP
+	table, the Harmony TCP/IP stack will refuse to generate the ping. We use the
+	ping to announce the presence of the EEM on the local network when it boots
+	up.
+*/
+void ping_gateway(void) {
     TCPIP_NET_HANDLE netH;
     IPV4_ADDR gwAddr;
     TCPIP_ICMP_ECHO_REQUEST echoReq;
@@ -88,8 +77,10 @@ void ping_gateway(void)
 
     netH = TCPIP_STACK_IndexToNet(0);
     gwAddr.Val = TCPIP_STACK_NetAddressGateway(netH);
-    console_print("Pinging gateway at %d.%d.%d.%d...",
-        gwAddr.v[0], gwAddr.v[1], gwAddr.v[2], gwAddr.v[3]);
+    TCPIP_MAC_ADDR fakeMac = { .v = { 0x02, 0x00, 0x00, 0x00, 0x00, 0x01 } };
+	TCPIP_ARP_EntrySet(netH, &gwAddr, &fakeMac, true);
+    console_print("Pinging %d.%d.%d.%d...",
+        gwAddr.v[0],gwAddr.v[1],gwAddr.v[2],gwAddr.v[3]);
     memset(&echoReq, 0, sizeof(echoReq));
     echoReq.netH            = netH;
     echoReq.targetAddr      = gwAddr;
@@ -100,14 +91,16 @@ void ping_gateway(void)
     echoReq.callback        = NULL;      // polling mode
     echoReq.param           = NULL;
     res = TCPIP_ICMP_EchoRequest(&echoReq, &reqHandle);
-
     if (res == ICMP_ECHO_OK) {
-    	console_message(" Succeeded.\r\n");
+    	console_print(" succeeded in %s.\r\n",__func__);
 	} else {
-    	console_print(" Failed with error code %u\r\n", res);
+    	console_print(" failed with code %u in %s.\r\n",res,__func__);
     }
 }
 
+/*
+	net_info prints network information to the console.
+*/
 void net_info(void)
 {
     TCPIP_NET_HANDLE netH;
@@ -125,13 +118,13 @@ void net_info(void)
 
     console_message("\r\nNetwork Info:\r\n");
     console_print("IP      : %u.%u.%u.%u\r\n",
-        ip.v[0], ip.v[1], ip.v[2], ip.v[3]);
+        ip.v[0],ip.v[1],ip.v[2],ip.v[3]);
     console_print("Mask    : %u.%u.%u.%u\r\n",
-        mask.v[0], mask.v[1], mask.v[2], mask.v[3]);
+        mask.v[0],mask.v[1],mask.v[2],mask.v[3]);
     console_print("Gateway : %u.%u.%u.%u\r\n",
-        gw.v[0], gw.v[1], gw.v[2], gw.v[3]);
+        gw.v[0],gw.v[1],gw.v[2],gw.v[3]);
     console_print("MAC     : %02X:%02X:%02X:%02X:%02X:%02X\r\n",
-        mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+        mac[0],mac[1],mac[2],mac[3],mac[4],mac[5]);
     console_print("Link    : %s\r\n",
         (TCPIP_STACK_NetIsLinked(netH) ? "UP" : "DOWN"));
     console_message("\r\n");
