@@ -41,6 +41,9 @@
 #include "console.h"
 #include "utils.h"
 
+// Current version number
+#define VERSION_NUM 15
+
 // Configuration constants.
 #define TCPIP_SERVER_PORT 90
 #define ETH_MTU 1514
@@ -174,20 +177,84 @@ int sys_tick(void) {
 }
 
 /*
-flip_bytes reverses the order of four bytes in a thirty-two bit
-variable, so as to convert little-endian to big-endian byte order,
-and visa-versa.
+	flip_bytes reverses the order of four bytes in a thirty-two bit variable, so
+	as to convert little-endian to big-endian byte order, and visa-versa.
 */
-int flip_bytes(int original) {
-	char *a,*b;
-	int result;
-	a=((char *) &original);
-	b=((char *) &result)+3;
+int flip_bytes(uint32_t original) {
+	uint8_t *a,*b;
+	uint32_t result;
+	a=((uint8_t *) &original);
+	b=((uint8_t *) &result)+3;
 	*b=*a;
 	a=a+1;b=b+(-1);*b=*a;
 	a=a+1;b=b+(-1);*b=*a;
 	a=a+1;b=b+(-1);*b=*a;
 	return result;
+}
+
+/*
+	return_header sends a data return message header through a socket.
+*/
+int return_header(uint32_t id, uint32_t len) {
+	uint8_t buff[15];
+	uint32_t* lp;
+	
+	buff[START_OFFSET]=START_CODE;
+	lp=(uint32_t*)&buff[ID_OFFSET];
+	*lp=flip_bytes(id);
+	lp=(uint32_t*)&buff[CLEN_OFFSET];
+	*lp=flip_bytes(len);
+    TCPIP_TCP_ArrayPut(daq_data.socket,buff,CONTENT_OFFSET);
+	return 0;
+}
+
+/*
+	return_footer sends a terminating sequence through a socket.
+*/
+int return_footer(void) {
+	uint8_t buff[15];
+	buff[0]=END_CODE;
+	TCPIP_TCP_ArrayPut(daq_data.socket,buff,1);
+	return 0;
+}
+
+/*
+	return_byte sends a data return message through a socket with a single-byte
+	integer as its content.
+*/
+int return_byte(uint8_t data) {
+	uint8_t buff[15];
+	return_header(DATA_RETURN,sizeof(data));
+	buff[0]=data;
+	TCPIP_TCP_ArrayPut(daq_data.socket,buff,sizeof(data));
+	return_footer();
+	return 0;
+}
+
+/*
+	return_int sends a data return message through a socket with a four-byte
+	integer as its content.
+*/
+int return_int(uint32_t data) {
+	uint8_t buff[15];
+	uint32_t* lp;
+
+	return_header(DATA_RETURN,sizeof(data));
+	lp=(uint32_t*)&buff[0];
+	*lp=flip_bytes(data);
+	TCPIP_TCP_ArrayPut(daq_data.socket,buff,sizeof(data));
+	return_footer();
+	return 0;
+}
+
+/*
+	return_data sends a block of data through a socket.
+*/
+int return_data(uint8_t* block, uint32_t len) {
+	return_header(DATA_RETURN,len);
+	TCPIP_TCP_ArrayPut(daq_data.socket,block,len);
+	return_footer();
+	return 0;
 }
 
 /*
@@ -202,8 +269,8 @@ int flip_bytes(int original) {
 	If the socket is closed, broken, or if the ram buffer is overflowing with
 	un-used data, the routine returns a value less than 0.
 */
-int buffered_socket_read(uint8_t* dp, int len) {
-	int tcp_remaining;
+int buffered_socket_read(uint8_t* dp, uint32_t len) {
+	uint32_t tcp_remaining;
 	uint8_t* tcp_destination;
 
 	if (tcp_available>=len) {
@@ -370,13 +437,13 @@ int process_message (int id, int len, uint8_t* content) {
 
 		case VERSION_READ:{
 			console_print("VERSION_READ in %s.\r\n",__func__);
-			//return_long(&socket,VERSION_NUM);
+			return_int(VERSION_NUM);
 			break;
 		}
 
 		case ECHO:{
-			console_print("ECHO in %s.\r\n",__func__);
-			//return_data(&socket,content,len);
+			console_print("ECHO of %u bytes in %s.\r\n",len,__func__);
+			return_data(content,len);
 			content[len]=0x00;
 			console_print("%s\r\n",content);
 			break;
