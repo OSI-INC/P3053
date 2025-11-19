@@ -63,6 +63,21 @@ uint8_t tcp_buffer[TCP_BUFF_SIZE];
 int tcp_first = 0;
 int tcp_available = 0;
 
+// Data acquisition state names and variable.
+typedef enum {
+	DAQ_TCPIP_WAIT_INIT,
+	DAQ_TCPIP_WAIT_FOR_IP,	
+	DAQ_TCPIP_OPENING_SERVER,
+	DAQ_TCPIP_WAIT_FOR_CONNECTION,
+	DAQ_TCPIP_SERVING_CONNECTION,
+	DAQ_TCPIP_CLOSING_CONNECTION,
+	DAQ_TCPIP_ERROR,
+} daq_state_type;
+daq_state_type daq_state;
+
+// Global socket variables.
+TCP_SOCKET lwdaq_socket;
+
 // LWDAQ messages
 #define START_CODE 0xA5 
 #define END_CODE 0x5A
@@ -144,23 +159,6 @@ void configure_pins (void)
    	GPIO_PortOutputEnable(GPIO_PORT_C,0x00008000);
 }
 
-// Data acquisition state names and variable. The TCP_SOCKET type is defined as
-// a sixteen-bit signed integer in tcp.h.
-typedef enum {
-	DAQ_TCPIP_WAIT_INIT,
-	DAQ_TCPIP_WAIT_FOR_IP,	
-	DAQ_TCPIP_OPENING_SERVER,
-	DAQ_TCPIP_WAIT_FOR_CONNECTION,
-	DAQ_TCPIP_SERVING_CONNECTION,
-	DAQ_TCPIP_CLOSING_CONNECTION,
-	DAQ_TCPIP_ERROR,
-} daq_states;
-typedef struct {
-    daq_states state;
-    TCP_SOCKET socket;
-} daq_data_type;
-daq_data_type daq_data;
-
 /*
 	sys_tick maintains the system and returns 1 if socket is still alive.
 */
@@ -168,8 +166,8 @@ int sys_tick(void) {
 	DRV_MIIM_OBJECT_BASE_Default.DRV_MIIM_Tasks(sysObj.drvMiim_0);
 	TCPIP_STACK_Task(sysObj.tcpip);
 	CMD_Tasks();
-    if (!TCPIP_TCP_IsConnected(daq_data.socket) 
-        || TCPIP_TCP_WasDisconnected(daq_data.socket)) {
+    if (!TCPIP_TCP_IsConnected(lwdaq_socket) 
+        || TCPIP_TCP_WasDisconnected(lwdaq_socket)) {
      	return 0;
     } else {
     	return 1;
@@ -204,7 +202,7 @@ int return_header(uint32_t id, uint32_t len) {
 	*lp=flip_bytes(id);
 	lp=(uint32_t*)&buff[CLEN_OFFSET];
 	*lp=flip_bytes(len);
-    TCPIP_TCP_ArrayPut(daq_data.socket,buff,CONTENT_OFFSET);
+    TCPIP_TCP_ArrayPut(lwdaq_socket,buff,CONTENT_OFFSET);
 	return 0;
 }
 
@@ -214,7 +212,7 @@ int return_header(uint32_t id, uint32_t len) {
 int return_footer(void) {
 	uint8_t buff[15];
 	buff[0]=END_CODE;
-	TCPIP_TCP_ArrayPut(daq_data.socket,buff,1);
+	TCPIP_TCP_ArrayPut(lwdaq_socket,buff,1);
 	return 0;
 }
 
@@ -226,7 +224,7 @@ int return_byte(uint8_t data) {
 	uint8_t buff[15];
 	return_header(DATA_RETURN,sizeof(data));
 	buff[0]=data;
-	TCPIP_TCP_ArrayPut(daq_data.socket,buff,sizeof(data));
+	TCPIP_TCP_ArrayPut(lwdaq_socket,buff,sizeof(data));
 	return_footer();
 	return 0;
 }
@@ -242,7 +240,7 @@ int return_int(uint32_t data) {
 	return_header(DATA_RETURN,sizeof(data));
 	lp=(uint32_t*)&buff[0];
 	*lp=flip_bytes(data);
-	TCPIP_TCP_ArrayPut(daq_data.socket,buff,sizeof(data));
+	TCPIP_TCP_ArrayPut(lwdaq_socket,buff,sizeof(data));
 	return_footer();
 	return 0;
 }
@@ -252,7 +250,7 @@ int return_int(uint32_t data) {
 */
 int return_data(uint8_t* block, uint32_t len) {
 	return_header(DATA_RETURN,len);
-	TCPIP_TCP_ArrayPut(daq_data.socket,block,len);
+	TCPIP_TCP_ArrayPut(lwdaq_socket,block,len);
 	return_footer();
 	return 0;
 }
@@ -292,9 +290,9 @@ int buffered_socket_read(uint8_t* dp, uint32_t len) {
 		while (tcp_remaining>0) {
 			console_print("Waiting for %d bytes in %s.\r\n",tcp_remaining,__func__);
 			while (tcp_available==0) {
-				tcp_available=TCPIP_TCP_GetIsReady(daq_data.socket);
+				tcp_available=TCPIP_TCP_GetIsReady(lwdaq_socket);
 				if (tcp_available>0) {
-					TCPIP_TCP_ArrayGet(daq_data.socket,tcp_buffer,tcp_available);	
+					TCPIP_TCP_ArrayGet(lwdaq_socket,tcp_buffer,tcp_available);	
 				} 
 				if (!sys_tick()) {
 	                console_print("Socket closed by client in %s.\r\n",__func__);
@@ -330,7 +328,7 @@ int receive_message(int* id, int* len, uint8_t* content) {
 	// We read the start code. If it's incorrect, we close the socket and return
 	// with an error code.
 	if (buffered_socket_read(&code,sizeof(code)) < 0) {
-		TCPIP_TCP_Close(daq_data.socket);
+		TCPIP_TCP_Close(lwdaq_socket);
 		return -1;
 	}
 	if (code!=START_CODE) {
@@ -339,17 +337,17 @@ int receive_message(int* id, int* len, uint8_t* content) {
 		} else {
 			console_print("Invalid start code, closing socket in %s.\r\n",__func__);
 		}
-		TCPIP_TCP_Close(daq_data.socket);
+		TCPIP_TCP_Close(lwdaq_socket);
 		return -1;
 	}
 	
 	// We read the message identifier and content length.
 	if (buffered_socket_read((uint8_t*)id,sizeof(*id)) < 0) {
-		TCPIP_TCP_Close(daq_data.socket);
+		TCPIP_TCP_Close(lwdaq_socket);
 		return -1;
 	}
 	if (buffered_socket_read((uint8_t*)len,sizeof(*len)) < 0) {
-		TCPIP_TCP_Close(daq_data.socket);
+		TCPIP_TCP_Close(lwdaq_socket);
 		return -1;
 	}
 	
@@ -363,7 +361,7 @@ int receive_message(int* id, int* len, uint8_t* content) {
 	// socket.
 	if (*len>BUFF_SIZE) {
 		console_print("Message too long, closing socket in %s.\r\n",__func__);
-		TCPIP_TCP_Close(daq_data.socket);
+		TCPIP_TCP_Close(lwdaq_socket);
 		return -1;
 	}
 	
@@ -372,7 +370,7 @@ int receive_message(int* id, int* len, uint8_t* content) {
 	// string-handling routines.
 	if (*len>0) {
 		if (buffered_socket_read(content,(int) *len) < 0) {
-			TCPIP_TCP_Close(daq_data.socket);
+			TCPIP_TCP_Close(lwdaq_socket);
 			return -1;
 		}
 		content[(int) *len]=0x00;
@@ -382,12 +380,12 @@ int receive_message(int* id, int* len, uint8_t* content) {
 	
 	// Read the end code.
 	if (buffered_socket_read(&code,sizeof(code)) < 0) {
-		TCPIP_TCP_Close(daq_data.socket);
+		TCPIP_TCP_Close(lwdaq_socket);
 		return -1;
 	}
 	if (code!=END_CODE) {
 		console_print("Invalid end code, closing socket in %s.\r\n",__func__);
-		TCPIP_TCP_Close(daq_data.socket);
+		TCPIP_TCP_Close(lwdaq_socket);
 		return -1;
 	}
 	
@@ -472,12 +470,12 @@ void tcpip_server (void)
 	static uint8_t 		in_buffer[BUFF_SIZE];
 	int 				id, len;
 
-    switch (daq_data.state) {
+    switch (daq_state) {
         case DAQ_TCPIP_WAIT_INIT: {
             tcpip_status = TCPIP_STACK_Status(sysObj.tcpip);
             if (tcpip_status < 0) {   
                 console_print("TCP/IP stack initialization failed in %s.\r\n",__func__);
-                daq_data.state = DAQ_TCPIP_ERROR;
+                daq_state = DAQ_TCPIP_ERROR;
             } else if (tcpip_status == SYS_STATUS_READY) {
 				net_hdl = TCPIP_STACK_IndexToNet(0);
 				interface_name = TCPIP_STACK_NetNameGet(net_hdl);
@@ -487,7 +485,7 @@ void tcpip_server (void)
 					interface_name,
 					string_trim(host_name),
 					__func__);
-                daq_data.state = DAQ_TCPIP_WAIT_FOR_IP;
+                daq_state = DAQ_TCPIP_WAIT_FOR_IP;
             }
         }
         break;
@@ -504,7 +502,7 @@ void tcpip_server (void)
 				interface_name,
 				ip_addr.v[0],ip_addr.v[1],ip_addr.v[2],ip_addr.v[3],
 				__func__);
-			daq_data.state = DAQ_TCPIP_OPENING_SERVER;
+			daq_state = DAQ_TCPIP_OPENING_SERVER;
         	ping_gateway();
        }
         break;
@@ -515,23 +513,23 @@ void tcpip_server (void)
             	__func__);
             tcp_first = 0;
             tcp_available = 0;
-            daq_data.socket = TCPIP_TCP_ServerOpen(
+            lwdaq_socket = TCPIP_TCP_ServerOpen(
             	IP_ADDRESS_TYPE_IPV4, 
             	TCPIP_SERVER_PORT,0);
-            if (daq_data.socket == INVALID_SOCKET) {
+            if (lwdaq_socket == INVALID_SOCKET) {
                 console_print("Could not open server socket in %s.\r\n",
                 	__func__);
                 break;
             }
-            daq_data.state = DAQ_TCPIP_WAIT_FOR_CONNECTION;
+            daq_state = DAQ_TCPIP_WAIT_FOR_CONNECTION;
         }
         break;
 
         case DAQ_TCPIP_WAIT_FOR_CONNECTION: {
-            if (!TCPIP_TCP_IsConnected(daq_data.socket)) {
+            if (!TCPIP_TCP_IsConnected(lwdaq_socket)) {
                 return;
             } else {
-				if(TCPIP_TCP_SocketInfoGet(daq_data.socket, &sock_info)) {
+				if(TCPIP_TCP_SocketInfoGet(lwdaq_socket, &sock_info)) {
 					IPV4_ADDR ip = sock_info.remoteIPaddress.v4Add;
 					console_print("Received connection from %u.%u.%u.%u in %s.\r\n",
 						ip.v[0],ip.v[1],ip.v[2],ip.v[3],
@@ -539,22 +537,22 @@ void tcpip_server (void)
 				} else {
 					console_print("Received connection, unknown peer.");
 				}
-				daq_data.state = DAQ_TCPIP_SERVING_CONNECTION;
+				daq_state = DAQ_TCPIP_SERVING_CONNECTION;
             }
         }
         break;
 
         case DAQ_TCPIP_SERVING_CONNECTION: {
-            if (!TCPIP_TCP_IsConnected(daq_data.socket) 
-            	|| TCPIP_TCP_WasDisconnected(daq_data.socket)) {
-                daq_data.state = DAQ_TCPIP_CLOSING_CONNECTION;
+            if (!TCPIP_TCP_IsConnected(lwdaq_socket) 
+            	|| TCPIP_TCP_WasDisconnected(lwdaq_socket)) {
+                daq_state = DAQ_TCPIP_CLOSING_CONNECTION;
                 console_print("Socket closed by client in %s.\r\n",
                 	__func__);
                 break;
             }
             
             if (receive_message(&id,&len,in_buffer)<0) {
-            	daq_data.state = DAQ_TCPIP_CLOSING_CONNECTION;
+            	daq_state = DAQ_TCPIP_CLOSING_CONNECTION;
             	break;
             }
             console_print("Message received: id=%u len=%u in %s.\r\n",
@@ -564,9 +562,9 @@ void tcpip_server (void)
         break;
         
         case DAQ_TCPIP_CLOSING_CONNECTION: {
-            TCPIP_TCP_Close(daq_data.socket);
-            daq_data.socket = INVALID_SOCKET;
-            daq_data.state = DAQ_TCPIP_OPENING_SERVER;
+            TCPIP_TCP_Close(lwdaq_socket);
+            lwdaq_socket = INVALID_SOCKET;
+            daq_state = DAQ_TCPIP_OPENING_SERVER;
         }
         break;
         
@@ -597,7 +595,7 @@ int main ( void ) {
 	UTILS_Initialize();
 	CMD_Initialize();
 	TCPIP_Initialize();
-	daq_data.state = DAQ_TCPIP_WAIT_INIT;
+	daq_state = DAQ_TCPIP_WAIT_INIT;
 	
 	// Re-enable interrupts and report initialization complete.
 	(void)__builtin_enable_interrupts();
