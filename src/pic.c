@@ -1,0 +1,92 @@
+/*
+	utils.c is a library of utility routines that communicate with the PIC32MZ
+	registers, read and write throught he MPCIE parallel port, and perform
+	various mundane tasks with strings and buffers.
+*/
+
+#include <stdio.h>
+#include <stdint.h>
+#include <stddef.h>                  
+#include <stdbool.h>
+#include <stdlib.h>
+#include <stdarg.h>
+#include <ctype.h>
+#include <string.h>
+#include "configuration.h"
+#include "definitions.h"
+#include "pic.h"
+
+/*
+	pic_reset resets the Embedded Etherent Module. It does so by unlocking the
+	PIC32MZ configuration registers and writing to the reset configuration bit.
+	We make three writes to the thirty-two bit SYSKEY register with the correct
+	combination to unlock the configuration bits. Then we set the RSWRSTSET
+	register equal to a value defined in the device pack: "_RSWRST_SWRST_MASK".
+	We read the reset register after that, which completes the initiation of
+	reset. The routine does not return, it puts itself in an infinite loop,
+	trusting that the reset will take place and reboot the system.
+*/
+void pic_reset(void) {
+    SYSKEY = 0x00000000;
+    SYSKEY = 0xAA996655;
+    SYSKEY = 0x556699AA;
+    RSWRSTSET = _RSWRST_SWRST_MASK;
+    (void) RSWRST;
+    while(1);
+}
+
+/*
+	pic_configure sets the PIC32MZ general-purpose input-output pins for our
+	application.
+*/
+void pic_initialize(void) {
+	// The A3053A is all-digital. so we configure all pins as digital pins. We
+	// don't even bother to check the data sheet to see which pins can be
+	// non-digital, we just set them all to digital even if they are always
+	// digital.
+	ANSELA = 0x00000000;
+	ANSELB = 0x00000000;
+	ANSELC = 0x00000000;
+	ANSELD = 0x00000000;
+	ANSELE = 0x00000000;
+	ANSELF = 0x00000000;
+	ANSELG = 0x00000000;
+	
+	// We unlock access to the configuration registers by writing a sequence of
+	// three values to the SYSKEY register. These three key values work on all
+	// PIC32 microprocessors. 
+	SYSKEY = 0x00000000U;
+	SYSKEY = 0xAA996655U;
+	SYSKEY = 0x556699AAU;
+	
+	// Now that we have unlocked the configuration registers for writing, we
+	// write to the IOLOCK bit of the configuration control register to enable
+	// writing to the Peripheral Pin Selection (PPS) registers.
+	CFGCONbits.IOLOCK = 0U;
+
+	// Select RF8 as the source of UART2 RX. On the A3053A, RF8 is U1-58,
+	// connected to R11, which in turn feeds D4, the white test point LED.
+	U2RXR = 0b1011;
+	
+	// Select UART2 TX as the source of RF2. On the A3053A, RF2 is U1-57,
+	// connected to, R10, which in turn feeds D3, the blue test point LED.
+	RPF2R = 0b0010;
+	
+	// Lock the PPS registers.
+	CFGCONbits.IOLOCK = 1U;
+	
+	// Lock the configuration registers.
+	SYSKEY = 0x00000000U;
+	
+	// So far, on our A3053A, we have have D3 and D4 dedicated to UART2, but D2
+	// and D5 are available as test points. Pin U1-56 is RF3, so we want to set
+	// bit 3 of port F as an output. Pin U1-59 is RA2, so we want to set bit 2
+	// of port A as an output as well. The constants that hold the numerical
+	// port codes are defined in plib_gpio.h. To specify the bit, we provide a
+	// mask.
+   	GPIO_PortOutputEnable(GPIO_PORT_F,0x00000008);
+   	GPIO_PortOutputEnable(GPIO_PORT_A,0x00000004);
+   	GPIO_PortOutputEnable(GPIO_PORT_C,0x00008000);
+}
+
+

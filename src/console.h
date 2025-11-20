@@ -11,7 +11,7 @@
 
 #include "config/system/console/sys_console.h"
 
-// Procedures that read from and write to the UART2 console.
+// Procedures that read from and write to the console.
 void console_putchar(char c);
 void console_flush(void);
 void console_puthex(uint32_t value);
@@ -22,8 +22,8 @@ void console_print(const char* fmt, ...);
 int console_readcount(void);
 int console_getchar(void);
 
-// Command interface procedures.
-void CMD_Initialize(void);
-void CMD_Tasks(void);
+// Procedures that initialize and maintain the console.
+void console_initialize(void);
+void console_server(void);
 
 #endif

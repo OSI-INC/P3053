@@ -1,7 +1,5 @@
 /*
-	utils.c is a library of utility routines that communicate with the PIC32MZ
-	registers, read and write throught he MPCIE parallel port, and perform
-	various mundane tasks with strings and buffers.
+	utils.c is a library of generic, platform-independent utility routines.
 */
 
 #include <stdio.h>
@@ -12,13 +10,7 @@
 #include <stdarg.h>
 #include <ctype.h>
 #include <string.h>
-#include "configuration.h"
-#include "definitions.h"
-#include "console.h"
-#include "tcpip/tcpip.h"
-#include "tcpip/src/tcpip_private.h"
-#include "tcpip/icmp.h"
-
+#include "utils.h"
 /*
 	string_trim takes a pointer to a null-terminated string and returns a pointer
 	to another null-terminated string that is the same as the original but with all
@@ -40,96 +32,6 @@ const char* string_trim(const char *s) {
     buf[len] = '\0';
     return buf;
 }
-
-/*
-	eem_reset resets the Embedded Etherent Module. It does so by unlocking the
-	PIC32MZ configuration registers and writing to the reset configuration bit.
-	We make three writes to the thirty-two bit SYSKEY register with the correct
-	combination to unlock the configuration bits. Then we set the RSWRSTSET
-	register equal to a value defined in the device pack: "_RSWRST_SWRST_MASK".
-	We read the reset register after that, which completes the initiation of
-	reset. The routine does not return, it puts itself in an infinite loop,
-	trusting that the reset will take place and reboot the system.
-*/
-void eem_reset(void) {
-    SYSKEY = 0x00000000;
-    SYSKEY = 0xAA996655;
-    SYSKEY = 0x556699AA;
-    RSWRSTSET = _RSWRST_SWRST_MASK;
-    (void) RSWRST;
-    while(1);
-}
-
-/*
-	ping_gateway sends a ping echo request to the default gateway address. In
-	order to be sure of generating a ping, we fake an ARP table entry for the
-	gatewayt, becauyse if there is no such entry in the local network's ARP
-	table, the Harmony TCP/IP stack will refuse to generate the ping. We use the
-	ping to announce the presence of the EEM on the local network when it boots
-	up.
-*/
-void ping_gateway(void) {
-    TCPIP_NET_HANDLE netH;
-    IPV4_ADDR gwAddr;
-    TCPIP_ICMP_ECHO_REQUEST echoReq;
-    TCPIP_ICMP_REQUEST_HANDLE reqHandle;
-    ICMP_ECHO_RESULT res;
-
-    netH = TCPIP_STACK_IndexToNet(0);
-    gwAddr.Val = TCPIP_STACK_NetAddressGateway(netH);
-    TCPIP_MAC_ADDR fakeMac = { .v = { 0x02, 0x00, 0x00, 0x00, 0x00, 0x01 } };
-	TCPIP_ARP_EntrySet(netH, &gwAddr, &fakeMac, true);
-    console_print("Pinging %d.%d.%d.%d...",
-        gwAddr.v[0],gwAddr.v[1],gwAddr.v[2],gwAddr.v[3]);
-    memset(&echoReq, 0, sizeof(echoReq));
-    echoReq.netH            = netH;
-    echoReq.targetAddr      = gwAddr;
-    echoReq.sequenceNumber  = 1;
-    echoReq.identifier      = 0xBEEF;    // arbitrary
-    echoReq.pData           = NULL;      // no payload
-    echoReq.dataSize        = 0;
-    echoReq.callback        = NULL;      // polling mode
-    echoReq.param           = NULL;
-    res = TCPIP_ICMP_EchoRequest(&echoReq, &reqHandle);
-    if (res == ICMP_ECHO_OK) {
-    	console_print(" succeeded in %s.\r\n",__func__);
-	} else {
-    	console_print(" failed with code %u in %s.\r\n",res,__func__);
-    }
-}
-
-/*
-	net_info prints network information to the console.
-*/
-void net_info(void)
-{
-    TCPIP_NET_HANDLE netH;
-    TCPIP_NET_IF* pNetIf;
-    IPV4_ADDR ip, mask, gw;
-    uint8_t* mac;
-
-    netH = TCPIP_STACK_IndexToNet(0);
-    pNetIf = _TCPIPStackHandleToNet(netH);
-
-    ip.Val  = pNetIf->netIPAddr.Val;
-    mask.Val = pNetIf->netMask.Val;
-    gw.Val   = pNetIf->netGateway.Val;
-    mac = pNetIf->netMACAddr.v;
-
-    console_message("\r\nNetwork Info:\r\n");
-    console_print("IP      : %u.%u.%u.%u\r\n",
-        ip.v[0],ip.v[1],ip.v[2],ip.v[3]);
-    console_print("Mask    : %u.%u.%u.%u\r\n",
-        mask.v[0],mask.v[1],mask.v[2],mask.v[3]);
-    console_print("Gateway : %u.%u.%u.%u\r\n",
-        gw.v[0],gw.v[1],gw.v[2],gw.v[3]);
-    console_print("MAC     : %02X:%02X:%02X:%02X:%02X:%02X\r\n",
-        mac[0],mac[1],mac[2],mac[3],mac[4],mac[5]);
-    console_print("Link    : %s\r\n",
-        (TCPIP_STACK_NetIsLinked(netH) ? "UP" : "DOWN"));
-    console_message("\r\n");
-}
-
 
 
 

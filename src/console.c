@@ -16,8 +16,10 @@
 #include <string.h>
 #include "configuration.h"
 #include "definitions.h"
-#include "console.h"
 #include "utils.h"
+#include "pic.h"
+#include "comms.h"
+#include "console.h"
 
 static inline bool is_printable(char c) {
     return (c >= 32 && c <= 126);
@@ -266,7 +268,7 @@ void SYS_CONSOLE_Task(int index) {
 static char cmd_buffer[CMD_MAX_LEN];
 static unsigned cmd_len = 0;
 
-void CMD_Initialize(void)
+void console_initialize(void)
 {
     cmd_len = 0;
 	console_print("\r\n\r\n");
@@ -276,7 +278,7 @@ void CMD_Initialize(void)
 	console_print("Command interface running, 'h' for help, 'r' for reset.\r\n");
 }
 
-void CMD_Tasks(void)
+void console_server(void)
 {
     char c;
     char buff[20];
@@ -314,7 +316,7 @@ void CMD_Tasks(void)
 					case 'r':
 						console_message("Resetting... \r\n");
 						console_flush();
-						eem_reset();
+						pic_reset();
 						break;
 					
 					default:

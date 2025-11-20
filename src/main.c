@@ -38,8 +38,10 @@
 #include <stdarg.h>
 #include "configuration.h"
 #include "definitions.h"
-#include "console.h"
 #include "utils.h"
+#include "pic.h"
+#include "comms.h"
+#include "console.h"
 
 // Current version number
 #define VERSION_NUM 15
@@ -49,7 +51,6 @@
 #define BUFF_SIZE (ETH_MTU-40)
 #define RAM_BUFF_SIZE (6*BUFF_SIZE)
 #define TCP_BUFF_SIZE (6*BUFF_SIZE)
-#define CHECK_TCP_COUNT 1000
 #define CONFIG_LENGTH 1024 // bytes for config file buffer
 #define SEPCHARS " :\n,;=" // separator characters in config file
 
@@ -62,29 +63,13 @@ uint8_t tcp_buffer[TCP_BUFF_SIZE];
 int tcp_first = 0;
 int tcp_available = 0;
 
-// Data acquisition state names and variable.
-typedef enum {
-    S_WAIT_STACK,
-    S_WAIT_IP,
-    S_OPEN_SERVER,
-    S_LISTENING,
-    S_CONNECTED,
-    S_SERVING,
-    S_CLOSE,
-    S_ERROR
-} SERVER_STATE;
-typedef struct {
-    TCP_SOCKET socket;
-    SERVER_STATE state;
-    int port;
-    const char* protocol;
-} SERVER;
-SERVER lwdaq_server = { INVALID_SOCKET, S_WAIT_STACK, 90, "LWDAQ" };
-SERVER telnet_server = { INVALID_SOCKET, S_WAIT_STACK, 23, "TELNET" };
-
 // Global socket variables.
 #define LWDAQ_PORT 90
 #define TELNET_PORT   23
+
+// Server state structures.
+SERVER lwdaq_server = { INVALID_SOCKET, S_WAIT_STACK, LWDAQ_PORT, "LWDAQ" };
+SERVER telnet_server = { INVALID_SOCKET, S_WAIT_STACK, TELNET_PORT, "TELNET" };
 
 // LWDAQ messages
 #define START_CODE 0xA5 
@@ -112,60 +97,6 @@ SERVER telnet_server = { INVALID_SOCKET, S_WAIT_STACK, 23, "TELNET" };
 #define STREAM_WRITE	12
 #define REBOOT			13
 
-/*
-	configure_pins sets the PIC32MZ general-purpose input-output pins for our
-	application.
-*/
-void configure_pins (void)
-{
-	// The A3053A is all-digital. so we configure all pins as digital pins. We
-	// don't even bother to check the data sheet to see which pins can be
-	// non-digital, we just set them all to digital even if they are always
-	// digital.
-	ANSELA = 0x00000000;
-	ANSELB = 0x00000000;
-	ANSELC = 0x00000000;
-	ANSELD = 0x00000000;
-	ANSELE = 0x00000000;
-	ANSELF = 0x00000000;
-	ANSELG = 0x00000000;
-	
-	// We unlock access to the configuration registers by writing a sequence of
-	// three values to the SYSKEY register. These three key values work on all
-	// PIC32 microprocessors. 
-	SYSKEY = 0x00000000U;
-	SYSKEY = 0xAA996655U;
-	SYSKEY = 0x556699AAU;
-	
-	// Now that we have unlocked the configuration registers for writing, we
-	// write to the IOLOCK bit of the configuration control register to enable
-	// writing to the Peripheral Pin Selection (PPS) registers.
-	CFGCONbits.IOLOCK = 0U;
-
-	// Select RF8 as the source of UART2 RX. On the A3053A, RF8 is U1-58,
-	// connected to R11, which in turn feeds D4, the white test point LED.
-	U2RXR = 0b1011;
-	
-	// Select UART2 TX as the source of RF2. On the A3053A, RF2 is U1-57,
-	// connected to, R10, which in turn feeds D3, the blue test point LED.
-	RPF2R = 0b0010;
-	
-	// Lock the PPS registers.
-	CFGCONbits.IOLOCK = 1U;
-	
-	// Lock the configuration registers.
-	SYSKEY = 0x00000000U;
-	
-	// So far, on our A3053A, we have have D3 and D4 dedicated to UART2, but D2
-	// and D5 are available as test points. Pin U1-56 is RF3, so we want to set
-	// bit 3 of port F as an output. Pin U1-59 is RA2, so we want to set bit 2
-	// of port A as an output as well. The constants that hold the numerical
-	// port codes are defined in plib_gpio.h. To specify the bit, we provide a
-	// mask.
-   	GPIO_PortOutputEnable(GPIO_PORT_F,0x00000008);
-   	GPIO_PortOutputEnable(GPIO_PORT_A,0x00000004);
-   	GPIO_PortOutputEnable(GPIO_PORT_C,0x00008000);
-}
 
 /*
 	sys_tick maintains the system and returns 1 if socket is still alive.
@@ -173,7 +104,7 @@ void configure_pins (void)
 void sys_tick(void) {
 	DRV_MIIM_OBJECT_BASE_Default.DRV_MIIM_Tasks(sysObj.drvMiim_0);
 	TCPIP_STACK_Task(sysObj.tcpip);
-	CMD_Tasks();
+	console_server();
 }
 
 /*
@@ -477,6 +408,9 @@ int process_message (TCP_SOCKET s, uint32_t id, uint32_t len, uint8_t* content) 
 int service_connection(SERVER* s) {
 	int status = 0;
 	 
+	console_print("Servicing %s connection on port %u by closing in %s.\r\n",
+		(*s).protocol,(*s).port,__func__);
+
 	switch (s->port) {
 		case 90: {
 			status = -1;
@@ -491,123 +425,6 @@ int service_connection(SERVER* s) {
 	return status;
 }
 
-/*
-	lwdaq_server handles TCP/IP connections. Right now the code accepts a telnet
-	connection and prints what it receives from the socket to the console. It
-	responds to ping too.
-*/
-void tcpip_server(SERVER* s) {
-	const uint32_t heartbeat_period = 5000000;
-	
-	SYS_STATUS tcpip_status;
-	IPV4_ADDR ip_addr;
-	TCP_SOCKET_INFO sock_info;
-	TCPIP_NET_HANDLE net_hdl;
-
-	const char* interface_name, *host_name;
-	int status;
-
-	switch (s->state) {
-		case S_WAIT_STACK: {
-			tcpip_status = TCPIP_STACK_Status(sysObj.tcpip);
-			if (tcpip_status < 0) {   
-				console_print("TCP/IP stack initialization failed in %s.\r\n",__func__);
-				s->state = S_ERROR;
-			} else if (tcpip_status == SYS_STATUS_READY) {
-				net_hdl = TCPIP_STACK_IndexToNet(0);
-				interface_name = TCPIP_STACK_NetNameGet(net_hdl);
-				host_name = TCPIP_STACK_NetBIOSName(net_hdl);
-				console_print(
-					"Interface %s on host %s awaiting initialization in %s.\r\n",
-					interface_name,
-					string_trim(host_name),
-					__func__);
-				s->state = S_WAIT_IP;
-			}
-		}
-		break;
-
-
-
-		case S_WAIT_IP: {
-			net_hdl = TCPIP_STACK_IndexToNet(0);
-			if (TCPIP_STACK_NetIsReady(net_hdl)) {
-				ip_addr.Val = TCPIP_STACK_NetAddress(net_hdl);
-				interface_name = TCPIP_STACK_NetNameGet(net_hdl);
-				console_print(
-					"Interface %s assigned IP address %d.%d.%d.%d in %s.\r\n", 
-					interface_name,
-					ip_addr.v[0],ip_addr.v[1],ip_addr.v[2],ip_addr.v[3],
-					__func__);
-				ping_gateway();
-				s->state = S_OPEN_SERVER;
-			}
-		}
-		break;
-
-		case S_OPEN_SERVER: {
-			s->socket = TCPIP_TCP_ServerOpen(IP_ADDRESS_TYPE_IPV4,s->port,0);
-			if (s->socket == INVALID_SOCKET) {
-				console_print("Could not open %s server on port %d in %s.\r\n",
-					s->protocol,s->port,__func__);
-				s->state = S_ERROR;
-			} else {
-				console_print("Listening for %s connection on port %d in %s.\r\n",
-					s->protocol,s->port,__func__);
-				s->state = S_LISTENING;
-			}
-		}
-		break;
-
-		case S_LISTENING: {
-			if (TCPIP_TCP_IsConnected(s->socket)) {
-				if (TCPIP_TCP_SocketInfoGet(s->socket,&sock_info)) {
-					IPV4_ADDR ip = sock_info.remoteIPaddress.v4Add;
-					console_print("%s connection from %u.%u.%u.%u in %s.\r\n",
-						s->protocol,ip.v[0],ip.v[1],ip.v[2],ip.v[3],__func__);
-				} else {
-					console_print("%s connection from unknown peer in %s.\r\n",
-						s->protocol,__func__);
-				}
-				s->state = S_SERVING;
-			}
-		}
-		break;
-
-		case S_SERVING: {
-			if (!TCPIP_TCP_IsConnected(s->socket) ||
-					TCPIP_TCP_WasDisconnected(s->socket)) {
-				console_print("%s socket closed by client in %s.\r\n",
-					s->protocol,__func__);
-				s->state = S_CLOSE;
-			} else {
-				status = service_connection(s);
-				if (status < 0) {
-					s->state = S_CLOSE;
-				}
-			}
-		}
-		break;
-		
-		case S_CLOSE: {
-			TCPIP_TCP_Close(s->socket);
-			s->socket = INVALID_SOCKET;
-			s->state = S_OPEN_SERVER;
-		}
-		break;
-		
-		case S_ERROR: {
-			if (rand() % heartbeat_period == 0) {
-				console_print("Failed to start TCP/IP server in %s.\r\n",
-					__func__);
-			}		
-		}
-		break;
-		
-		default:
-		break;
-	}
-}
 
 int main ( void ) {
 	int i;
@@ -617,7 +434,7 @@ int main ( void ) {
 	
 	CLK_Initialize();
 	ACCESS_Initialize();
-	configure_pins();
+	pic_initialize();
 	NVM_Initialize();
 	CORETIMER_Initialize();
 	UART2_Initialize();
@@ -629,7 +446,7 @@ int main ( void ) {
 	};
 	UART2_SerialSetup(&uart2Setup, 0);
 	UTILS_Initialize();
-	CMD_Initialize();
+	console_initialize();
 	TCPIP_Initialize();
 	
 	// Re-enable interrupts and report initialization complete.
@@ -644,8 +461,8 @@ int main ( void ) {
    	i=0;
 	while (true) {
 		sys_tick();
-		tcpip_server(&lwdaq_server);
-		tcpip_server(&telnet_server);
+		tcpip_server(&lwdaq_server,service_connection);
+		tcpip_server(&telnet_server,service_connection);
 		
 		i = i+1;
 		if (i % 100 == 0) {
