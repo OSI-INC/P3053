@@ -162,12 +162,20 @@ void configure_pins (void)
 /*
 	sys_tick maintains the system and returns 1 if socket is still alive.
 */
-int sys_tick(void) {
+void sys_tick(void) {
 	DRV_MIIM_OBJECT_BASE_Default.DRV_MIIM_Tasks(sysObj.drvMiim_0);
 	TCPIP_STACK_Task(sysObj.tcpip);
 	CMD_Tasks();
-    if (!TCPIP_TCP_IsConnected(lwdaq_socket) 
-        || TCPIP_TCP_WasDisconnected(lwdaq_socket)) {
+}
+
+/*
+	socket_tick maintains the system drivers and TCP/IP stack by calling
+	sys_tick. It also checks the socket passed in as an argument and returns 1
+	if the socket is still connected and zero otherwise.
+*/
+int socket_tick(TCP_SOCKET s) {
+	sys_tick();
+    if (!TCPIP_TCP_IsConnected(s) || TCPIP_TCP_WasDisconnected(s)) {
      	return 0;
     } else {
     	return 1;
@@ -193,7 +201,7 @@ int flip_bytes(uint32_t original) {
 /*
 	return_header sends a data return message header through a socket.
 */
-int return_header(uint32_t id, uint32_t len) {
+int return_header(TCP_SOCKET s, uint32_t id, uint32_t len) {
 	uint8_t buff[15];
 	uint32_t* lp;
 	
@@ -202,17 +210,17 @@ int return_header(uint32_t id, uint32_t len) {
 	*lp=flip_bytes(id);
 	lp=(uint32_t*)&buff[CLEN_OFFSET];
 	*lp=flip_bytes(len);
-    TCPIP_TCP_ArrayPut(lwdaq_socket,buff,CONTENT_OFFSET);
+    TCPIP_TCP_ArrayPut(s,buff,CONTENT_OFFSET);
 	return 0;
 }
 
 /*
 	return_footer sends a terminating sequence through a socket.
 */
-int return_footer(void) {
+int return_footer(TCP_SOCKET s) {
 	uint8_t buff[15];
 	buff[0]=END_CODE;
-	TCPIP_TCP_ArrayPut(lwdaq_socket,buff,1);
+	TCPIP_TCP_ArrayPut(s,buff,1);
 	return 0;
 }
 
@@ -220,12 +228,12 @@ int return_footer(void) {
 	return_byte sends a data return message through a socket with a single-byte
 	integer as its content.
 */
-int return_byte(uint8_t data) {
+int return_byte(TCP_SOCKET s, uint8_t data) {
 	uint8_t buff[15];
-	return_header(DATA_RETURN,sizeof(data));
+	return_header(s,DATA_RETURN,sizeof(data));
 	buff[0]=data;
-	TCPIP_TCP_ArrayPut(lwdaq_socket,buff,sizeof(data));
-	return_footer();
+	TCPIP_TCP_ArrayPut(s,buff,sizeof(data));
+	return_footer(s);
 	return 0;
 }
 
@@ -233,25 +241,25 @@ int return_byte(uint8_t data) {
 	return_int sends a data return message through a socket with a four-byte
 	integer as its content.
 */
-int return_int(uint32_t data) {
+int return_int(TCP_SOCKET s, uint32_t data) {
 	uint8_t buff[15];
 	uint32_t* lp;
 
-	return_header(DATA_RETURN,sizeof(data));
+	return_header(s,DATA_RETURN,sizeof(data));
 	lp=(uint32_t*)&buff[0];
 	*lp=flip_bytes(data);
-	TCPIP_TCP_ArrayPut(lwdaq_socket,buff,sizeof(data));
-	return_footer();
+	TCPIP_TCP_ArrayPut(s,buff,sizeof(data));
+	return_footer(s);
 	return 0;
 }
 
 /*
 	return_data sends a block of data through a socket.
 */
-int return_data(uint8_t* block, uint32_t len) {
-	return_header(DATA_RETURN,len);
-	TCPIP_TCP_ArrayPut(lwdaq_socket,block,len);
-	return_footer();
+int return_data(TCP_SOCKET s, uint8_t* block, uint32_t len) {
+	return_header(s,DATA_RETURN,len);
+	TCPIP_TCP_ArrayPut(s,block,len);
+	return_footer(s);
 	return 0;
 }
 
@@ -263,11 +271,11 @@ int return_data(uint8_t* block, uint32_t len) {
 	bytes. The routine returns the number of bytes it read. If the routine
 	cannot supply the requested number of bytes, perhaps because the socket is
 	closed or broken, it returns value -1. With the socket buffer empty, the
-	routine calls sys_tick. If the socket is still open, the routine returns 0.
+	routine calls socket_tick. If the socket is still open, the routine returns 0.
 	If the socket is closed, broken, or if the ram buffer is overflowing with
 	un-used data, the routine returns a value less than 0.
 */
-int buffered_socket_read(uint8_t* dp, uint32_t len) {
+int buffered_socket_read(TCP_SOCKET s, uint8_t* dp, uint32_t len) {
 	uint32_t tcp_remaining;
 	uint8_t* tcp_destination;
 
@@ -290,11 +298,11 @@ int buffered_socket_read(uint8_t* dp, uint32_t len) {
 		while (tcp_remaining>0) {
 			console_print("Waiting for %d bytes in %s.\r\n",tcp_remaining,__func__);
 			while (tcp_available==0) {
-				tcp_available=TCPIP_TCP_GetIsReady(lwdaq_socket);
+				tcp_available=TCPIP_TCP_GetIsReady(s);
 				if (tcp_available>0) {
-					TCPIP_TCP_ArrayGet(lwdaq_socket,tcp_buffer,tcp_available);	
+					TCPIP_TCP_ArrayGet(s,tcp_buffer,tcp_available);	
 				} 
-				if (!sys_tick()) {
+				if (!socket_tick(s)) {
 	                console_print("Socket closed by client in %s.\r\n",__func__);
  					return -1;
 				}
@@ -322,13 +330,13 @@ int buffered_socket_read(uint8_t* dp, uint32_t len) {
 	reports the length of the content in *len. The routine assumes the LWDAQ
 	Message Protocol.
 */
-int receive_message(int* id, int* len, uint8_t* content) {
+int receive_message(TCP_SOCKET s, int* id, int* len, uint8_t* content) {
 	uint8_t code;
 
 	// We read the start code. If it's incorrect, we close the socket and return
 	// with an error code.
-	if (buffered_socket_read(&code,sizeof(code)) < 0) {
-		TCPIP_TCP_Close(lwdaq_socket);
+	if (buffered_socket_read(s,&code,sizeof(code)) < 0) {
+		TCPIP_TCP_Close(s);
 		return -1;
 	}
 	if (code!=START_CODE) {
@@ -337,17 +345,17 @@ int receive_message(int* id, int* len, uint8_t* content) {
 		} else {
 			console_print("Invalid start code, closing socket in %s.\r\n",__func__);
 		}
-		TCPIP_TCP_Close(lwdaq_socket);
+		TCPIP_TCP_Close(s);
 		return -1;
 	}
 	
 	// We read the message identifier and content length.
-	if (buffered_socket_read((uint8_t*)id,sizeof(*id)) < 0) {
-		TCPIP_TCP_Close(lwdaq_socket);
+	if (buffered_socket_read(s,(uint8_t*)id,sizeof(*id)) < 0) {
+		TCPIP_TCP_Close(s);
 		return -1;
 	}
-	if (buffered_socket_read((uint8_t*)len,sizeof(*len)) < 0) {
-		TCPIP_TCP_Close(lwdaq_socket);
+	if (buffered_socket_read(s,(uint8_t*)len,sizeof(*len)) < 0) {
+		TCPIP_TCP_Close(s);
 		return -1;
 	}
 	
@@ -361,7 +369,7 @@ int receive_message(int* id, int* len, uint8_t* content) {
 	// socket.
 	if (*len>BUFF_SIZE) {
 		console_print("Message too long, closing socket in %s.\r\n",__func__);
-		TCPIP_TCP_Close(lwdaq_socket);
+		TCPIP_TCP_Close(s);
 		return -1;
 	}
 	
@@ -369,8 +377,8 @@ int receive_message(int* id, int* len, uint8_t* content) {
 	// write a null character so we can pass the content buffer to
 	// string-handling routines.
 	if (*len>0) {
-		if (buffered_socket_read(content,(int) *len) < 0) {
-			TCPIP_TCP_Close(lwdaq_socket);
+		if (buffered_socket_read(s,content,(int) *len) < 0) {
+			TCPIP_TCP_Close(s);
 			return -1;
 		}
 		content[(int) *len]=0x00;
@@ -379,13 +387,13 @@ int receive_message(int* id, int* len, uint8_t* content) {
 	}
 	
 	// Read the end code.
-	if (buffered_socket_read(&code,sizeof(code)) < 0) {
-		TCPIP_TCP_Close(lwdaq_socket);
+	if (buffered_socket_read(s,&code,sizeof(code)) < 0) {
+		TCPIP_TCP_Close(s);
 		return -1;
 	}
 	if (code!=END_CODE) {
 		console_print("Invalid end code, closing socket in %s.\r\n",__func__);
-		TCPIP_TCP_Close(lwdaq_socket);
+		TCPIP_TCP_Close(s);
 		return -1;
 	}
 	
@@ -395,7 +403,7 @@ int receive_message(int* id, int* len, uint8_t* content) {
 /*
 	process_message handles an incoming LWDAQ message.
 */
-int process_message (int id, int len, uint8_t* content) {
+int process_message (TCP_SOCKET s, int id, int len, uint8_t* content) {
 	uint8_t register_addr = 0;
 	uint8_t value = 0;
 //	int status;
@@ -435,13 +443,13 @@ int process_message (int id, int len, uint8_t* content) {
 
 		case VERSION_READ:{
 			console_print("VERSION_READ in %s.\r\n",__func__);
-			return_int(VERSION_NUM);
+			return_int(s,VERSION_NUM);
 			break;
 		}
 
 		case ECHO:{
 			console_print("ECHO of %u bytes in %s.\r\n",len,__func__);
-			return_data(content,len);
+			return_data(s,content,len);
 			content[len]=0x00;
 			console_print("%s\r\n",content);
 			break;
@@ -551,13 +559,13 @@ void tcpip_server (void)
                 break;
             }
             
-            if (receive_message(&id,&len,in_buffer)<0) {
+            if (receive_message(lwdaq_socket,&id,&len,in_buffer)<0) {
             	daq_state = DAQ_TCPIP_CLOSING_CONNECTION;
             	break;
             }
             console_print("Message received: id=%u len=%u in %s.\r\n",
             	id,len,__func__);
-            process_message(id,len,in_buffer);
+            process_message(lwdaq_socket,id,len,in_buffer);
         }
         break;
         
