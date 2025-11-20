@@ -32,7 +32,7 @@
 // Include files.
 #include <stdio.h>
 #include <stdint.h>
-#include <stddef.h>                  
+#include <stddef.h>				  
 #include <stdbool.h>
 #include <stdlib.h>
 #include <stdarg.h>
@@ -45,7 +45,6 @@
 #define VERSION_NUM 15
 
 // Configuration constants.
-#define TCPIP_SERVER_PORT 90
 #define ETH_MTU 1514
 #define BUFF_SIZE (ETH_MTU-40)
 #define RAM_BUFF_SIZE (6*BUFF_SIZE)
@@ -65,18 +64,21 @@ int tcp_available = 0;
 
 // Data acquisition state names and variable.
 typedef enum {
-	DAQ_TCPIP_WAIT_INIT,
-	DAQ_TCPIP_WAIT_FOR_IP,	
-	DAQ_TCPIP_OPENING_SERVER,
-	DAQ_TCPIP_WAIT_FOR_CONNECTION,
-	DAQ_TCPIP_SERVING_CONNECTION,
-	DAQ_TCPIP_CLOSING_CONNECTION,
-	DAQ_TCPIP_ERROR,
+	tcpip_wait_init,
+	tcpip_wait_ip,	
+	tcpip_opening_server,
+	tcpip_wait_connection,
+	tcpip_serving_connection,
+	tcpip_closing_connection,
+	tcpip_error,
 } daq_state_type;
 daq_state_type daq_state;
 
 // Global socket variables.
-TCP_SOCKET lwdaq_socket;
+static TCP_SOCKET lwdaq_socket = INVALID_SOCKET;  
+static TCP_SOCKET telnet_socket = INVALID_SOCKET; 
+#define LWDAQ_PORT 90
+#define TELNET_PORT   23
 
 // LWDAQ messages
 #define START_CODE 0xA5 
@@ -122,17 +124,17 @@ void configure_pins (void)
 	ANSELF = 0x00000000;
 	ANSELG = 0x00000000;
 	
-    // We unlock access to the configuration registers by writing a sequence of
-    // three values to the SYSKEY register. These three key values work on all
-    // PIC32 microprocessors. 
-    SYSKEY = 0x00000000U;
-    SYSKEY = 0xAA996655U;
-    SYSKEY = 0x556699AAU;
-    
-    // Now that we have unlocked the configuration registers for writing, we
-    // write to the IOLOCK bit of the configuration control register to enable
-    // writing to the Peripheral Pin Selection (PPS) registers.
-    CFGCONbits.IOLOCK = 0U;
+	// We unlock access to the configuration registers by writing a sequence of
+	// three values to the SYSKEY register. These three key values work on all
+	// PIC32 microprocessors. 
+	SYSKEY = 0x00000000U;
+	SYSKEY = 0xAA996655U;
+	SYSKEY = 0x556699AAU;
+	
+	// Now that we have unlocked the configuration registers for writing, we
+	// write to the IOLOCK bit of the configuration control register to enable
+	// writing to the Peripheral Pin Selection (PPS) registers.
+	CFGCONbits.IOLOCK = 0U;
 
 	// Select RF8 as the source of UART2 RX. On the A3053A, RF8 is U1-58,
 	// connected to R11, which in turn feeds D4, the white test point LED.
@@ -142,18 +144,18 @@ void configure_pins (void)
 	// connected to, R10, which in turn feeds D3, the blue test point LED.
 	RPF2R = 0b0010;
 	
-    // Lock the PPS registers.
-    CFGCONbits.IOLOCK = 1U;
-    
-    // Lock the configuration registers.
-    SYSKEY = 0x00000000U;
-    
-    // So far, on our A3053A, we have have D3 and D4 dedicated to UART2, but D2
-    // and D5 are available as test points. Pin U1-56 is RF3, so we want to set
-    // bit 3 of port F as an output. Pin U1-59 is RA2, so we want to set bit 2
-    // of port A as an output as well. The constants that hold the numerical
-    // port codes are defined in plib_gpio.h. To specify the bit, we provide a
-    // mask.
+	// Lock the PPS registers.
+	CFGCONbits.IOLOCK = 1U;
+	
+	// Lock the configuration registers.
+	SYSKEY = 0x00000000U;
+	
+	// So far, on our A3053A, we have have D3 and D4 dedicated to UART2, but D2
+	// and D5 are available as test points. Pin U1-56 is RF3, so we want to set
+	// bit 3 of port F as an output. Pin U1-59 is RA2, so we want to set bit 2
+	// of port A as an output as well. The constants that hold the numerical
+	// port codes are defined in plib_gpio.h. To specify the bit, we provide a
+	// mask.
    	GPIO_PortOutputEnable(GPIO_PORT_F,0x00000008);
    	GPIO_PortOutputEnable(GPIO_PORT_A,0x00000004);
    	GPIO_PortOutputEnable(GPIO_PORT_C,0x00008000);
@@ -175,11 +177,11 @@ void sys_tick(void) {
 */
 int socket_tick(TCP_SOCKET s) {
 	sys_tick();
-    if (!TCPIP_TCP_IsConnected(s) || TCPIP_TCP_WasDisconnected(s)) {
-     	return 0;
-    } else {
-    	return 1;
-    }
+	if (!TCPIP_TCP_IsConnected(s) || TCPIP_TCP_WasDisconnected(s)) {
+	 	return 0;
+	} else {
+		return 1;
+	}
 }
 
 /*
@@ -210,7 +212,7 @@ int return_header(TCP_SOCKET s, uint32_t id, uint32_t len) {
 	*lp=flip_bytes(id);
 	lp=(uint32_t*)&buff[CLEN_OFFSET];
 	*lp=flip_bytes(len);
-    TCPIP_TCP_ArrayPut(s,buff,CONTENT_OFFSET);
+	TCPIP_TCP_ArrayPut(s,buff,CONTENT_OFFSET);
 	return 0;
 }
 
@@ -303,7 +305,7 @@ int buffered_socket_read(TCP_SOCKET s, uint8_t* dp, uint32_t len) {
 					TCPIP_TCP_ArrayGet(s,tcp_buffer,tcp_available);	
 				} 
 				if (!socket_tick(s)) {
-	                console_print("Socket closed by client in %s.\r\n",__func__);
+					console_print("Socket closed by client in %s.\r\n",__func__);
  					return -1;
 				}
 			}
@@ -330,7 +332,7 @@ int buffered_socket_read(TCP_SOCKET s, uint8_t* dp, uint32_t len) {
 	reports the length of the content in *len. The routine assumes the LWDAQ
 	Message Protocol.
 */
-int receive_message(TCP_SOCKET s, int* id, int* len, uint8_t* content) {
+int receive_message(TCP_SOCKET s, uint32_t* id, uint32_t* len, uint8_t* content) {
 	uint8_t code;
 
 	// We read the start code. If it's incorrect, we close the socket and return
@@ -403,7 +405,7 @@ int receive_message(TCP_SOCKET s, int* id, int* len, uint8_t* content) {
 /*
 	process_message handles an incoming LWDAQ message.
 */
-int process_message (TCP_SOCKET s, int id, int len, uint8_t* content) {
+int process_message (TCP_SOCKET s, uint32_t id, uint32_t len, uint8_t* content) {
 	uint8_t register_addr = 0;
 	uint8_t value = 0;
 //	int status;
@@ -470,21 +472,24 @@ int process_message (TCP_SOCKET s, int id, int len, uint8_t* content) {
 */
 void tcpip_server (void) 
 {
-    SYS_STATUS          tcpip_status;
-    const char          *interface_name, *host_name;
-    IPV4_ADDR           ip_addr;
-    TCP_SOCKET_INFO		sock_info;
-    TCPIP_NET_HANDLE    net_hdl;
-	static uint8_t 		in_buffer[BUFF_SIZE];
-	int 				id, len;
+	const uint32_t heartbeat_period = 1000000;
+	
+	SYS_STATUS tcpip_status;
+	IPV4_ADDR ip_addr;
+	TCP_SOCKET_INFO sock_info;
+	TCPIP_NET_HANDLE net_hdl;
 
-    switch (daq_state) {
-        case DAQ_TCPIP_WAIT_INIT: {
-            tcpip_status = TCPIP_STACK_Status(sysObj.tcpip);
-            if (tcpip_status < 0) {   
-                console_print("TCP/IP stack initialization failed in %s.\r\n",__func__);
-                daq_state = DAQ_TCPIP_ERROR;
-            } else if (tcpip_status == SYS_STATUS_READY) {
+	const char *interface_name, *host_name;
+	static uint8_t in_buffer[BUFF_SIZE];
+	uint32_t id, len;
+
+	switch (daq_state) {
+		case tcpip_wait_init: {
+			tcpip_status = TCPIP_STACK_Status(sysObj.tcpip);
+			if (tcpip_status < 0) {   
+				console_print("TCP/IP stack initialization failed in %s.\r\n",__func__);
+				daq_state = tcpip_error;
+			} else if (tcpip_status == SYS_STATUS_READY) {
 				net_hdl = TCPIP_STACK_IndexToNet(0);
 				interface_name = TCPIP_STACK_NetNameGet(net_hdl);
 				host_name = TCPIP_STACK_NetBIOSName(net_hdl);
@@ -493,12 +498,12 @@ void tcpip_server (void)
 					interface_name,
 					string_trim(host_name),
 					__func__);
-                daq_state = DAQ_TCPIP_WAIT_FOR_IP;
-            }
-        }
-        break;
+				daq_state = tcpip_wait_ip;
+			}
+		}
+		break;
 
-        case DAQ_TCPIP_WAIT_FOR_IP: {
+		case tcpip_wait_ip: {
 			net_hdl = TCPIP_STACK_IndexToNet(0);
 			if(!TCPIP_STACK_NetIsReady(net_hdl)) {
 				return;
@@ -510,75 +515,83 @@ void tcpip_server (void)
 				interface_name,
 				ip_addr.v[0],ip_addr.v[1],ip_addr.v[2],ip_addr.v[3],
 				__func__);
-			daq_state = DAQ_TCPIP_OPENING_SERVER;
-        	ping_gateway();
-       }
-        break;
-            
-        case DAQ_TCPIP_OPENING_SERVER: {
-            console_print("Waiting for connection on port %d in %s.\r\n",
-            	TCPIP_SERVER_PORT,
-            	__func__);
-            tcp_first = 0;
-            tcp_available = 0;
-            lwdaq_socket = TCPIP_TCP_ServerOpen(
-            	IP_ADDRESS_TYPE_IPV4, 
-            	TCPIP_SERVER_PORT,0);
-            if (lwdaq_socket == INVALID_SOCKET) {
-                console_print("Could not open server socket in %s.\r\n",
-                	__func__);
-                break;
-            }
-            daq_state = DAQ_TCPIP_WAIT_FOR_CONNECTION;
-        }
-        break;
+			daq_state = tcpip_opening_server;
+			ping_gateway();
+	   }
+		break;
 
-        case DAQ_TCPIP_WAIT_FOR_CONNECTION: {
-            if (!TCPIP_TCP_IsConnected(lwdaq_socket)) {
-                return;
-            } else {
+		case tcpip_opening_server: {
+			console_print("Waiting for connection on port %d and port %d in %s.\r\n",
+				LWDAQ_PORT, TELNET_PORT, __func__);
+			lwdaq_socket = TCPIP_TCP_ServerOpen(
+				IP_ADDRESS_TYPE_IPV4, LWDAQ_PORT,0);
+			if (lwdaq_socket == INVALID_SOCKET) {
+				console_print("Could not open server socket in %s.\r\n",__func__);
+			}
+	 		telnet_socket = TCPIP_TCP_ServerOpen(
+	 			IP_ADDRESS_TYPE_IPV4, TELNET_PORT, 0);
+			if (telnet_socket == INVALID_SOCKET) {
+				console_print("Could not open Telnet server socket.\r\n");
+			}
+			daq_state = tcpip_wait_connection;
+		}
+		break;
+
+		case tcpip_wait_connection: {
+			if (!TCPIP_TCP_IsConnected(lwdaq_socket)) {
+				return;
+			} else {
 				if(TCPIP_TCP_SocketInfoGet(lwdaq_socket, &sock_info)) {
 					IPV4_ADDR ip = sock_info.remoteIPaddress.v4Add;
+					tcp_first = 0;
+					tcp_available = 0;
 					console_print("Received connection from %u.%u.%u.%u in %s.\r\n",
 						ip.v[0],ip.v[1],ip.v[2],ip.v[3],
 						__func__);
 				} else {
 					console_print("Received connection, unknown peer.");
 				}
-				daq_state = DAQ_TCPIP_SERVING_CONNECTION;
-            }
-        }
-        break;
+				daq_state = tcpip_serving_connection;
+			}
+		}
+		break;
 
-        case DAQ_TCPIP_SERVING_CONNECTION: {
-            if (!TCPIP_TCP_IsConnected(lwdaq_socket) 
-            	|| TCPIP_TCP_WasDisconnected(lwdaq_socket)) {
-                daq_state = DAQ_TCPIP_CLOSING_CONNECTION;
-                console_print("Socket closed by client in %s.\r\n",
-                	__func__);
-                break;
-            }
-            
-            if (receive_message(lwdaq_socket,&id,&len,in_buffer)<0) {
-            	daq_state = DAQ_TCPIP_CLOSING_CONNECTION;
-            	break;
-            }
-            console_print("Message received: id=%u len=%u in %s.\r\n",
-            	id,len,__func__);
-            process_message(lwdaq_socket,id,len,in_buffer);
-        }
-        break;
-        
-        case DAQ_TCPIP_CLOSING_CONNECTION: {
-            TCPIP_TCP_Close(lwdaq_socket);
-            lwdaq_socket = INVALID_SOCKET;
-            daq_state = DAQ_TCPIP_OPENING_SERVER;
-        }
-        break;
-        
-        default:
-        break;
-    }
+		case tcpip_serving_connection: {
+			if (!TCPIP_TCP_IsConnected(lwdaq_socket) 
+				|| TCPIP_TCP_WasDisconnected(lwdaq_socket)) {
+				daq_state = tcpip_closing_connection;
+				console_print("Socket closed by client in %s.\r\n",
+					__func__);
+				break;
+			}
+			
+			if (receive_message(lwdaq_socket,&id,&len,in_buffer)<0) {
+				daq_state = tcpip_closing_connection;
+				break;
+			}
+			console_print("Message received: id=%u len=%u in %s.\r\n",
+				id,len,__func__);
+			process_message(lwdaq_socket,id,len,in_buffer);
+		}
+		break;
+		
+		case tcpip_closing_connection: {
+			TCPIP_TCP_Close(lwdaq_socket);
+			lwdaq_socket = INVALID_SOCKET;
+			daq_state = tcpip_opening_server;
+		}
+		break;
+		
+		case tcpip_error: {
+			if (rand() % heartbeat_period == 0) {
+				console_print("Failed to start TCP/IP server.\r\n");
+			}		
+		}
+		break;
+		
+		default:
+		break;
+	}
 }
 
 int main ( void ) {
@@ -599,11 +612,11 @@ int main ( void ) {
 		.parity = UART_PARITY_NONE,
 		.stopBits = UART_STOP_1_BIT
 	};
-    UART2_SerialSetup(&uart2Setup, 0);
+	UART2_SerialSetup(&uart2Setup, 0);
 	UTILS_Initialize();
 	CMD_Initialize();
 	TCPIP_Initialize();
-	daq_state = DAQ_TCPIP_WAIT_INIT;
+	daq_state = tcpip_wait_init;
 	
 	// Re-enable interrupts and report initialization complete.
 	(void)__builtin_enable_interrupts();
@@ -615,7 +628,7 @@ int main ( void ) {
    	
    	// A while loop with a counter to control the state of our LEDs. 
    	i=0;
-    while (true) {
+	while (true) {
 		sys_tick();
 		tcpip_server();
 		
@@ -630,10 +643,10 @@ int main ( void ) {
 			GPIO_PortToggle(GPIO_PORT_A,0x00000004);
 			i=0;
 		}
-    }
-    
-    // Return an error code of the correct type if we get here.
-    return (EXIT_FAILURE);
+	}
+	
+	// Return an error code of the correct type if we get here.
+	return (EXIT_FAILURE);
 }
 
 
