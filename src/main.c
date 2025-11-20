@@ -64,19 +64,25 @@ int tcp_available = 0;
 
 // Data acquisition state names and variable.
 typedef enum {
-	tcpip_wait_init,
-	tcpip_wait_ip,	
-	tcpip_opening_server,
-	tcpip_wait_connection,
-	tcpip_serving_connection,
-	tcpip_closing_connection,
-	tcpip_error,
-} daq_state_type;
-daq_state_type daq_state;
+    S_WAIT_STACK,
+    S_WAIT_IP,
+    S_OPEN_SERVER,
+    S_LISTENING,
+    S_CONNECTED,
+    S_SERVING,
+    S_CLOSE,
+    S_ERROR
+} SERVER_STATE;
+typedef struct {
+    TCP_SOCKET socket;
+    SERVER_STATE state;
+    int port;
+    const char* protocol;
+} SERVER;
+SERVER lwdaq_server = { INVALID_SOCKET, S_WAIT_STACK, 90, "LWDAQ" };
+SERVER telnet_server = { INVALID_SOCKET, S_WAIT_STACK, 23, "TELNET" };
 
 // Global socket variables.
-static TCP_SOCKET lwdaq_socket = INVALID_SOCKET;  
-static TCP_SOCKET telnet_socket = INVALID_SOCKET; 
 #define LWDAQ_PORT 90
 #define TELNET_PORT   23
 
@@ -466,29 +472,47 @@ int process_message (TCP_SOCKET s, uint32_t id, uint32_t len, uint8_t* content) 
 }
 
 /*
+	service_connection services a connected socket based upon its port number.
+*/
+int service_connection(SERVER* s) {
+	int status = 0;
+	 
+	switch (s->port) {
+		case 90: {
+			status = -1;
+		}
+		break;
+		
+		case 23: {
+			status = -1;
+		}
+		break;
+	}
+	return status;
+}
+
+/*
 	lwdaq_server handles TCP/IP connections. Right now the code accepts a telnet
 	connection and prints what it receives from the socket to the console. It
 	responds to ping too.
 */
-void tcpip_server (void) 
-{
-	const uint32_t heartbeat_period = 1000000;
+void tcpip_server(SERVER* s) {
+	const uint32_t heartbeat_period = 5000000;
 	
 	SYS_STATUS tcpip_status;
 	IPV4_ADDR ip_addr;
 	TCP_SOCKET_INFO sock_info;
 	TCPIP_NET_HANDLE net_hdl;
 
-	const char *interface_name, *host_name;
-	static uint8_t in_buffer[BUFF_SIZE];
-	uint32_t id, len;
+	const char* interface_name, *host_name;
+	int status;
 
-	switch (daq_state) {
-		case tcpip_wait_init: {
+	switch (s->state) {
+		case S_WAIT_STACK: {
 			tcpip_status = TCPIP_STACK_Status(sysObj.tcpip);
 			if (tcpip_status < 0) {   
 				console_print("TCP/IP stack initialization failed in %s.\r\n",__func__);
-				daq_state = tcpip_error;
+				s->state = S_ERROR;
 			} else if (tcpip_status == SYS_STATUS_READY) {
 				net_hdl = TCPIP_STACK_IndexToNet(0);
 				interface_name = TCPIP_STACK_NetNameGet(net_hdl);
@@ -498,93 +522,84 @@ void tcpip_server (void)
 					interface_name,
 					string_trim(host_name),
 					__func__);
-				daq_state = tcpip_wait_ip;
+				s->state = S_WAIT_IP;
 			}
 		}
 		break;
 
-		case tcpip_wait_ip: {
+
+
+		case S_WAIT_IP: {
 			net_hdl = TCPIP_STACK_IndexToNet(0);
-			if(!TCPIP_STACK_NetIsReady(net_hdl)) {
-				return;
-			}
-			ip_addr.Val = TCPIP_STACK_NetAddress(net_hdl);
-			interface_name = TCPIP_STACK_NetNameGet(net_hdl);
-			console_print(
-				"Interface %s assigned IP address %d.%d.%d.%d in %s.\r\n", 
-				interface_name,
-				ip_addr.v[0],ip_addr.v[1],ip_addr.v[2],ip_addr.v[3],
-				__func__);
-			daq_state = tcpip_opening_server;
-			ping_gateway();
-	   }
-		break;
-
-		case tcpip_opening_server: {
-			console_print("Waiting for connection on port %d and port %d in %s.\r\n",
-				LWDAQ_PORT, TELNET_PORT, __func__);
-			lwdaq_socket = TCPIP_TCP_ServerOpen(
-				IP_ADDRESS_TYPE_IPV4, LWDAQ_PORT,0);
-			if (lwdaq_socket == INVALID_SOCKET) {
-				console_print("Could not open server socket in %s.\r\n",__func__);
-			}
-	 		telnet_socket = TCPIP_TCP_ServerOpen(
-	 			IP_ADDRESS_TYPE_IPV4, TELNET_PORT, 0);
-			if (telnet_socket == INVALID_SOCKET) {
-				console_print("Could not open Telnet server socket.\r\n");
-			}
-			daq_state = tcpip_wait_connection;
-		}
-		break;
-
-		case tcpip_wait_connection: {
-			if (!TCPIP_TCP_IsConnected(lwdaq_socket)) {
-				return;
-			} else {
-				if(TCPIP_TCP_SocketInfoGet(lwdaq_socket, &sock_info)) {
-					IPV4_ADDR ip = sock_info.remoteIPaddress.v4Add;
-					tcp_first = 0;
-					tcp_available = 0;
-					console_print("Received connection from %u.%u.%u.%u in %s.\r\n",
-						ip.v[0],ip.v[1],ip.v[2],ip.v[3],
-						__func__);
-				} else {
-					console_print("Received connection, unknown peer.");
-				}
-				daq_state = tcpip_serving_connection;
-			}
-		}
-		break;
-
-		case tcpip_serving_connection: {
-			if (!TCPIP_TCP_IsConnected(lwdaq_socket) 
-				|| TCPIP_TCP_WasDisconnected(lwdaq_socket)) {
-				daq_state = tcpip_closing_connection;
-				console_print("Socket closed by client in %s.\r\n",
+			if (TCPIP_STACK_NetIsReady(net_hdl)) {
+				ip_addr.Val = TCPIP_STACK_NetAddress(net_hdl);
+				interface_name = TCPIP_STACK_NetNameGet(net_hdl);
+				console_print(
+					"Interface %s assigned IP address %d.%d.%d.%d in %s.\r\n", 
+					interface_name,
+					ip_addr.v[0],ip_addr.v[1],ip_addr.v[2],ip_addr.v[3],
 					__func__);
-				break;
+				ping_gateway();
+				s->state = S_OPEN_SERVER;
 			}
-			
-			if (receive_message(lwdaq_socket,&id,&len,in_buffer)<0) {
-				daq_state = tcpip_closing_connection;
-				break;
+		}
+		break;
+
+		case S_OPEN_SERVER: {
+			s->socket = TCPIP_TCP_ServerOpen(IP_ADDRESS_TYPE_IPV4,s->port,0);
+			if (s->socket == INVALID_SOCKET) {
+				console_print("Could not open %s server on port %d in %s.\r\n",
+					s->protocol,s->port,__func__);
+				s->state = S_ERROR;
+			} else {
+				console_print("Listening for %s connection on port %d in %s.\r\n",
+					s->protocol,s->port,__func__);
+				s->state = S_LISTENING;
 			}
-			console_print("Message received: id=%u len=%u in %s.\r\n",
-				id,len,__func__);
-			process_message(lwdaq_socket,id,len,in_buffer);
+		}
+		break;
+
+		case S_LISTENING: {
+			if (TCPIP_TCP_IsConnected(s->socket)) {
+				if (TCPIP_TCP_SocketInfoGet(s->socket,&sock_info)) {
+					IPV4_ADDR ip = sock_info.remoteIPaddress.v4Add;
+					console_print("%s connection from %u.%u.%u.%u in %s.\r\n",
+						s->protocol,ip.v[0],ip.v[1],ip.v[2],ip.v[3],__func__);
+				} else {
+					console_print("%s connection from unknown peer in %s.\r\n",
+						s->protocol,__func__);
+				}
+				s->state = S_SERVING;
+			}
+		}
+		break;
+
+		case S_SERVING: {
+			if (!TCPIP_TCP_IsConnected(s->socket) ||
+					TCPIP_TCP_WasDisconnected(s->socket)) {
+				console_print("%s socket closed by client in %s.\r\n",
+					s->protocol,__func__);
+				s->state = S_CLOSE;
+			} else {
+				status = service_connection(s);
+				if (status < 0) {
+					s->state = S_CLOSE;
+				}
+			}
 		}
 		break;
 		
-		case tcpip_closing_connection: {
-			TCPIP_TCP_Close(lwdaq_socket);
-			lwdaq_socket = INVALID_SOCKET;
-			daq_state = tcpip_opening_server;
+		case S_CLOSE: {
+			TCPIP_TCP_Close(s->socket);
+			s->socket = INVALID_SOCKET;
+			s->state = S_OPEN_SERVER;
 		}
 		break;
 		
-		case tcpip_error: {
+		case S_ERROR: {
 			if (rand() % heartbeat_period == 0) {
-				console_print("Failed to start TCP/IP server.\r\n");
+				console_print("Failed to start TCP/IP server in %s.\r\n",
+					__func__);
 			}		
 		}
 		break;
@@ -616,7 +631,6 @@ int main ( void ) {
 	UTILS_Initialize();
 	CMD_Initialize();
 	TCPIP_Initialize();
-	daq_state = tcpip_wait_init;
 	
 	// Re-enable interrupts and report initialization complete.
 	(void)__builtin_enable_interrupts();
@@ -630,7 +644,8 @@ int main ( void ) {
    	i=0;
 	while (true) {
 		sys_tick();
-		tcpip_server();
+		tcpip_server(&lwdaq_server);
+		tcpip_server(&telnet_server);
 		
 		i = i+1;
 		if (i % 100 == 0) {
