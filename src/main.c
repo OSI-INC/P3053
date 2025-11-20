@@ -66,10 +66,12 @@ int tcp_available = 0;
 // Global socket variables.
 #define LWDAQ_PORT 90
 #define TELNET_PORT   23
+#define HTTP_PORT 80
 
 // Server state structures.
 SERVER lwdaq_server = { INVALID_SOCKET, S_WAIT_STACK, LWDAQ_PORT, "LWDAQ" };
 SERVER telnet_server = { INVALID_SOCKET, S_WAIT_STACK, TELNET_PORT, "TELNET" };
+SERVER http_server = { INVALID_SOCKET, S_WAIT_STACK, HTTP_PORT, "HTTP" };
 
 // LWDAQ messages
 #define START_CODE 0xA5 
@@ -403,25 +405,41 @@ int process_message (TCP_SOCKET s, uint32_t id, uint32_t len, uint8_t* content) 
 }
 
 /*
-	service_connection services a connected socket based upon its port number.
+	lwdaq_tasks services a LWDAQ socket connection.
 */
-int service_connection(SERVER* s) {
+int lwdaq_tasks(SERVER* s) {
 	int status = 0;
 	 
 	console_print("Servicing %s connection on port %u by closing in %s.\r\n",
 		(*s).protocol,(*s).port,__func__);
+	status = -1;
 
-	switch (s->port) {
-		case 90: {
-			status = -1;
-		}
-		break;
-		
-		case 23: {
-			status = -1;
-		}
-		break;
-	}
+	return status;
+}
+
+/*
+	telnet_tasks services a Telnet socket connection.
+*/
+int telnet_tasks(SERVER* s) {
+	int status = 0;
+	 
+	console_print("Servicing %s connection on port %u by closing in %s.\r\n",
+		(*s).protocol,(*s).port,__func__);
+	status = -1;
+
+	return status;
+}
+
+/*
+	http_tasks services an HTTP socket connection.
+*/
+int http_tasks(SERVER* s) {
+	int status = 0;
+	 
+	console_print("Servicing %s connection on port %u by closing in %s.\r\n",
+		(*s).protocol,(*s).port,__func__);
+	status = -1;
+
 	return status;
 }
 
@@ -461,8 +479,9 @@ int main ( void ) {
    	i=0;
 	while (true) {
 		sys_tick();
-		tcpip_server(&lwdaq_server,service_connection);
-		tcpip_server(&telnet_server,service_connection);
+		tcpip_server(&lwdaq_server,lwdaq_tasks);
+		tcpip_server(&telnet_server,telnet_tasks);
+		tcpip_server(&http_server,http_tasks);
 		
 		i = i+1;
 		if (i % 100 == 0) {
