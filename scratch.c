@@ -1,346 +1,190 @@
-void APP_Tasks(void)
+// Harmony Code Warning:
+// ---------------------
+//
+// Below you will find the original TCP/IP echo server from the Harmony example
+// project. It contains a serious bug. Its management of the receive buffer
+// violates the range of the receive buffer. Because the receive buffer resides
+// in the stack, writing past the end of the buffer overwrites a location in the
+// stack. With the receive buffer declaration where it is in the code, it just
+// so happens that the the location above the buffer in the stack is not vital
+// to the operation of the program. But if we move the buffer declaration to the
+// top of the routine, the compiler places the buffer below a vital location,
+// the stack gets trashed by APP_Tasks, and the entire program crashes. So far
+// as we can tell, the authors placed the buffer declaration where it is now
+// during development. They probably tried to move the buffer declaration to the
+// top of the procedure when they had the code working, found that the code
+// crashed, could not figure out why in the time they had available, and decided
+// to restore the declaration to its development location and move on to their
+// next programming project.
+//
+// Our warning is this: assume that all of the Harmony code is written in the
+// same spirit. The code works within the bounds that it was tested, but any
+// change that you make to it, however trivial, even in the ordering or location
+// of variable declarations, can break the code.
+//
+void APP_Tasks ( void )
 {
-    static IPV4_ADDR lastIP = { {-1} };
-    IPV4_ADDR ipAddr;
-    TCPIP_NET_HANDLE netH;
-    SYS_STATUS tcpipStat;
-    int16_t wMaxGet, wMaxPut, wCurrentChunk;
-    uint16_t w, w2;
-    uint8_t AppBuffer[32 + 1];
-    int i;
+    SYS_STATUS          tcpipStat;
+    const char          *netName, *netBiosName;
+    static IPV4_ADDR    dwLastIP[2] = { {-1}, {-1} };
+    IPV4_ADDR           ipAddr;
+    int                 i, nNets;
+    TCPIP_NET_HANDLE    netH;
 
-    switch (appData.state)
+    switch(appData.state)
     {
         case APP_TCPIP_WAIT_INIT:
             tcpipStat = TCPIP_STACK_Status(sysObj.tcpip);
-            if (tcpipStat < 0)
-            {
-                SYS_CONSOLE_MESSAGE("APP: TCP/IP stack initialization failed!\r\n");
+            if(tcpipStat < 0)
+            {   // some error occurred
+                SYS_CONSOLE_MESSAGE(" APP: TCP/IP stack initialization failed!\r\n");
                 appData.state = APP_TCPIP_ERROR;
             }
-            else if (tcpipStat == SYS_STATUS_READY)
+            else if(tcpipStat == SYS_STATUS_READY)
             {
-                netH = TCPIP_STACK_IndexToNet(0);
-                SYS_CONSOLE_PRINT("Interface %s on host %s ready\r\n",
-                    TCPIP_STACK_NetNameGet(netH),
-                    TCPIP_STACK_NetBIOSName(netH));
+                // now that the stack is ready we can check the
+                // available interfaces
+                nNets = TCPIP_STACK_NumberOfNetworksGet();
+                for(i = 0; i < nNets; i++)
+                {
+
+                    netH = TCPIP_STACK_IndexToNet(i);
+                    netName = TCPIP_STACK_NetNameGet(netH);
+                    netBiosName = TCPIP_STACK_NetBIOSName(netH);
+
+#if defined(TCPIP_STACK_USE_NBNS)
+                    SYS_CONSOLE_PRINT("    Interface %s on host %s - NBNS enabled\r\n", netName, netBiosName);
+#else
+                    SYS_CONSOLE_PRINT("    Interface %s on host %s - NBNS disabled\r\n", netName, netBiosName);
+#endif  // defined(TCPIP_STACK_USE_NBNS)
+                    (void)netName;          // avoid compiler warning 
+                    (void)netBiosName;      // if SYS_CONSOLE_PRINT is null macro
+
+                }
                 appData.state = APP_TCPIP_WAIT_FOR_IP;
+
             }
             break;
 
         case APP_TCPIP_WAIT_FOR_IP:
-            netH = TCPIP_STACK_IndexToNet(0);
-            if (!TCPIP_STACK_NetIsReady(netH))
-                return;
 
-            ipAddr.Val = TCPIP_STACK_NetAddress(netH);
-            if (lastIP.Val != ipAddr.Val)
+            // if the IP address of an interface has changed
+            // display the new value on the system console
+            nNets = TCPIP_STACK_NumberOfNetworksGet();
+
+            for (i = 0; i < nNets; i++)
             {
-                lastIP.Val = ipAddr.Val;
-                SYS_CONSOLE_PRINT("IP Address: %d.%d.%d.%d\r\n",
-                    ipAddr.v[0], ipAddr.v[1], ipAddr.v[2], ipAddr.v[3]);
+                netH = TCPIP_STACK_IndexToNet(i);
+                if(!TCPIP_STACK_NetIsReady(netH))
+                {
+                    return;    // interface not ready yet!
+                }
+                ipAddr.Val = TCPIP_STACK_NetAddress(netH);
+                if(dwLastIP[i].Val != ipAddr.Val)
+                {
+                    dwLastIP[i].Val = ipAddr.Val;
+
+                    SYS_CONSOLE_MESSAGE(TCPIP_STACK_NetNameGet(netH));
+                    SYS_CONSOLE_MESSAGE(" IP Address: ");
+                    SYS_CONSOLE_PRINT("%d.%d.%d.%d \r\n", ipAddr.v[0], ipAddr.v[1], ipAddr.v[2], ipAddr.v[3]);
+                }
+                appData.state = APP_TCPIP_OPENING_SERVER;
             }
-
-            appData.state = APP_TCPIP_OPENING_SERVER;
             break;
-
+            
         case APP_TCPIP_OPENING_SERVER:
-            SYS_CONSOLE_PRINT("Waiting for client connection on port %d\r\n",
-                TCPIP_SERVER_PORT);
-            appData.socket = TCPIP_TCP_ServerOpen(IP_ADDRESS_TYPE_IPV4,
-                TCPIP_SERVER_PORT, 0);
+        {
+            SYS_CONSOLE_PRINT("Waiting for Client Connection on port: %d\r\n", SERVER_PORT);
+            appData.socket = TCPIP_TCP_ServerOpen(IP_ADDRESS_TYPE_IPV4, SERVER_PORT, 0);
             if (appData.socket == INVALID_SOCKET)
             {
                 SYS_CONSOLE_MESSAGE("Couldn't open server socket\r\n");
                 break;
             }
             appData.state = APP_TCPIP_WAIT_FOR_CONNECTION;
-            break;
+        }
+        break;
 
         case APP_TCPIP_WAIT_FOR_CONNECTION:
+        {
             if (!TCPIP_TCP_IsConnected(appData.socket))
+            {
                 return;
-
-            SYS_CONSOLE_MESSAGE("Client connected\r\n");
-            appData.state = APP_TCPIP_SERVING_CONNECTION;
-            break;
+            }
+            else
+            {
+                // We got a connection
+                appData.state = APP_TCPIP_SERVING_CONNECTION;
+                SYS_CONSOLE_MESSAGE("Received a connection\r\n");
+            }
+        }
+        break;
 
         case APP_TCPIP_SERVING_CONNECTION:
-            if (!TCPIP_TCP_IsConnected(appData.socket) ||
-                TCPIP_TCP_WasDisconnected(appData.socket))
+        {
+            if (!TCPIP_TCP_IsConnected(appData.socket) || TCPIP_TCP_WasDisconnected(appData.socket))
             {
-                SYS_CONSOLE_MESSAGE("Connection closed\r\n");
                 appData.state = APP_TCPIP_CLOSING_CONNECTION;
+                SYS_CONSOLE_MESSAGE("Connection was closed\r\n");
                 break;
             }
+            int16_t wMaxGet, wMaxPut, wCurrentChunk;
+            uint16_t w, w2;
+            uint8_t AppBuffer[32 + 1];
+            // Figure out how many bytes have been received and how many we can transmit.
+            wMaxGet = TCPIP_TCP_GetIsReady(appData.socket);	// Get TCP RX FIFO byte count
+            wMaxPut = TCPIP_TCP_PutIsReady(appData.socket);	// Get TCP TX FIFO free space
 
-            // RX/TX buffer handling
-            wMaxGet = TCPIP_TCP_GetIsReady(appData.socket);
-            wMaxPut = TCPIP_TCP_PutIsReady(appData.socket);
-            if (wMaxPut < wMaxGet)
-                wMaxGet = wMaxPut;
+            // Make sure we don't take more bytes out of the RX FIFO than we can put into the TX FIFO
+            if(wMaxPut < wMaxGet)
+                    wMaxGet = wMaxPut;
 
-            wCurrentChunk = sizeof(AppBuffer) - 1;
-            for (w = 0; w < wMaxGet; w += sizeof(AppBuffer) - 1)
+            // Process all bytes that we can
+            // This is implemented as a loop, processing up to sizeof(AppBuffer)
+            // bytes at a time. This limits memory usage while maximizing
+            // performance.  Single byte Gets and Puts are a lot slower than
+            // multibyte GetArrays and PutArrays.
+            wCurrentChunk = sizeof(AppBuffer) -1;
+            for(w = 0; w < wMaxGet; w += sizeof(AppBuffer) - 1)
             {
-                if (w + sizeof(AppBuffer) - 1 > wMaxGet)
+                // Make sure the last chunk, which will likely be smaller than sizeof(AppBuffer), is treated correctly.
+                if(w + sizeof(AppBuffer) - 1 > wMaxGet)
                     wCurrentChunk = wMaxGet - w;
 
+                // Transfer the data out of the TCP RX FIFO and into our local processing buffer.
                 TCPIP_TCP_ArrayGet(appData.socket, AppBuffer, wCurrentChunk);
 
-                for (w2 = 0; w2 < wCurrentChunk; w2++)
+                // Perform the "ToUpper" operation on each data byte
+                for(w2 = 0; w2 < wCurrentChunk; w2++)
                 {
                     i = AppBuffer[w2];
-                    if (i == '\x1b')   // ESC closes connection
+                    if(i == '\x1b')   // escape
                     {
-                        SYS_CONSOLE_MESSAGE("ESC received, closing connection\r\n");
                         appData.state = APP_TCPIP_CLOSING_CONNECTION;
+                        SYS_CONSOLE_MESSAGE("Connection was closed\r\n");
                     }
                 }
+                AppBuffer[w2] = 0;  // end the console string properly
 
-                AppBuffer[w2] = 0;
-                SYS_CONSOLE_PRINT("Server echo: %s\r\n", AppBuffer);
+                // Transfer the data out of our local processing buffer and into the TCP TX FIFO.
+                SYS_CONSOLE_PRINT("Server Sending %s\r\n", AppBuffer);
                 TCPIP_TCP_ArrayPut(appData.socket, AppBuffer, wCurrentChunk);
-            }
-            break;
 
+                // No need to perform any flush.  TCP data in TX FIFO will automatically transmit itself after it accumulates for a while.  If you want to decrease latency (at the expense of wasting network bandwidth on TCP overhead), perform and explicit flush via the TCPFlush() API.
+            }
+        }
+        break;
         case APP_TCPIP_CLOSING_CONNECTION:
+        {
+            // Close the socket connection.
             TCPIP_TCP_Close(appData.socket);
             appData.socket = INVALID_SOCKET;
             appData.state = APP_TCPIP_WAIT_FOR_IP;
-            break;
 
+        }
+        break;
         default:
             break;
     }
-}
-
-
-#ifndef UART_CONSOLE_H
-#define UART_CONSOLE_H
-
-#include <stdarg.h>
-#include <stdio.h>
-#include "plib_uart2.h"
-
-// Blocking write of one character
-static inline void uart_putc(char c)
-{
-    // UART2_Write returns 0 if TX buffer is full
-    while (UART2_Write((uint8_t*)&c, 1) == 0)
-        ;
-}
-
-// Write a zero-terminated string
-static inline void uart_puts(const char* s)
-{
-    while (*s)
-        uart_putc(*s++);
-}
-
-// printf-style formatted output
-static inline void uart_printf(const char* fmt, ...)
-{
-    char buf[256];      // Adjust size as needed
-    va_list args;
-
-    va_start(args, fmt);
-    vsnprintf(buf, sizeof(buf), fmt, args);
-    va_end(args);
-
-    uart_puts(buf);
-}
-
-#endif // UART_CONSOLE_H
-
-
-static const char* trim_spaces(const char* s)
-{
-    static char buf[17];  // NetBIOS names are 16 chars max
-    int i;
-
-    // Copy string (up to 16 chars)
-    for (i = 0; i < 16 && s[i]; i++)
-        buf[i] = s[i];
-    buf[i] = '\0';
-
-    // Trim trailing spaces
-    for (i = strlen(buf) - 1; i >= 0 && buf[i] == ' '; i--)
-        buf[i] = '\0';
-
-    return buf;
-}
-
-
-// ----- SYS_CMD Adapter for UART2 ------
-
-// Return # of characters available to read
-static int cmd_uart_isRdy(const void* unused)
-{
-    return UART2_ReadCountGet();
-}
-
-// Read one char (required by SYS_CMD)
-static char cmd_uart_getc(const void* unused)
-{
-    uint8_t c = 0;
-
-    // UART2_Read returns number of bytes read
-    if (UART2_Read(&c, 1) == 1)
-        return (char)c;
-
-    return 0;   // SYS_CMD treats "0" as "no new character"
-}
-
-// Write one character
-static void cmd_uart_putc(const void* unused, char c)
-{
-    while (UART2_Write((uint8_t*)&c, 1) == 0)
-        ;
-}
-
-// Simple message function
-static void cmd_uart_msg(const void* unused, const char* str)
-{
-    console_write(str);
-}
-
-// Formatted printf function
-static void cmd_uart_print(const void* unused, const char* fmt, ...)
-{
-    char buf[256];
-    va_list ap;
-
-    va_start(ap, fmt);
-    vsnprintf(buf, sizeof(buf), fmt, ap);
-    va_end(ap);
-
-    console_write(buf);
-}
-
-static const SYS_CMD_API cmdUartApi =
-{
-    .msg    = cmd_uart_msg,
-    .print  = cmd_uart_print,
-    .putc_t = cmd_uart_putc,
-    .isRdy  = cmd_uart_isRdy,
-    .getc_t = cmd_uart_getc
-};
-
-SYS_CMDIO_ADD(&cmdUartApi, NULL, 0);
-
-#define SYS_CONSOLE_PRINT(...)  console_printf(__VA_ARGS__)
-#define SYS_CONSOLE_MESSAGE(msg) console_printf("%s", msg)
-#define SYS_DEBUG_PRINT(level, ...) console_printf(__VA_ARGS__)
-#define SYS_DEBUG_PRINT(level, ...) \
-    do { if ((level) <= DEBUG_LEVEL) console_printf(__VA_ARGS__); } while (0)
-
-
-#ifdef STACK_DEBUG
-    #define SYS_CONSOLE_PRINT(...)  console_printf(__VA_ARGS__)
-    #define SYS_CONSOLE_MESSAGE(msg) console_printf("%s", msg)
-    #define SYS_DEBUG_PRINT(level, ...) console_printf(__VA_ARGS__)
-#else
-    #define SYS_CONSOLE_PRINT(...)
-    #define SYS_CONSOLE_MESSAGE(...)
-    #define SYS_DEBUG_PRINT(...)
-#endif
-
-
-#include <stdarg.h>
-#include <stdio.h>
-#include "console.h"
-
-/*******************************************
- * SYS_CONSOLE: Minimal Console Redirection
- *******************************************/
-
-/* -----------------------------------------
-   SYS_CONSOLE_Print()
-   Formatted print (like printf)
-   ----------------------------------------- */
-void SYS_CONSOLE_Print(int index, const char* fmt, ...)
-{
-    (void)index;   // Only one console instance in your system
-
-    char buffer[256];
-
-    va_list ap;
-    va_start(ap, fmt);
-    vsnprintf(buffer, sizeof(buffer), fmt, ap);
-    va_end(ap);
-
-    console_write(buffer);
-}
-
-/* -----------------------------------------
-   SYS_CONSOLE_Message()
-   Simple string output
-   ----------------------------------------- */
-void SYS_CONSOLE_Message(int index, const char* msg)
-{
-    (void)index;
-    console_write(msg);
-}
-
-/* -----------------------------------------
-   SYS_CONSOLE_Write()
-   Raw byte buffer output
-   ----------------------------------------- */
-void SYS_CONSOLE_Write(int index, const void* buff, size_t size)
-{
-    (void)index;
-
-    const uint8_t* p = (const uint8_t*)buff;
-    for (size_t i = 0; i < size; i++)
-    {
-        console_putchar(p[i]);
-    }
-}
-
-/* -----------------------------------------
-   SYS_CONSOLE_Read()
-   Read up to size bytes into buff
-   ----------------------------------------- */
-void SYS_CONSOLE_Read(int index, void* buff, size_t size)
-{
-    (void)index;
-
-    uint8_t* p = (uint8_t*)buff;
-    for (size_t i = 0; i < size; i++)
-    {
-        if (console_read_ready() == 0)
-            return;     // no more available
-
-        p[i] = console_getchar();
-    }
-}
-
-/* -----------------------------------------
-   SYS_CONSOLE_ReadCountGet()
-   Returns number of characters available
-   ----------------------------------------- */
-int SYS_CONSOLE_ReadCountGet(int index)
-{
-    (void)index;
-    return console_read_ready();   // this should return count or 0/1 — either is fine for SYS_CMD
-}
-
-/* -----------------------------------------
-   SYS_CONSOLE_Tasks()
-   SYS_CONSOLE_Task()
-   Harmony expects these, but your console
-   does not require background polling.
-   ----------------------------------------- */
-void SYS_CONSOLE_Tasks(int index)
-{
-    (void)index;
-    // No background tasks required
-}
-
-void SYS_CONSOLE_Task(int index)
-{
-    (void)index;
-    // No background tasks required
 }
 

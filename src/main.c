@@ -107,20 +107,6 @@ void sys_tick(void) {
 }
 
 /*
-	socket_tick maintains the system drivers and TCP/IP stack by calling
-	sys_tick. It also checks the socket passed in as an argument and returns 1
-	if the socket is still connected and zero otherwise.
-*/
-int socket_tick(TCP_SOCKET s) {
-	sys_tick();
-	if (!TCPIP_TCP_IsConnected(s) || TCPIP_TCP_WasDisconnected(s)) {
-	 	return 0;
-	} else {
-		return 1;
-	}
-}
-
-/*
 	swap_u32 reverses the order of four bytes in a thirty-two bit unsigned
 	integer so as to convert little-endian to big-endian byte order, and
 	visa-versa.
@@ -146,84 +132,82 @@ static inline uint32_t load32_be(const uint8_t *p)
 		| (uint32_t)p[3];
 }
 
-
 /*
-	return_header sends a data return message header through a socket.
+	lwdaq_header sends a data return message header through a socket.
 */
-int return_header(TCP_SOCKET s, uint32_t id, uint32_t len) {
+int lwdaq_header(SERVER* s, uint32_t id, uint32_t len) {
 	uint8_t buff[15];
 	uint32_t* lp;
 	
-	buff[START_OFFSET]=START_CODE;
-	lp=(uint32_t*)&buff[ID_OFFSET];
-	*lp=swap_u32(id);
-	lp=(uint32_t*)&buff[CLEN_OFFSET];
-	*lp=swap_u32(len);
-	TCPIP_TCP_ArrayPut(s,buff,CONTENT_OFFSET);
+	buff[START_OFFSET] = START_CODE;
+	lp = (uint32_t*)&buff[ID_OFFSET];
+	*lp = swap_u32(id);
+	lp = (uint32_t*)&buff[CLEN_OFFSET];
+	*lp = swap_u32(len);
+	TCPIP_TCP_ArrayPut((*s).socket,buff,CONTENT_OFFSET);
 	return 0;
 }
 
 /*
-	return_footer sends a terminating sequence through a socket.
+	lwdaq_footer sends a terminating sequence through a socket.
 */
-int return_footer(TCP_SOCKET s) {
+int lwdaq_footer(SERVER* s) {
 	uint8_t buff[15];
-	buff[0]=END_CODE;
-	TCPIP_TCP_ArrayPut(s,buff,1);
+	buff[0] = END_CODE;
+	TCPIP_TCP_ArrayPut((*s).socket,buff,1);
 	return 0;
 }
 
 /*
-	return_byte sends a data return message through a socket with a single-byte
+	lwdaq_byte sends a data return message through a socket with a single-byte
 	integer as its content.
 */
-int return_byte(TCP_SOCKET s, uint8_t data) {
+int lwdaq_byte(SERVER* s, uint8_t data) {
 	uint8_t buff[15];
-	return_header(s,DATA_RETURN,sizeof(data));
-	buff[0]=data;
-	TCPIP_TCP_ArrayPut(s,buff,sizeof(data));
-	return_footer(s);
+	lwdaq_header(s,DATA_RETURN,sizeof(data));
+	buff[0] = data;
+	TCPIP_TCP_ArrayPut((*s).socket,buff,sizeof(data));
+	lwdaq_footer(s);
 	return 0;
 }
 
 /*
-	return_int sends a data return message through a socket with a four-byte
+	lwdaq_integer sends a data return message through a socket with a four-byte
 	integer as its content.
 */
-int return_int(TCP_SOCKET s, uint32_t data) {
+int lwdaq_integer(SERVER* s, uint32_t data) {
 	uint8_t buff[15];
 	uint32_t* lp;
-
-	return_header(s,DATA_RETURN,sizeof(data));
-	lp=(uint32_t*)&buff[0];
-	*lp=swap_u32(data);
-	TCPIP_TCP_ArrayPut(s,buff,sizeof(data));
-	return_footer(s);
+	lwdaq_header(s,DATA_RETURN,sizeof(data));
+	lp = (uint32_t*)&buff[0];
+	*lp = swap_u32(data);
+	TCPIP_TCP_ArrayPut((*s).socket,buff,sizeof(data));
+	lwdaq_footer(s);
 	return 0;
 }
 
 /*
-	return_data sends a block of data through a socket.
+	lwdaq_data sends a block of data through a socket.
 */
-int return_data(TCP_SOCKET s, uint8_t* block, uint32_t len) {
-	return_header(s,DATA_RETURN,len);
-	TCPIP_TCP_ArrayPut(s,block,len);
-	return_footer(s);
+int lwdaq_data(SERVER* s, uint8_t* block, uint32_t len) {
+	lwdaq_header(s,DATA_RETURN,len);
+	TCPIP_TCP_ArrayPut((*s).socket,block,len);
+	lwdaq_footer(s);
 	return 0;
 }
 
 /*
-	process_message handles an incoming LWDAQ message.
+	lwdaq_process_message handles an incoming LWDAQ message.
 */
-int process_message (TCP_SOCKET s, uint32_t id, uint32_t len, uint8_t* content) {
+int lwdaq_process_message (SERVER* s, uint32_t id, uint32_t len, uint8_t* content) {
 	uint8_t register_addr = 0;
 	uint8_t value = 0;
 //	int status;
 	
 	switch (id) {
 		case BYTE_WRITE:{
-			register_addr=content[3];
-			value=content[4];
+			register_addr = content[3];
+			value = content[4];
 			//write_controller_byte(register_addr,value);
 			console_print("BYTE_WRITE to %d of %d in %s.\r\n",
 				register_addr,value,__func__);
@@ -231,22 +215,22 @@ int process_message (TCP_SOCKET s, uint32_t id, uint32_t len, uint8_t* content) 
 		}
 
 		case BYTE_READ:{
-			register_addr=content[3];
-			//value=read_controller_byte(register_addr);
+			register_addr = content[3];
+			//value = read_controller_byte(register_addr);
 			console_print("BYTE_READ from %d of %d in %s.\r\n",
 				register_addr,value,__func__);
-			//return_byte(value);
+			//lwdaq_byte(value);
 			break;
 		}
 
 		case BYTE_POLL:{
-			register_addr=content[3];
-			value=content[4];
+			register_addr = content[3];
+			value = content[4];
 			console_print("BYTE_POLL of %d for %d in %s.\r\n",
 				register_addr,value,__func__);
 /*
 			while (read_controller_byte(register_addr) != value) {
-				status=buffered_socket_read(&socket,NULL,0);
+				status = buffered_socket_read(&socket,NULL,0);
 				if (status<0) break;
 			}
 */
@@ -255,14 +239,14 @@ int process_message (TCP_SOCKET s, uint32_t id, uint32_t len, uint8_t* content) 
 
 		case VERSION_READ:{
 			console_print("VERSION_READ in %s.\r\n",__func__);
-			return_int(s,VERSION_NUM);
+			lwdaq_integer(s,VERSION_NUM);
 			break;
 		}
 
 		case ECHO:{
 			console_print("ECHO of %u bytes in %s.\r\n",len,__func__);
-			return_data(s,content,len);
-			content[len]=0x00;
+			lwdaq_data(s,content,len);
+			content[len] = 0x00;
 			console_print("%s\r\n",content);
 			break;
 		}
@@ -289,22 +273,22 @@ int lwdaq_tasks(SERVER* s) {
 	
 	if ((*s).state == S_LISTENING) {
 		rx_available = 0;
-		console_print("Initialized %s connection in %s.\r\n",(*s).protocol,__func__);
+		console_print("Initialized %s connection in %s.\r\n", (*s).protocol,__func__);
 		status = 0;
 		return status;
 	};
 
 	if ((*s).state == S_SERVING) {
-		rx_ready=TCPIP_TCP_GetIsReady((*s).socket);
+		rx_ready = TCPIP_TCP_GetIsReady((*s).socket);
 		if (rx_ready>0) {
 			TCPIP_TCP_ArrayGet((*s).socket,&rx_buffer[rx_available],rx_ready);	
-			rx_available=rx_available+rx_ready;
+			rx_available = rx_available+rx_ready;
 		}
-		if (rx_available==0) return 0;
+		if (rx_available == 0) return 0;
 		console_print("rx_ready=%u rx_available=%u in %s.\r\n",
-			rx_ready,rx_available,__func__);
-		if (rx_buffer[0]!=START_CODE) {
-			if (rx_buffer[0]==CLOSE_CODE) {
+			rx_ready, rx_available,__func__);
+		if (rx_buffer[0] != START_CODE) {
+			if (rx_buffer[0] == CLOSE_CODE) {
 				console_print("Close code received in %s.\r\n",__func__);
 			} else {
 				console_print("Invalid start code in %s.\r\n",__func__);
@@ -312,23 +296,23 @@ int lwdaq_tasks(SERVER* s) {
 			return -1;
 		}
 		if (rx_available<9) return rx_available;		
-		id=load32_be(&rx_buffer[1]);
-		len=load32_be(&rx_buffer[5]);
+		id = load32_be(&rx_buffer[1]);
+		len = load32_be(&rx_buffer[5]);
 		console_print("id=%u len=%u in %s.\r\n",id,len,__func__);
 		if (rx_available<len+10) return rx_available;
-		if (rx_buffer[len+9]!=END_CODE) {
+		if (rx_buffer[len+9] != END_CODE) {
 			console_print("Invalid end code in %s.\r\n",__func__);
 			return -1;
 		}
-		status=process_message((*s).socket,id,len,&rx_buffer[9]);
+		status = lwdaq_process_message(s,id,len,&rx_buffer[9]);
 		if (status<0) return status;
 		if (rx_available>len+10) {
 			console_print("Copying %u to %u from %u in %s.\r\n",
 				rx_available-len-10,0,len+10,__func__);
 			memmove(&rx_buffer[0],&rx_buffer[len+10],rx_available-len-10);
-			rx_available=rx_available-len-10;
+			rx_available = rx_available-len-10;
 		} else {
-			rx_available=0;
+			rx_available = 0;
 		}
 		console_print("rx_available=%u in %s.\r\n",rx_available,__func__);
 		return rx_available;
@@ -343,7 +327,7 @@ int lwdaq_tasks(SERVER* s) {
 int telnet_tasks(SERVER* s) {
 	int status = 0;
 	 
-	console_print("Servicing %s connection on port %u by closing in %s.\r\n",
+	console_print("Servicing %s connection on port %u in %s.\r\n",
 		(*s).protocol,(*s).port,__func__);
 	status = -1;
 
@@ -356,7 +340,7 @@ int telnet_tasks(SERVER* s) {
 int http_tasks(SERVER* s) {
 	int status = 0;
 	 
-	console_print("Servicing %s connection on port %u by closing in %s.\r\n",
+	console_print("Servicing %s connection on port %u in %s.\r\n",
 		(*s).protocol,(*s).port,__func__);
 	status = -1;
 
@@ -396,7 +380,7 @@ int main ( void ) {
    	GPIO_PortSet(GPIO_PORT_C,0x00008000);
    	
    	// A while loop with a counter to control the state of our LEDs. 
-   	i=0;
+   	i = 0;
 	while (true) {
 		sys_tick();
 		tcpip_server(&lwdaq_server,lwdaq_tasks);
@@ -410,9 +394,9 @@ int main ( void ) {
 		if (i % 1000 == 0) {
 			GPIO_PortSet(GPIO_PORT_C,0x00008000);
 		}
-		if (i==200000) {
+		if (i == 200000) {
 			GPIO_PortToggle(GPIO_PORT_A,0x00000004);
-			i=0;
+			i = 0;
 		}
 	}
 	

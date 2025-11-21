@@ -21,6 +21,46 @@
 #include "utils.h"
 
 /*
+	tcp_get_ready returns the number of bytes that are ready to be read out of a
+	TCP socket. It is the first of four routines that allow use to manage
+	reading and writing from a socket. These routines are wrappers for Harmony
+	TCP routines. The wrappers stop us from dealing with sixteen-bit unsigned
+	integers in our own code, which are a waste of time on a thirty-two bit
+	machine. And they allow us to adapt our TCP/IP socket reading and writing
+	without changing our protocol handling routines.	
+*/ 
+uint32_t tcp_get_ready(TCP_SOCKET s) {
+	return TCPIP_TCP_GetIsReady(s);
+}
+
+/*
+	tcp_get attempts to read a specified number of bytes from a TCP socket. It
+	returns the number of bytes it actually read. It takes as arguments a socket
+	handle, a byte buffer pointer, and an unsigned integer length.
+*/
+uint32_t tcp_get(TCP_SOCKET s, uint8_t* buffer, uint32_t len) {
+	return TCPIP_TCP_ArrayGet(s,buffer,len);
+}
+
+/*
+	tcp_put_ready returns how much space we have available for writing to the
+	outgoing TCP buffer of a socket. It takes a socket handle.
+*/
+uint32_t tcp_put_ready(TCP_SOCKET s) {
+	return TCPIP_TCP_PutIsReady(s);
+}
+
+/*
+	tcp_put attempts to write a specified number of bytes to a TCP socket. It
+	returns the number of bytes it actually wrote. It takes as argument a socket
+	handle, a pointer to the byte buffer containing the data that should be
+	written, and an unsigned integer length.
+*/
+uint32_t tcp_put(TCP_SOCKET s, const uint8_t* data, uint32_t len) {
+	return TCPIP_TCP_ArrayPut(s,data,len);
+}
+
+/*
 	ping_gateway sends a ping echo request to the default gateway address. In
 	order to be sure of generating a ping, we fake an ARP table entry for the
 	gatewayt, becauyse if there is no such entry in the local network's ARP
@@ -90,7 +130,26 @@ void net_info(void) {
 }
 
 /*
-	tcpip_server handles TCP/IP connections.
+	tcpip_server provides management of connection, service, and closure of a
+	TCP/IP protocol. The core actions of waiting for the TCP/IP stack to start
+	up, waiting for an IP address to be assigned, listening on the port assigned
+	to the protocol, accepting a socket connection on that port, maintaining
+	service of the protocol on that socket by repeatedly calling a task
+	management routine, and closing the socket when the management routine
+	returns an error, are all handled by tcpip_server. In order to support a
+	particular protocol, we pass into the routine a call-back function. This
+	call-back function takes as a parameter the server's status record, which
+	includes the server state and a handle to the socket. The server procedure
+	calls the task procedure first when the socket is accepted, and then
+	repeatedly every time the server procedure is called by the main event loop.
+	The task procedure can tell whether it should initialize the protocol
+	interaction or continue an existing interaction because it has access to the
+	server state, which will be S_LISTENING for a newly-opened socket and
+	S_SERVING for a pre-existing socket. The task procedure can read and write
+	from the socket using the tcp_get and tcp_put routines. If it encounters an
+	error, or detects that the socket has closed, it should return a negative
+	value. When the server receives this negative value, it closes the socket
+	and starts listening again for the next connection.
 */
 void tcpip_server(SERVER* s, tcpip_tasks_type tasks) {
 	const uint32_t heartbeat_period = 5000000;
@@ -167,6 +226,8 @@ void tcpip_server(SERVER* s, tcpip_tasks_type tasks) {
 				if (status >= 0) {
 					(*s).state = S_SERVING;
 				} else {
+					console_print("%s socket closed pre-emptively by server in %s.\r\n",
+						(*s).protocol,__func__);			
 					(*s).state = S_CLOSE;
 				}
 			}
@@ -181,7 +242,11 @@ void tcpip_server(SERVER* s, tcpip_tasks_type tasks) {
 				(*s).state = S_CLOSE;
 			} else {
 				status = tasks(s);
-				if (status < 0) {(*s).state = S_CLOSE;}
+				if (status < 0) {
+					console_print("%s socket closed by server in %s.\r\n",
+						(*s).protocol,__func__);			
+					(*s).state = S_CLOSE;
+				}
 			}
 		}
 		break;
@@ -195,13 +260,16 @@ void tcpip_server(SERVER* s, tcpip_tasks_type tasks) {
 		
 		case S_ERROR: {
 			if (rand() % heartbeat_period == 0) {
-				console_print("Failed to start TCP/IP server in %s.\r\n",
-					__func__);
+				console_print("Failed to start server in %s.\r\n",__func__);
 			}		
 		}
 		break;
 		
-		default:
+		default: {
+			if (rand() % heartbeat_period == 0) {
+				console_print("Unknown state %u in %s.\r\n",(*s).state,__func__);
+			}		
+		}
 		break;
 	}
 }
