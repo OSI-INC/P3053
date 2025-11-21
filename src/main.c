@@ -121,19 +121,16 @@ int socket_tick(TCP_SOCKET s) {
 }
 
 /*
-	flip_bytes reverses the order of four bytes in a thirty-two bit variable, so
-	as to convert little-endian to big-endian byte order, and visa-versa.
+	swap_u32 reverses the order of four bytes in a thirty-two bit unsigned
+	integer so as to convert little-endian to big-endian byte order, and
+	visa-versa.
 */
-int flip_bytes(uint32_t original) {
-	uint8_t *a,*b;
-	uint32_t result;
-	a=((uint8_t *) &original);
-	b=((uint8_t *) &result)+3;
-	*b=*a;
-	a=a+1;b=b+(-1);*b=*a;
-	a=a+1;b=b+(-1);*b=*a;
-	a=a+1;b=b+(-1);*b=*a;
-	return result;
+static inline uint32_t swap_u32(uint32_t x)
+{
+    return ((x & 0x000000FFu) << 24) |
+		((x & 0x0000FF00u) <<  8) |
+		((x & 0x00FF0000u) >>  8) |
+		((x & 0xFF000000u) >> 24);
 }
 
 /*
@@ -143,10 +140,10 @@ int flip_bytes(uint32_t original) {
 */
 static inline uint32_t load32_be(const uint8_t *p)
 {
-    return ((uint32_t)p[0] << 24) |
-           ((uint32_t)p[1] << 16) |
-           ((uint32_t)p[2] <<  8) |
-            (uint32_t)p[3];
+	return ((uint32_t)p[0] << 24) 
+		| ((uint32_t)p[1] << 16) 
+		| ((uint32_t)p[2] <<  8) 
+		| (uint32_t)p[3];
 }
 
 
@@ -159,9 +156,9 @@ int return_header(TCP_SOCKET s, uint32_t id, uint32_t len) {
 	
 	buff[START_OFFSET]=START_CODE;
 	lp=(uint32_t*)&buff[ID_OFFSET];
-	*lp=flip_bytes(id);
+	*lp=swap_u32(id);
 	lp=(uint32_t*)&buff[CLEN_OFFSET];
-	*lp=flip_bytes(len);
+	*lp=swap_u32(len);
 	TCPIP_TCP_ArrayPut(s,buff,CONTENT_OFFSET);
 	return 0;
 }
@@ -199,7 +196,7 @@ int return_int(TCP_SOCKET s, uint32_t data) {
 
 	return_header(s,DATA_RETURN,sizeof(data));
 	lp=(uint32_t*)&buff[0];
-	*lp=flip_bytes(data);
+	*lp=swap_u32(data);
 	TCPIP_TCP_ArrayPut(s,buff,sizeof(data));
 	return_footer(s);
 	return 0;
