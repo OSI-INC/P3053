@@ -123,8 +123,6 @@ void tcpip_server(SERVER* s, tcpip_tasks_type tasks) {
 		}
 		break;
 
-
-
 		case S_WAIT_IP: {
 			net_hdl = TCPIP_STACK_IndexToNet(0);
 			if (TCPIP_STACK_NetIsReady(net_hdl)) {
@@ -165,7 +163,12 @@ void tcpip_server(SERVER* s, tcpip_tasks_type tasks) {
 					console_print("%s connection from unknown peer in %s.\r\n",
 						(*s).protocol,__func__);
 				}
-				(*s).state = S_SERVING;
+				status = tasks(s);
+				if (status >= 0) {
+					(*s).state = S_SERVING;
+				} else {
+					(*s).state = S_CLOSE;
+				}
 			}
 		}
 		break;
@@ -178,9 +181,7 @@ void tcpip_server(SERVER* s, tcpip_tasks_type tasks) {
 				(*s).state = S_CLOSE;
 			} else {
 				status = tasks(s);
-				if (status < 0) {
-					(*s).state = S_CLOSE;
-				}
+				if (status < 0) {(*s).state = S_CLOSE;}
 			}
 		}
 		break;

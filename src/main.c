@@ -59,9 +59,11 @@ char logged_in;
 int ip_port,tcp_timeout,security_level;
 char password[32];
 char configuration[CONFIG_LENGTH];
-uint8_t tcp_buffer[TCP_BUFF_SIZE];
-int tcp_first = 0;
-int tcp_available = 0;
+
+// Variables and buffers for servers.
+uint8_t lwdaq_rx_buff[TCP_BUFF_SIZE];
+uint32_t lwdaq_rx_first = 0;
+uint32_t lwdaq_rx_available = 0;
 
 // Global socket variables.
 #define LWDAQ_PORT 90
@@ -220,45 +222,45 @@ int buffered_socket_read(TCP_SOCKET s, uint8_t* dp, uint32_t len) {
 	uint32_t tcp_remaining;
 	uint8_t* tcp_destination;
 
-	if (tcp_available>=len) {
-		memcpy(dp,&tcp_buffer[tcp_first],len);
-		tcp_first=tcp_first+len;
-		tcp_available=tcp_available-len;
+	if (lwdaq_rx_available>=len) {
+		memcpy(dp,&lwdaq_rx_buff[lwdaq_rx_first],len);
+		lwdaq_rx_first=lwdaq_rx_first+len;
+		lwdaq_rx_available=lwdaq_rx_available-len;
 	} else {
 		tcp_remaining=len;
 		tcp_destination=dp;
-		if (tcp_available>0) {
-			memcpy(tcp_destination,&tcp_buffer[tcp_first],tcp_available);
-			tcp_remaining=tcp_remaining-tcp_available;
-			tcp_destination=tcp_destination+tcp_available;
+		if (lwdaq_rx_available>0) {
+			memcpy(tcp_destination,&lwdaq_rx_buff[lwdaq_rx_first],lwdaq_rx_available);
+			tcp_remaining=tcp_remaining-lwdaq_rx_available;
+			tcp_destination=tcp_destination+lwdaq_rx_available;
 			console_print("Read last %d available, need %d more in %s.\r\n",
-				tcp_available,tcp_remaining,__func__);
+				lwdaq_rx_available,tcp_remaining,__func__);
 		}
-		tcp_available=0;
-		tcp_first=0;
+		lwdaq_rx_available=0;
+		lwdaq_rx_first=0;
 		while (tcp_remaining>0) {
 			console_print("Waiting for %d bytes in %s.\r\n",tcp_remaining,__func__);
-			while (tcp_available==0) {
-				tcp_available=TCPIP_TCP_GetIsReady(s);
-				if (tcp_available>0) {
-					TCPIP_TCP_ArrayGet(s,tcp_buffer,tcp_available);	
+			while (lwdaq_rx_available==0) {
+				lwdaq_rx_available=TCPIP_TCP_GetIsReady(s);
+				if (lwdaq_rx_available>0) {
+					TCPIP_TCP_ArrayGet(s,lwdaq_rx_buff,lwdaq_rx_available);	
 				} 
 				if (!socket_tick(s)) {
 					console_print("Socket closed by client in %s.\r\n",__func__);
  					return -1;
 				}
 			}
-			console_print("Received %d bytes in %s.\r\n",tcp_available,__func__);
-			if (tcp_available>=tcp_remaining) {
-				memcpy(tcp_destination,tcp_buffer,tcp_remaining);
-				tcp_first=tcp_remaining;
-				tcp_available=tcp_available-tcp_remaining;
+			console_print("Received %d bytes in %s.\r\n",lwdaq_rx_available,__func__);
+			if (lwdaq_rx_available>=tcp_remaining) {
+				memcpy(tcp_destination,lwdaq_rx_buff,tcp_remaining);
+				lwdaq_rx_first=tcp_remaining;
+				lwdaq_rx_available=lwdaq_rx_available-tcp_remaining;
 				tcp_remaining=0;
 			} else {
-				memcpy(tcp_destination,tcp_buffer,tcp_available);
-				tcp_destination=tcp_destination+tcp_available;
-				tcp_remaining=tcp_remaining-tcp_available;
-				tcp_available=0;
+				memcpy(tcp_destination,lwdaq_rx_buff,lwdaq_rx_available);
+				tcp_destination=tcp_destination+lwdaq_rx_available;
+				tcp_remaining=tcp_remaining-lwdaq_rx_available;
+				lwdaq_rx_available=0;
 			}
 		}
 	}
@@ -408,13 +410,29 @@ int process_message (TCP_SOCKET s, uint32_t id, uint32_t len, uint8_t* content) 
 	lwdaq_tasks services a LWDAQ socket connection.
 */
 int lwdaq_tasks(SERVER* s) {
-	int status = 0;
-	 
-	console_print("Servicing %s connection on port %u by closing in %s.\r\n",
-		(*s).protocol,(*s).port,__func__);
-	status = -1;
+	uint32_t id,len;
+	uint8_t* content;
+	int status;
+	
+	if ((*s).state == S_LISTENING) {
+		lwdaq_rx_first = 0;
+		lwdaq_rx_available = 0;
+		console_print("Initialized %s connection in %s.\r\n",(*s).protocol,__func__);
+		return 0;
+	};
 
-	return status;
+	if ((*s).state == S_SERVING) {
+		console_print("Receiving %s message in %s.\r\n",(*s).protocol,__func__);
+		status=receive_message((*s).socket,&id,&len,content);
+		if (status >= 0) {
+			console_print("Received: id=%u len=%u in %s.\r\n",id,len,__func__);
+			return len;
+		} else {
+			return status;
+		}
+	};
+	
+	return -1;
 }
 
 /*
