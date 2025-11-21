@@ -276,6 +276,8 @@ int buffered_socket_read(TCP_SOCKET s, uint8_t* dp, uint32_t len) {
 int receive_message(TCP_SOCKET s, uint32_t* id, uint32_t* len, uint8_t* content) {
 	uint8_t code;
 
+	console_print("Entering %s.\r\n",__func__);
+
 	// We read the start code. If it's incorrect, we close the socket and return
 	// with an error code.
 	if (buffered_socket_read(s,&code,sizeof(code)) < 0) {
@@ -339,6 +341,8 @@ int receive_message(TCP_SOCKET s, uint32_t* id, uint32_t* len, uint8_t* content)
 		TCPIP_TCP_Close(s);
 		return -1;
 	}
+
+	console_print("Leaving %s.\r\n",__func__);
 	
 	return 0;
 }
@@ -411,28 +415,38 @@ int process_message (TCP_SOCKET s, uint32_t id, uint32_t len, uint8_t* content) 
 */
 int lwdaq_tasks(SERVER* s) {
 	uint32_t id,len;
-	uint8_t* content;
+	static uint8_t in_buffer[BUFF_SIZE];
 	int status;
+
+	status = -1;
+	
 	
 	if ((*s).state == S_LISTENING) {
 		lwdaq_rx_first = 0;
 		lwdaq_rx_available = 0;
 		console_print("Initialized %s connection in %s.\r\n",(*s).protocol,__func__);
-		return 0;
+		status = 0;
+		return status;
 	};
 
 	if ((*s).state == S_SERVING) {
 		console_print("Receiving %s message in %s.\r\n",(*s).protocol,__func__);
-		status=receive_message((*s).socket,&id,&len,content);
+		status=receive_message((*s).socket,&id,&len,in_buffer);
 		if (status >= 0) {
 			console_print("Received: id=%u len=%u in %s.\r\n",id,len,__func__);
-			return len;
 		} else {
 			return status;
 		}
+		status=process_message((*s).socket,id,len,in_buffer);
+		if (status >= 0) {
+			console_print("Processed %s message in %s.\r\n",(*s).protocol,__func__);
+		} else {
+			return status;
+		}
+		status = lwdaq_rx_available;
 	};
 	
-	return -1;
+	return status;
 }
 
 /*
