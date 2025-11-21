@@ -60,14 +60,9 @@ int ip_port,tcp_timeout,security_level;
 char password[32];
 char configuration[CONFIG_LENGTH];
 
-// Variables and buffers for servers.
-uint8_t lwdaq_rx_buff[TCP_BUFF_SIZE];
-uint32_t lwdaq_rx_first = 0;
-uint32_t lwdaq_rx_available = 0;
-
 // Global socket variables.
 #define LWDAQ_PORT 90
-#define TELNET_PORT   23
+#define TELNET_PORT 23
 #define HTTP_PORT 80
 
 // Server state structures.
@@ -142,6 +137,20 @@ int flip_bytes(uint32_t original) {
 }
 
 /*
+	load32_be takes a pointer to a byte buffer and reads the byte pointed
+	to and the three after it as the bytes of a four-byte big-endian integer
+	and returns a little-endian uint32_t.
+*/
+static inline uint32_t load32_be(const uint8_t *p)
+{
+    return ((uint32_t)p[0] << 24) |
+           ((uint32_t)p[1] << 16) |
+           ((uint32_t)p[2] <<  8) |
+            (uint32_t)p[3];
+}
+
+
+/*
 	return_header sends a data return message header through a socket.
 */
 int return_header(TCP_SOCKET s, uint32_t id, uint32_t len) {
@@ -203,147 +212,6 @@ int return_data(TCP_SOCKET s, uint8_t* block, uint32_t len) {
 	return_header(s,DATA_RETURN,len);
 	TCPIP_TCP_ArrayPut(s,block,len);
 	return_footer(s);
-	return 0;
-}
-
-/*
-	buffered_socket_read takes available bytes from the socket buffer and places
-	them in a ram buffer so that we can execute commands consecutively without
-	having to call the sock_fastread or sock_read routines. Each of these takes
-	a couple of milliseconds to return, whether we read one byte or a thousand
-	bytes. The routine returns the number of bytes it read. If the routine
-	cannot supply the requested number of bytes, perhaps because the socket is
-	closed or broken, it returns value -1. With the socket buffer empty, the
-	routine calls socket_tick. If the socket is still open, the routine returns 0.
-	If the socket is closed, broken, or if the ram buffer is overflowing with
-	un-used data, the routine returns a value less than 0.
-*/
-int buffered_socket_read(TCP_SOCKET s, uint8_t* dp, uint32_t len) {
-	uint32_t tcp_remaining;
-	uint8_t* tcp_destination;
-
-	if (lwdaq_rx_available>=len) {
-		memcpy(dp,&lwdaq_rx_buff[lwdaq_rx_first],len);
-		lwdaq_rx_first=lwdaq_rx_first+len;
-		lwdaq_rx_available=lwdaq_rx_available-len;
-	} else {
-		tcp_remaining=len;
-		tcp_destination=dp;
-		if (lwdaq_rx_available>0) {
-			memcpy(tcp_destination,&lwdaq_rx_buff[lwdaq_rx_first],lwdaq_rx_available);
-			tcp_remaining=tcp_remaining-lwdaq_rx_available;
-			tcp_destination=tcp_destination+lwdaq_rx_available;
-			console_print("Read last %d available, need %d more in %s.\r\n",
-				lwdaq_rx_available,tcp_remaining,__func__);
-		}
-		lwdaq_rx_available=0;
-		lwdaq_rx_first=0;
-		while (tcp_remaining>0) {
-			console_print("Waiting for %d bytes in %s.\r\n",tcp_remaining,__func__);
-			while (lwdaq_rx_available==0) {
-				lwdaq_rx_available=TCPIP_TCP_GetIsReady(s);
-				if (lwdaq_rx_available>0) {
-					TCPIP_TCP_ArrayGet(s,lwdaq_rx_buff,lwdaq_rx_available);	
-				} 
-				if (!socket_tick(s)) {
-					console_print("Socket closed by client in %s.\r\n",__func__);
- 					return -1;
-				}
-			}
-			console_print("Received %d bytes in %s.\r\n",lwdaq_rx_available,__func__);
-			if (lwdaq_rx_available>=tcp_remaining) {
-				memcpy(tcp_destination,lwdaq_rx_buff,tcp_remaining);
-				lwdaq_rx_first=tcp_remaining;
-				lwdaq_rx_available=lwdaq_rx_available-tcp_remaining;
-				tcp_remaining=0;
-			} else {
-				memcpy(tcp_destination,lwdaq_rx_buff,lwdaq_rx_available);
-				tcp_destination=tcp_destination+lwdaq_rx_available;
-				tcp_remaining=tcp_remaining-lwdaq_rx_available;
-				lwdaq_rx_available=0;
-			}
-		}
-	}
-	return len;
-}
-
-/*
-	receive_message reads data from a socket until an entire message has been
-	received. It saves the message id to *id and the content to *content. It
-	reports the length of the content in *len. The routine assumes the LWDAQ
-	Message Protocol.
-*/
-int receive_message(TCP_SOCKET s, uint32_t* id, uint32_t* len, uint8_t* content) {
-	uint8_t code;
-
-	console_print("Entering %s.\r\n",__func__);
-
-	// We read the start code. If it's incorrect, we close the socket and return
-	// with an error code.
-	if (buffered_socket_read(s,&code,sizeof(code)) < 0) {
-		TCPIP_TCP_Close(s);
-		return -1;
-	}
-	if (code!=START_CODE) {
-		if (code==CLOSE_CODE) {
-			console_print("Close code received, closing socket in %s.\r\n",__func__);
-		} else {
-			console_print("Invalid start code, closing socket in %s.\r\n",__func__);
-		}
-		TCPIP_TCP_Close(s);
-		return -1;
-	}
-	
-	// We read the message identifier and content length.
-	if (buffered_socket_read(s,(uint8_t*)id,sizeof(*id)) < 0) {
-		TCPIP_TCP_Close(s);
-		return -1;
-	}
-	if (buffered_socket_read(s,(uint8_t*)len,sizeof(*len)) < 0) {
-		TCPIP_TCP_Close(s);
-		return -1;
-	}
-	
-	// We flip the big-endian integer bytes around to make them little-endian.
-	*id=flip_bytes(*id);
-	*len=flip_bytes(*len);
-	
-	// We are limited in the size of a single message by the length of our input
-	// buffer, so we check to see if the contents length specified in the
-	// message header exceeds the length of our buffer. If so, we close the
-	// socket.
-	if (*len>BUFF_SIZE) {
-		console_print("Message too long, closing socket in %s.\r\n",__func__);
-		TCPIP_TCP_Close(s);
-		return -1;
-	}
-	
-	// We read the content itself into a buffer. At the end of the content we
-	// write a null character so we can pass the content buffer to
-	// string-handling routines.
-	if (*len>0) {
-		if (buffered_socket_read(s,content,(int) *len) < 0) {
-			TCPIP_TCP_Close(s);
-			return -1;
-		}
-		content[(int) *len]=0x00;
-	} else {
-		content[0]=0x00;
-	}
-	
-	// Read the end code.
-	if (buffered_socket_read(s,&code,sizeof(code)) < 0) {
-		TCPIP_TCP_Close(s);
-		return -1;
-	}
-	if (code!=END_CODE) {
-		console_print("Invalid end code, closing socket in %s.\r\n",__func__);
-		TCPIP_TCP_Close(s);
-		return -1;
-	}
-
-	console_print("Leaving %s.\r\n",__func__);
-	
 	return 0;
 }
 
@@ -415,35 +283,58 @@ int process_message (TCP_SOCKET s, uint32_t id, uint32_t len, uint8_t* content) 
 */
 int lwdaq_tasks(SERVER* s) {
 	uint32_t id,len;
-	static uint8_t in_buffer[BUFF_SIZE];
+	static uint8_t rx_buffer[TCP_BUFF_SIZE];
+	static uint32_t rx_available = 0;
+	uint32_t rx_ready = 0;
 	int status;
 
 	status = -1;
 	
-	
 	if ((*s).state == S_LISTENING) {
-		lwdaq_rx_first = 0;
-		lwdaq_rx_available = 0;
+		rx_available = 0;
 		console_print("Initialized %s connection in %s.\r\n",(*s).protocol,__func__);
 		status = 0;
 		return status;
 	};
 
 	if ((*s).state == S_SERVING) {
-		console_print("Receiving %s message in %s.\r\n",(*s).protocol,__func__);
-		status=receive_message((*s).socket,&id,&len,in_buffer);
-		if (status >= 0) {
-			console_print("Received: id=%u len=%u in %s.\r\n",id,len,__func__);
-		} else {
-			return status;
+		rx_ready=TCPIP_TCP_GetIsReady((*s).socket);
+		if (rx_ready>0) {
+			TCPIP_TCP_ArrayGet((*s).socket,&rx_buffer[rx_available],rx_ready);	
+			rx_available=rx_available+rx_ready;
 		}
-		status=process_message((*s).socket,id,len,in_buffer);
-		if (status >= 0) {
-			console_print("Processed %s message in %s.\r\n",(*s).protocol,__func__);
-		} else {
-			return status;
+		if (rx_available==0) return 0;
+		console_print("rx_ready=%u rx_available=%u in %s.\r\n",
+			rx_ready,rx_available,__func__);
+		if (rx_buffer[0]!=START_CODE) {
+			if (rx_buffer[0]==CLOSE_CODE) {
+				console_print("Close code received in %s.\r\n",__func__);
+			} else {
+				console_print("Invalid start code in %s.\r\n",__func__);
+			}
+			return -1;
 		}
-		status = lwdaq_rx_available;
+		if (rx_available<9) return rx_available;		
+		id=load32_be(&rx_buffer[1]);
+		len=load32_be(&rx_buffer[5]);
+		console_print("id=%u len=%u in %s.\r\n",id,len,__func__);
+		if (rx_available<len+10) return rx_available;
+		if (rx_buffer[len+9]!=END_CODE) {
+			console_print("Invalid end code in %s.\r\n",__func__);
+			return -1;
+		}
+		status=process_message((*s).socket,id,len,&rx_buffer[9]);
+		if (status<0) return status;
+		if (rx_available>len+10) {
+			console_print("Copying %u to %u from %u in %s.\r\n",
+				rx_available-len-10,0,len+10,__func__);
+			memmove(&rx_buffer[0],&rx_buffer[len+10],rx_available-len-10);
+			rx_available=rx_available-len-10;
+		} else {
+			rx_available=0;
+		}
+		console_print("rx_available=%u in %s.\r\n",rx_available,__func__);
+		return rx_available;
 	};
 	
 	return status;
