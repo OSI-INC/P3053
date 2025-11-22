@@ -283,10 +283,21 @@ void console_initialize(void)
 	console_print("Command interface running, 'h' for help, 'r' for reset.\r\n");
 }
 
-void console_server(void)
-{
+/*
+	console_server looks out for characters sent in through the console
+	interface, interpretes tham, and responds to them. It always provides an "h"
+	command for help, and the help menu in the code below shows the
+	currently-supported, or partially-supported commands. The commands are all
+	single-letter commands, but some of them, such as the one to change the IP
+	address, will subsequently accept a string of characters.
+*/
+void console_server(void) {
+	#define MAX_CMD_LEN 64
+    #define MAX_MSG_LEN 1024    
+	static char cmd_buffer[MAX_CMD_LEN];
+	static uint32_t cmd_len = 0;
+    static char msg_buffer[MAX_MSG_LEN];
     char c;
-    char buff[20];
 
 	while (console_readcount() > 0) {
 		c = console_getchar();
@@ -306,12 +317,14 @@ void console_server(void)
 						
 					case 'a':
 						console_message("New IP Address: ");
-						console_readln(buff,sizeof(buff));
-						console_print("%s\r\n",buff);
+						console_readln(msg_buffer,MAX_MSG_LEN);
+						console_print("%s\r\n",msg_buffer);
+						console_print("This feature not yet implemented.");
 						break;
 						
 					case 'n':
-						net_info();
+						net_info(msg_buffer,MAX_MSG_LEN);
+						console_print("%s\r\n",msg_buffer);
 						break;
 					
 					case 'p':
@@ -331,9 +344,9 @@ void console_server(void)
 			} else if (cmd_len > 1) {
 				console_message("ERROR: Only single-letter commands supported.\r\n");
 			}
-		cmd_len = 0;
-		console_message("EEM$ ");
-		continue;
+			cmd_len = 0;
+			console_message("EEM$ ");
+			continue;
 		}
 		if (c == '\b' || c == 0x7F) {
 			if (cmd_len > 0) {
@@ -344,7 +357,7 @@ void console_server(void)
 		}
 		if (!is_printable(c)) continue;
 		console_print("%c", c);
-		if (cmd_len < CMD_MAX_LEN) {
+		if (cmd_len < MAX_CMD_LEN) {
 			cmd_buffer[cmd_len++] = c;
 		} else {
 			cmd_len = 0;
