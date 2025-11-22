@@ -264,3 +264,18 @@ const DRV_ETHPHY_INIT tcpipPhyInitData_LAN8740 =
     .pMiimInit              = &drvMiimInitData_0,
     .miimIndex              = 0,
 };
+
+/*
+	Initialize the TCP/IP stack.
+*/
+void TCPIP_Initialize (void) {
+	sysObj.drvMiim_0 = 
+		DRV_MIIM_OBJECT_BASE_Default.DRV_MIIM_Initialize(
+			DRV_MIIM_DRIVER_INDEX_0,
+			(const SYS_MODULE_INIT *) &drvMiimInitData_0); 
+	sysObj.tcpip = TCPIP_STACK_Init();
+	SYS_ASSERT(sysObj.tcpip != SYS_MODULE_OBJ_INVALID, "TCPIP_STACK_Init Failed" );
+	CRYPT_WCCB_Initialize();
+	EVIC_Initialize();
+}
+

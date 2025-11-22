@@ -82,7 +82,7 @@ void pic_initialize(void) {
 	// Disable interrupts for initialization.
 	(void)__builtin_disable_interrupts();	
 	
-	// Initialize the system clock and phase locked loops. This must come first.
+	// Initialize the system clock and phase locked loops.
 	CLK_Initialize();
 	
 	// Enable prefetch for both instructions and data.
@@ -110,7 +110,7 @@ void pic_initialize(void) {
 	console_initialize();
 	
 	// Set up the Ethernet physical interface and start up the TCP/IP stack.
-//	tcpip_initialize();
+	TCPIP_Initialize();
 	
 	// Re-enable interrupts and report initialization complete.
 	(void)__builtin_enable_interrupts();

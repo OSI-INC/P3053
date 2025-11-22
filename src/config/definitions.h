@@ -70,6 +70,9 @@
 // CPU clock frequency in Hz
 #define CPU_CLOCK_FREQUENCY 200000000
 
+// The TCP/IP Initialization routine.
+void TCPIP_Initialize (void);
+
 // A record containing handles to data objects used by various processes.
 typedef struct
 {

@@ -334,38 +334,27 @@ int http_tasks(SERVER* s) {
 	return status;
 }
 
-/*
-	tcpip_initialize starts up the RMII interface with the Ethernet physical layer
-	and initializes the TCP/IP stack. Assuming we call the tcpip
-*/
-void tcpip_initialize (void) {
-	sysObj.drvMiim_0 = 
-		DRV_MIIM_OBJECT_BASE_Default.DRV_MIIM_Initialize(
-			DRV_MIIM_DRIVER_INDEX_0,
-			(const SYS_MODULE_INIT *) &drvMiimInitData_0); 
-	sysObj.tcpip = TCPIP_STACK_Init();
-	SYS_ASSERT(sysObj.tcpip != SYS_MODULE_OBJ_INVALID, "TCPIP_STACK_Init Failed" );
-	CRYPT_WCCB_Initialize();
-	EVIC_Initialize();
-}
-
-
 int main ( void ) {
-	int i;
+	int i = 0;
+
+	// Initialize all I/O pins, functions, and drivers.
+	pic_initialize();
 
 	// Turn on the red and green lamps.
    	GPIO_PortSet(GPIO_PORT_A,0x00000004);
    	GPIO_PortSet(GPIO_PORT_C,0x00008000);
-   	
-   	// A while loop with a counter to control the state of our LEDs. 
-   	i = 0;
-	while (true) {
+ 
+ 	// Infinite loop that manages all functions.  	
+ 	while (true) {
+	
+		// Service all system tasks.
 		console_server();
-		server_tick();
+		tcpip_tick();
 		tcpip_server(&lwdaq_server,lwdaq_tasks);
 		tcpip_server(&telnet_server,telnet_tasks);
 		tcpip_server(&http_server,http_tasks);
 		
+		// Flash the lights.
 		i = i+1;
 		if (i % 100 == 0) {
 			GPIO_PortClear(GPIO_PORT_C,0x00008000);
