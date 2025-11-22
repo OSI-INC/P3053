@@ -350,29 +350,8 @@ int http_tasks(SERVER* s) {
 int main ( void ) {
 	int i = 0;
 
-	// Disable interrupts for initialization.
-	(void)__builtin_disable_interrupts();	
-	
-	CLK_Initialize();
-	ACCESS_Initialize();
 	pic_initialize();
-	NVM_Initialize();
-	CORETIMER_Initialize();
-	UART2_Initialize();
-	UART_SERIAL_SETUP uart2Setup = {
-		.baudRate = 115200,
-		.dataWidth = UART_DATA_8_BIT,
-		.parity = UART_PARITY_NONE,
-		.stopBits = UART_STOP_1_BIT
-	};
-	UART2_SerialSetup(&uart2Setup, 0);
-	UTILS_Initialize();
-	console_initialize();
-	TCPIP_Initialize();
-	
-	// Re-enable interrupts and report initialization complete.
-	(void)__builtin_enable_interrupts();
-	
+		
 	// Turn on the red and green lamps.
    	GPIO_PortSet(GPIO_PORT_A,0x00000004);
    	GPIO_PortSet(GPIO_PORT_C,0x00008000);

@@ -281,42 +281,15 @@ static const SYS_TIME_INIT sysTimeInitData =
     .hwTimerIntNum = 0,
 };
 
-static const SYS_DEBUG_INIT debugInit =
-{
-    .moduleInit = {0},
-    .errorLevel = SYS_DEBUG_GLOBAL_ERROR_LEVEL,
-    .consoleIndex = 0,
-};
-
 /*
-	Memory Access Initialization. We enable pre-fetch for both instructions and
-	data. We set the number of program flash memory wait states to a value
-	suited to our clock frequency. We configure flash memory error correction to
-	force correction of single-bit errors and report double-bit errors.
+	Initialize the SYSTIME module. Needed for timing of initialization.
 */
-void ACCESS_Initialize (void)
+void SYSTIME_Initialize (void)
 {
-	PRECONbits.PREFEN = 3;
-	PRECONbits.PFMWS = 3;
-	CFGCONbits.ECCCON = 3;
-}
-
-/*
-	Initialize various system utilities.
-*/
-void UTILS_Initialize (void)
-{
-	sysObj.drvMiim_0 = 
-		DRV_MIIM_OBJECT_BASE_Default.DRV_MIIM_Initialize(
-			DRV_MIIM_DRIVER_INDEX_0,
-			(const SYS_MODULE_INIT *) &drvMiimInitData_0); 
 	sysObj.sysTime = 
 		SYS_TIME_Initialize(
 			SYS_TIME_INDEX_0,
 			(SYS_MODULE_INIT *)&sysTimeInitData);
-	sysObj.sysDebug = SYS_DEBUG_Initialize(
-		SYS_DEBUG_INDEX_0,
-		(SYS_MODULE_INIT*)&debugInit);
 }
 
 /*
@@ -324,6 +297,10 @@ void UTILS_Initialize (void)
 */
 void TCPIP_Initialize (void)
 {
+	sysObj.drvMiim_0 = 
+		DRV_MIIM_OBJECT_BASE_Default.DRV_MIIM_Initialize(
+			DRV_MIIM_DRIVER_INDEX_0,
+			(const SYS_MODULE_INIT *) &drvMiimInitData_0); 
 	sysObj.tcpip = TCPIP_STACK_Init();
 	SYS_ASSERT(sysObj.tcpip != SYS_MODULE_OBJ_INVALID, "TCPIP_STACK_Init Failed" );
 	CRYPT_WCCB_Initialize();

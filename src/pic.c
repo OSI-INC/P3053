@@ -39,7 +39,7 @@ void pic_reset(void) {
 	pic_configure sets the PIC32MZ general-purpose input-output pins for our
 	application.
 */
-void pic_initialize(void) {
+void pic_io_initialize(void) {
 	// The A3053A is all-digital. so we configure all pins as digital pins. We
 	// don't even bother to check the data sheet to see which pins can be
 	// non-digital, we just set them all to digital even if they are always
@@ -94,7 +94,6 @@ void pic_initialize(void) {
 	starts up all system modules to support TCP/IP servers, interrupt timers, flash
 	memory use, and the UART console.
 */
-/*
 void pic_initialize(void) {
 
 	// Disable interrupts for initialization.
@@ -121,6 +120,10 @@ void pic_initialize(void) {
 	// interrupt-driven timers and delays.
 	CORETIMER_Initialize();
 	
+	// Initialize the system timer module, which we need to time initialization
+	// of the UART and TCP/IP stack.
+	SYSTIME_Initialize();
+	
 	// Configure the functions of the gerneral-purpose input and output pins.
 	pic_io_initialize();
 	
@@ -133,5 +136,4 @@ void pic_initialize(void) {
 	// Re-enable interrupts and report initialization complete.
 	(void)__builtin_enable_interrupts();
 }
-*/
 

@@ -260,16 +260,21 @@ void SYS_CONSOLE_Tasks(int index) {
 void SYS_CONSOLE_Task(int index) {
 }
 
-/*
-
-
-*/
 #define CMD_MAX_LEN 64
 static char cmd_buffer[CMD_MAX_LEN];
 static unsigned cmd_len = 0;
 
 void console_initialize(void)
 {
+	UART2_Initialize();
+	UART_SERIAL_SETUP uart2Setup = {
+		.baudRate = 115200,
+		.dataWidth = UART_DATA_8_BIT,
+		.parity = UART_PARITY_NONE,
+		.stopBits = UART_STOP_1_BIT
+	};
+	UART2_SerialSetup(&uart2Setup, 0);
+
     cmd_len = 0;
 	console_print("\r\n\r\n");
 	console_print("===========================================================\r\n");
