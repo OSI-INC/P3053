@@ -144,6 +144,14 @@ int console_getchar(void) {
     return -1; 
 }
 
+/*
+	console_readln reads from the console until it comes to a newline character.
+	Until such time, it blocks the processor, so only interrupts will be
+	services. When it receives the newline, it echoes characters and adds them
+	to the buffer it was passed as an argument. It makes sure it does not write
+	more than maxlen-1 characters to the buffer, and it terminates the string
+	with a null character.
+*/
 int console_readln(char* buf, int maxlen)
 {
     int idx = 0;
@@ -260,10 +268,11 @@ void SYS_CONSOLE_Tasks(int index) {
 void SYS_CONSOLE_Task(int index) {
 }
 
-#define CMD_MAX_LEN 64
-static char cmd_buffer[CMD_MAX_LEN];
-static unsigned cmd_len = 0;
-
+/*
+	console_initialize sets up the UART2 as our console interface. The UART2 will
+	receive and transmit characters from a UART terminal. The routine immediately
+	prints an announcement, even if the REPORT flag is not set.
+*/
 void console_initialize(void)
 {
 	UART2_Initialize();
@@ -275,12 +284,16 @@ void console_initialize(void)
 	};
 	UART2_SerialSetup(&uart2Setup, 0);
 
-    cmd_len = 0;
 	console_print("\r\n\r\n");
 	console_print("===========================================================\r\n");
 	console_print("=========    Embedded Ethernet Module (A3053)     =========\r\n");
 	console_print("===========================================================\r\n");
 	console_print("Command interface running, 'h' for help, 'r' for reset.\r\n");
+	if (REPORT) {
+		console_print("Diagnostic announcements to the console are enabled.\r\n");
+	} else {
+		console_print("Diagnostic announcements to the console are disnabled.\t\n");	
+	}
 }
 
 /*
@@ -289,7 +302,8 @@ void console_initialize(void)
 	command for help, and the help menu in the code below shows the
 	currently-supported, or partially-supported commands. The commands are all
 	single-letter commands, but some of them, such as the one to change the IP
-	address, will subsequently accept a string of characters.
+	address, will subsequently accept a string of characters. The console server
+	is always active, even if the REPORT flag is not set.
 */
 void console_server(void) {
 	#define MAX_CMD_LEN 64

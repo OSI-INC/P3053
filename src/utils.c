@@ -11,6 +11,7 @@
 #include <ctype.h>
 #include <string.h>
 #include "utils.h"
+
 /*
 	string_trim takes a pointer to a null-terminated string and returns a pointer
 	to another null-terminated string that is the same as the original but with all

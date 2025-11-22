@@ -11,6 +11,8 @@
 
 #include "config/system/console/sys_console.h"
 
+#define REPORT 1
+
 // Procedures that read from and write to the console.
 void console_putchar(char c);
 void console_flush(void);
