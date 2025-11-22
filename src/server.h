@@ -1,10 +1,10 @@
 /*
-	comms.h declares the variables, types, and functions used in our
+	server.h declares the variables, types, and functions used in our
 	communications routines.
 */
 
-#ifndef COMMS_H
-#define COMMS_H
+#ifndef SERVER_H
+#define SERVER_H
 
 // A structure that provides names for the states of a TCP/IP server. 
 typedef enum {

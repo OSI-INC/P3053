@@ -1,17 +1,24 @@
 /*
 	console.h declares the console read and write routines, as well as the
-	console-based command interface. It declares the SYS_CONSOLE family of
-	read and write routines as well, bu calling sys_console.h. In console.c,
-	we provide bodies for these SYS_CONSOLE routines that are used by all
-	Harmony system modules.
+	console-based command interface. It declares the SYS_CONSOLE family of read
+	and write routines as well, by calling sys_console.h. In console.c, we
+	provide bodies for these SYS_CONSOLE routines that are used by all Harmony
+	system modules. If the VERBOSE_CONSOLE macro is defined, we set a local
+	"debug" flag, which routines can use to turn on and off their reporting to
+	the console.
 */
 
 #ifndef CONSOLE_H
 #define CONSOLE_H
 
+// Include the Harmony SYS_CONSOLE routine declarations. We will be supplying 
 #include "config/system/console/sys_console.h"
 
-#define REPORT 1
+#ifdef VERBOSE_CONSOLE
+static const bool debug = true;
+#else
+static const bool debug = false;
+#endif
 
 // Procedures that read from and write to the console.
 void console_putchar(char c);

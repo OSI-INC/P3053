@@ -199,7 +199,7 @@ int lwdaq_process_message (SERVER* s, uint32_t id, uint32_t len, uint8_t* conten
 			register_addr = content[3];
 			value = content[4];
 			//write_controller_byte(register_addr,value);
-			if (REPORT) console_print("BYTE_WRITE to %d of %d in %s.\r\n",
+			if (debug) console_print("BYTE_WRITE to %d of %d in %s.\r\n",
 				register_addr,value,__func__);
 			break;
 		}
@@ -207,7 +207,7 @@ int lwdaq_process_message (SERVER* s, uint32_t id, uint32_t len, uint8_t* conten
 		case BYTE_READ:{
 			register_addr = content[3];
 			//value = read_controller_byte(register_addr);
-			if (REPORT) console_print("BYTE_READ from %d of %d in %s.\r\n",
+			if (debug) console_print("BYTE_READ from %d of %d in %s.\r\n",
 				register_addr,value,__func__);
 			//lwdaq_byte(value);
 			break;
@@ -216,7 +216,7 @@ int lwdaq_process_message (SERVER* s, uint32_t id, uint32_t len, uint8_t* conten
 		case BYTE_POLL:{
 			register_addr = content[3];
 			value = content[4];
-			if (REPORT) console_print("BYTE_POLL of %d for %d in %s.\r\n",
+			if (debug) console_print("BYTE_POLL of %d for %d in %s.\r\n",
 				register_addr,value,__func__);
 /*
 			while (read_controller_byte(register_addr) != value) {
@@ -228,21 +228,21 @@ int lwdaq_process_message (SERVER* s, uint32_t id, uint32_t len, uint8_t* conten
 		}
 
 		case VERSION_READ:{
-			if (REPORT) console_print("VERSION_READ in %s.\r\n",__func__);
+			if (debug) console_print("VERSION_READ in %s.\r\n",__func__);
 			lwdaq_integer(s,VERSION_NUM);
 			break;
 		}
 
 		case ECHO:{
-			if (REPORT) console_print("ECHO of %u bytes in %s.\r\n",len,__func__);
+			if (debug) console_print("ECHO of %u bytes in %s.\r\n",len,__func__);
 			lwdaq_data(s,content,len);
 			content[len] = 0x00;
-			if (REPORT) console_print("%s\r\n",content);
+			if (debug) console_print("%s\r\n",content);
 			break;
 		}
 
 		default: {
-			if (REPORT) console_print("Unrecognised message in %s.\r\n",__func__);
+			if (debug) console_print("Unrecognised message in %s.\r\n",__func__);
 			break;
 		}
 	}
@@ -263,7 +263,7 @@ int lwdaq_tasks(SERVER* s) {
 	
 	if ((*s).state == S_LISTENING) {
 		rx_available = 0;
-		if (REPORT) console_print("Initialized %s connection in %s.\r\n",
+		if (debug) console_print("Initialized %s connection in %s.\r\n",
 			(*s).protocol,__func__);
 		status = 0;
 		return status;
@@ -276,36 +276,36 @@ int lwdaq_tasks(SERVER* s) {
 			rx_available = rx_available+rx_ready;
 		}
 		if (rx_available == 0) return 0;
-		if (REPORT) console_print("rx_ready=%u rx_available=%u in %s.\r\n",
+		if (debug) console_print("rx_ready=%u rx_available=%u in %s.\r\n",
 			rx_ready, rx_available,__func__);
 		if (rx_buffer[0] != START_CODE) {
 			if (rx_buffer[0] == CLOSE_CODE) {
-				if (REPORT) console_print("Close code received in %s.\r\n",__func__);
+				if (debug) console_print("Close code received in %s.\r\n",__func__);
 			} else {
-				if (REPORT) console_print("Invalid start code in %s.\r\n",__func__);
+				if (debug) console_print("Invalid start code in %s.\r\n",__func__);
 			}
 			return -1;
 		}
 		if (rx_available<9) return rx_available;		
 		id = load32_be(&rx_buffer[1]);
 		len = load32_be(&rx_buffer[5]);
-		if (REPORT) console_print("id=%u len=%u in %s.\r\n",id,len,__func__);
+		if (debug) console_print("id=%u len=%u in %s.\r\n",id,len,__func__);
 		if (rx_available<len+10) return rx_available;
 		if (rx_buffer[len+9] != END_CODE) {
-			if (REPORT) console_print("Invalid end code in %s.\r\n",__func__);
+			if (debug) console_print("Invalid end code in %s.\r\n",__func__);
 			return -1;
 		}
 		status = lwdaq_process_message(s,id,len,&rx_buffer[9]);
 		if (status<0) return status;
 		if (rx_available>len+10) {
-			if (REPORT) console_print("Copying %u to %u from %u in %s.\r\n",
+			if (debug) console_print("Copying %u to %u from %u in %s.\r\n",
 				rx_available-len-10,0,len+10,__func__);
 			memmove(&rx_buffer[0],&rx_buffer[len+10],rx_available-len-10);
 			rx_available = rx_available-len-10;
 		} else {
 			rx_available = 0;
 		}
-		if (REPORT) console_print("rx_available=%u in %s.\r\n",rx_available,__func__);
+		if (debug) console_print("rx_available=%u in %s.\r\n",rx_available,__func__);
 		return rx_available;
 	};
 	
@@ -318,7 +318,7 @@ int lwdaq_tasks(SERVER* s) {
 int telnet_tasks(SERVER* s) {
 	int status = 0;
 	 
-	if (REPORT) console_print("Servicing %s connection on port %u in %s.\r\n",
+	if (debug) console_print("Servicing %s connection on port %u in %s.\r\n",
 		(*s).protocol,(*s).port,__func__);
 	status = -1;
 
@@ -331,7 +331,7 @@ int telnet_tasks(SERVER* s) {
 int http_tasks(SERVER* s) {
 	int status = 0;
 	 
-	if (REPORT) console_print("Servicing %s connection on port %u in %s.\r\n",
+	if (debug) console_print("Servicing %s connection on port %u in %s.\r\n",
 		(*s).protocol,(*s).port,__func__);
 	status = -1;
 

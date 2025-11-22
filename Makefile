@@ -1,17 +1,19 @@
 #
-# The P3053A Makefile. 
+# P3053A Makefile. 
 #
 # This makefile uses GNUMake to compile a hexadecimail programming file from all
-# the source files in the local src directory. The "build" target adds some
-# debugging flags to the compile, assemble, and link. We want to turn on the
-# debugging console for debug builds, but disable it for production builds. The
-# build produces a hex output file we can use to program a PIC32MZ
-# microprocessor. We developed the makefile for a PIC32MZ2048EFH100, with TCP/IP
-# and WOLFSSL code for our Embedded Ethernet Module (A3053A), but we trust that
-# the same structure can be used to compile arbitrary projects from the command
-# line for any PIC processor. The build uses an installation of the xc32
-# compiler, as well as a Microchip Device Package repository, where it finds
-# the CPU device package.
+# the source files in the local src directory. The "release" target is the default
+# target, for which the the DEBUG macro will be undefined, and the products will
+# but assembled in a "build/release" directory. The "debug" target will be built in
+# the "build/debug" directory, and the DEBUG macro will be defined for all
+# sources. 
+#
+# We developed this makefile for the PIC32MZ2048EFH100 device, Harmony TCP/IP
+# sources, and WOLFSSL sources. These we compile for our Embedded Ethernet
+# Module (A3053A) target. We trust that the same Makefult structure can be
+# adapted to other, similar embedded ethernet modules. The build uses the xc32
+# compiler, as well as a Microchip Device Package repository. Both must be
+# present on your system for the build to complete.
 #
 # Kevan Hashemi, Open Source Instruments Inc., 2025.
 #
@@ -22,12 +24,11 @@
 # for certain targets that dictate the build mode.
 #
 ifeq (debug,$(findstring debug,$(MAKECMDGOALS)))
-BUILD_MODE=debug
+MODE=debug
 else
-BUILD_MODE=production
+MODE=release
 endif
-$(info BUILD_MODE = $(BUILD_MODE))
-
+$(info MODE=$(MODE))
 
 #
 # Define the exact processor, its family, the location of its device pack, and
@@ -63,9 +64,12 @@ MP_AR=$(MP_DIR)/xc32-ar
 # Define the build and distribution directories, the final output file and the
 # map file names.
 #
-BUILD_DIR=build
-OUTPUT_FILE=$(BUILD_DIR)/$(BUILD_MODE).elf
-MAP_FILE=$(BUILD_DIR)/$(BUILD_MODE).map
+TARGET=P3053A
+BUILD_DIR=build/$(MODE)
+$(info BUILD_DIR=$(BUILD_DIR))
+OUTPUT_FILE=$(BUILD_DIR)/$(TARGET).elf
+$(info OUTPUT_FILE=$(OUTPUT_FILE))
+MAP_FILE=$(BUILD_DIR)/$(TARGET).map
 
 #
 # Get a list of all the sources in the source directory. These are C and
@@ -85,7 +89,7 @@ ASFLAGS=
 LDFLAGS=
 
 #
-# Flags that are shared by the production and debug builds.
+# Flags that are shared by the release and debug builds.
 #
 CFLAGS += -mprocessor=$(CPU) \
 	-ffunction-sections \
@@ -121,10 +125,8 @@ LDFLAGS += -mprocessor=$(CPU) \
 #
 # Add flags depending upon whether this is a debug or production build.
 #
-ifeq ($(BUILD_MODE),debug)
-CFLAGS += -D__DEBUG
-ASFLAGS += -D__DEBUG
-LDFLAGS += -Wl,--defsym=__DEBUG=1
+ifeq ($(MODE),debug)
+CFLAGS += -DVERBOSE_CONSOLE
 endif
 
 #
@@ -155,33 +157,40 @@ $(OUTPUT_FILE): $(OBJECTFILES) $(CPULD) Makefile
 	$(MP_BIN2HEX) $(OUTPUT_FILE)
 
 #
-# When we build, we create the compiled hex or elf file that we can 
-# load into the processor.
+# The release target is the one in which diagnostic reporting and other debugging
+# features are turned off. The files will be written to a release directory, and
+# we will get a production version of the hex file to distribute.
 #
-build: $(OUTPUT_FILE)
+release: $(OUTPUT_FILE)
 
 #
-# The debug target is the same as the build target, except we have added
-# some compiler, assembler, and linker flags earlier in the makefile, so
-# as to affect the build.
+# The debug target is the same as the release target, except compiled with flags
+# that can turn on diagnostic reporting and debugging features that slow down the
+# process at run-time. The files will be written to a debug directory. 
 #
-debug: build
+debug: release
 
 #
 # When we clean, we remove all files and directories in the object and
 # distribution directory trees.
 #
 clean:
-	@printf "$(YELLOW)Cleaning ${BUILD_DIR} directories$(RESET)\n"
-	find ${BUILD_DIR} -mindepth 1 -delete
+	@printf "$(YELLOW)Cleaning build directories$(RESET)\n"
+	find build/release -mindepth 1 -delete
+	find build/debug -mindepth 1 -delete
 
 #
 # The remove target removes the output file so that we can, by calling
 # make, re-link the output file and test the link command.
 #
 remove:
-	@printf "$(YELLOW)Removing $(OUTPUT_FILE)$(RESET)\n"
-	rm $(OUTPUT_FILE)
+	@printf "$(YELLOW)Removing output files$(RESET)\n"
+	rm -f build/release/$(TARGET).elf
+	rm -f build/release/$(TARGET).hex
+	rm -f build/release/$(TARGET).map
+	rm -f build/debug/$(TARGET).elf
+	rm -f build/debug/$(TARGET).hex
+	rm -f build/debug/$(TARGET).map
 
 #
 # We have told the compiler to create a dependency makefiles for every object it

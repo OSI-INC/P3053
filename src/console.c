@@ -289,28 +289,28 @@ void console_initialize(void)
 	console_print("=========    Embedded Ethernet Module (A3053)     =========\r\n");
 	console_print("===========================================================\r\n");
 	console_print("Command interface running, 'h' for help, 'r' for reset.\r\n");
-	if (REPORT) {
+	if (debug) {
 		console_print("Diagnostic announcements to the console are enabled.\r\n");
 	} else {
-		console_print("Diagnostic announcements to the console are disnabled.\t\n");	
+		console_print("Diagnostic announcements to the console are disabled.\r\n");	
 	}
 }
 
 /*
 	console_server looks out for characters sent in through the console
 	interface, interpretes tham, and responds to them. It always provides an "h"
-	command for help, and the help menu in the code below shows the
-	currently-supported, or partially-supported commands. The commands are all
-	single-letter commands, but some of them, such as the one to change the IP
-	address, will subsequently accept a string of characters. The console server
-	is always active, even if the REPORT flag is not set.
+	command for help, and the help menu in the code below shows the supported
+	and planned commands. The commands are all single-letter commands, but some
+	of them, such as the one to change the IP address, will subsequently accept
+	a string of characters. The console server is always active, regardless of
+	the state of the debug flag.
 */
 void console_server(void) {
 	#define MAX_CMD_LEN 64
-    #define MAX_MSG_LEN 1024    
 	static char cmd_buffer[MAX_CMD_LEN];
-	static uint32_t cmd_len = 0;
+    #define MAX_MSG_LEN 1024    
     static char msg_buffer[MAX_MSG_LEN];
+	static uint32_t cmd_len = 0;
     char c;
 
 	while (console_readcount() > 0) {

@@ -1,5 +1,5 @@
 /*
-	comms.c is a library of communication routines, including network and
+	server.c is a library of communication routines, including network and
 	console interfaces.
 */
 
@@ -99,8 +99,8 @@ void ping_gateway(void) {
 }
 
 /*
-	net_info returns a string ready to print in a console that presents all the current
-	status and configuration of the network interface.
+	net_info returns a string ready to print in a console that presents all the
+	current status and configuration of the network interface.
 */
 void net_info(char* out, uint32_t out_size) {
     TCPIP_NET_HANDLE netH;
@@ -174,9 +174,7 @@ void tcpip_tick(void) {
 	The server starts in the S_WAIT_STACK state, where it checks the status of
 	the stack. If the stack initialization failed, the server will move to its
 	error state. The server announces success or failure provided that it is the
-	first server to perform the stack check. Otherwise it proceeds quietly. If
-	makes no announcement if the REPORT flag is cleared. In the error state, it
-	will write a heartbeat error message.
+	first server to perform the stack check. Otherwise it proceeds quietly. 
 	
 	In the S_WAIT_IP state, the server waits until the network interface has its
 	IP address. When the IP address is established, the first server to detect the
@@ -192,6 +190,10 @@ void tcpip_tick(void) {
 	
 	In S_Close, the server closes the socket, and in S_ERROR the server sits and 
 	makes an occasional heartbeat announcement about its state.
+	
+	At least one server will announce the initialization of the stack and the
+	assigning of an IP address. If the debug flag is cleared, all other
+	announcements will be suppressed.
 */
 void tcpip_server(SERVER* s, tcpip_tasks_type tasks) {
 	#define HEARTBEAT_PERIOD 5000000
@@ -211,7 +213,7 @@ void tcpip_server(SERVER* s, tcpip_tasks_type tasks) {
 			tcpip_status = TCPIP_STACK_Status(sysObj.tcpip);
 			if (tcpip_status < 0) {   
 				if (!wait_stack_done) {
-					if (REPORT) console_print(
+					console_print(
 						"TCP/IP stack initialization failed in %s.\r\n",
 						__func__);
 				}
@@ -221,7 +223,7 @@ void tcpip_server(SERVER* s, tcpip_tasks_type tasks) {
 				interface_name = TCPIP_STACK_NetNameGet(net_hdl);
 				host_name = TCPIP_STACK_NetBIOSName(net_hdl);
 				if (!wait_stack_done) {
-					if (REPORT) console_print(
+					console_print(
 						"Interface %s on host %s awaiting initialization in %s.\r\n",
 						interface_name,
 						string_trim(host_name),
@@ -239,7 +241,7 @@ void tcpip_server(SERVER* s, tcpip_tasks_type tasks) {
 				ip_addr.Val = TCPIP_STACK_NetAddress(net_hdl);
 				interface_name = TCPIP_STACK_NetNameGet(net_hdl);
 				if (!wait_ip_done) {
-					if (REPORT) console_print(
+					console_print(
 						"Interface %s assigned IP address %d.%d.%d.%d in %s.\r\n", 
 						interface_name,
 						ip_addr.v[0],ip_addr.v[1],ip_addr.v[2],ip_addr.v[3],
@@ -255,12 +257,12 @@ void tcpip_server(SERVER* s, tcpip_tasks_type tasks) {
 		case S_OPEN_SERVER: {
 			(*s).socket = TCPIP_TCP_ServerOpen(IP_ADDRESS_TYPE_IPV4,(*s).port,0);
 			if ((*s).socket == INVALID_SOCKET) {
-				if (REPORT) console_print(
+				if (debug) console_print(
 					"Could not open %s server on port %d in %s.\r\n",
 					(*s).protocol,(*s).port,__func__);
 				(*s).state = S_ERROR;
 			} else {
-				if (REPORT) console_print(
+				if (debug) console_print(
 					"Listening for %s connection on port %d in %s.\r\n",
 					(*s).protocol,(*s).port,__func__);
 				(*s).state = S_LISTENING;
@@ -272,11 +274,11 @@ void tcpip_server(SERVER* s, tcpip_tasks_type tasks) {
 			if (TCPIP_TCP_IsConnected((*s).socket)) {
 				if (TCPIP_TCP_SocketInfoGet((*s).socket,&sock_info)) {
 					IPV4_ADDR ip = sock_info.remoteIPaddress.v4Add;
-					if (REPORT) console_print(
+					if (debug) console_print(
 						"%s connection from %u.%u.%u.%u in %s.\r\n",
 						(*s).protocol,ip.v[0],ip.v[1],ip.v[2],ip.v[3],__func__);
 				} else {
-					if (REPORT) console_print(
+					if (debug) console_print(
 						"%s connection from unknown peer in %s.\r\n",
 						(*s).protocol,__func__);
 				}
@@ -284,7 +286,7 @@ void tcpip_server(SERVER* s, tcpip_tasks_type tasks) {
 				if (status >= 0) {
 					(*s).state = S_SERVING;
 				} else {
-					if (REPORT) console_print(
+					if (debug) console_print(
 						"%s socket closed pre-emptively by server in %s.\r\n",
 						(*s).protocol,__func__);			
 					(*s).state = S_CLOSE;
@@ -296,13 +298,13 @@ void tcpip_server(SERVER* s, tcpip_tasks_type tasks) {
 		case S_SERVING: {
 			if (!TCPIP_TCP_IsConnected((*s).socket) ||
 					TCPIP_TCP_WasDisconnected((*s).socket)) {
-				if (REPORT) console_print("%s socket closed by client in %s.\r\n",
+				if (debug) console_print("%s socket closed by client in %s.\r\n",
 					(*s).protocol,__func__);
 				(*s).state = S_CLOSE;
 			} else {
 				status = tasks(s);
 				if (status < 0) {
-					if (REPORT) console_print("%s socket closed by server in %s.\r\n",
+					if (debug) console_print("%s socket closed by server in %s.\r\n",
 						(*s).protocol,__func__);			
 					(*s).state = S_CLOSE;
 				}
@@ -319,7 +321,7 @@ void tcpip_server(SERVER* s, tcpip_tasks_type tasks) {
 		
 		case S_ERROR: {
 			if (rand() % HEARTBEAT_PERIOD == 0) {
-				if (REPORT) console_print("Failed to start %s server in %s.\r\n",
+				if (debug) console_print("Failed to start %s server in %s.\r\n",
 					(*s).protocol,__func__);
 			}		
 		}
@@ -327,7 +329,7 @@ void tcpip_server(SERVER* s, tcpip_tasks_type tasks) {
 		
 		default: {
 			if (rand() % HEARTBEAT_PERIOD == 0) {
-				if (REPORT) console_print("Unknown state %u for % server in %s.\r\n",
+				if (debug) console_print("Unknown state %u for % server in %s.\r\n",
 					(*s).protocol,(*s).state,__func__);
 			}		
 		}
