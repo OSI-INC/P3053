@@ -17,11 +17,6 @@
 #
 
 #
-# Set the target name.
-#
-TARGET=P3053A
-
-#
 # Detect the build mode so that we can set flags before we get to the
 # target definition. We will look in the MAKECMDGOALS reservbed variable
 # for certain targets that dictate the build mode.
@@ -31,6 +26,8 @@ BUILD_MODE=debug
 else
 BUILD_MODE=production
 endif
+$(info BUILD_MODE = $(BUILD_MODE))
+
 
 #
 # Define the exact processor, its family, the location of its device pack, and
@@ -67,8 +64,8 @@ MP_AR=$(MP_DIR)/xc32-ar
 # map file names.
 #
 BUILD_DIR=build
-OUTPUT_FILE=$(BUILD_DIR)/$(TARGET).elf
-MAP_FILE=$(BUILD_DIR)/$(TARGET).map
+OUTPUT_FILE=$(BUILD_DIR)/$(BUILD_MODE).elf
+MAP_FILE=$(BUILD_DIR)/$(BUILD_MODE).map
 
 #
 # Get a list of all the sources in the source directory. These are C and
@@ -183,10 +180,8 @@ clean:
 # make, re-link the output file and test the link command.
 #
 remove:
-	@printf "$(YELLOW)Removing $(TARGET) build products.$(RESET)\n"
-	rm -f $(BUILD_DIR)/$(TARGET).elf
-	rm -f $(BUILD_DIR)/$(TARGET).hex
-	rm -f $(BUILD_DIR)/$(TARGET).map
+	@printf "$(YELLOW)Removing $(OUTPUT_FILE)$(RESET)\n"
+	rm $(OUTPUT_FILE)
 
 #
 # We have told the compiler to create a dependency makefiles for every object it

@@ -70,7 +70,15 @@
 // CPU clock frequency in Hz
 #define CPU_CLOCK_FREQUENCY 200000000
 
+<<<<<<< HEAD
 // The TCP/IP Initialization routine.
+=======
+// Initialization routines we can call from our main program.
+void ACCESS_Initialize (void);
+void GPIO_Initialize (void);
+void CONSOLE_Initialize (void);
+void UTILS_Initialize (void);
+>>>>>>> parent of e0a9ead (Rearranging initialization routines, compile broken.)
 void TCPIP_Initialize (void);
 
 // A record containing handles to data objects used by various processes.

@@ -18,7 +18,7 @@
 #include "definitions.h"
 #include "utils.h"
 #include "pic.h"
-#include "server.h"
+#include "comms.h"
 #include "console.h"
 
 static inline bool is_printable(char c) {
@@ -254,33 +254,23 @@ void SYS_CONSOLE_Tasks(int index) {
 
 /*
 	SYS_CONSOLE_Tasks is a routine used by the Harmony system processes. It is
-	intended to perform polling tasks. We are not going to provide any polling
-	for the Harmony processes, so our implementation of the routine does
-	nothing.
+	intended to perform polling tasks. We are not going to do any polling for
+	the Harmony processes, so our implementation of the routine does nothing.
 */
 void SYS_CONSOLE_Task(int index) {
 }
 
 /*
-	console_initialize sets up the UART2 interface for our console and
-	immediately prints a message to the console.
+
+
 */
+#define CMD_MAX_LEN 64
+static char cmd_buffer[CMD_MAX_LEN];
+static unsigned cmd_len = 0;
+
 void console_initialize(void)
 {
-	// We use UART2 for our console, which our PIC initialization must direct
-	// to two of the I/O pins using peripheral pin selection (PPS).
-	UART2_Initialize();
-	UART_SERIAL_SETUP uart2Setup = {
-		.baudRate = 115200,
-		.dataWidth = UART_DATA_8_BIT,
-		.parity = UART_PARITY_NONE,
-		.stopBits = UART_STOP_1_BIT
-	};
-	UART2_SerialSetup(&uart2Setup, 0);
-
-	// Whether there is anything attached to our console or not, we send a message
-	// through the UART. This initial print is enabled even if we are not running 
-	// with the debug flag set.
+    cmd_len = 0;
 	console_print("\r\n\r\n");
 	console_print("===========================================================\r\n");
 	console_print("=========    Embedded Ethernet Module (A3053)     =========\r\n");
@@ -288,22 +278,10 @@ void console_initialize(void)
 	console_print("Command interface running, 'h' for help, 'r' for reset.\r\n");
 }
 
-/*
-	console_server looks out for characters sent in through the console
-	interface, interpretes tham, and responds to them. It always provides an "h"
-	command for help, and the help menu in the code below shows the
-	currently-supported, or partially-supported commands. The commands are all
-	single-letter commands, but some of them, such as the one to change the IP
-	address, will subsequently accept a string of characters.
-*/
 void console_server(void)
 {
-	#define MAX_CMD_LEN 64
-    #define MAX_MSG_LEN 1024    
-	static char cmd_buffer[MAX_CMD_LEN];
-	static uint32_t cmd_len = 0;
-    static char msg_buffer[MAX_MSG_LEN];
     char c;
+    char buff[20];
 
 	while (console_readcount() > 0) {
 		c = console_getchar();
@@ -323,14 +301,12 @@ void console_server(void)
 						
 					case 'a':
 						console_message("New IP Address: ");
-						console_readln(msg_buffer,MAX_MSG_LEN);
-						console_print("%s\r\n",msg_buffer);
-						console_print("This feature not yet implemented.");
+						console_readln(buff,sizeof(buff));
+						console_print("%s\r\n",buff);
 						break;
 						
 					case 'n':
-						net_info(msg_buffer,MAX_MSG_LEN);
-						console_print("%s\r\n",msg_buffer);
+						net_info();
 						break;
 					
 					case 'p':
@@ -350,9 +326,9 @@ void console_server(void)
 			} else if (cmd_len > 1) {
 				console_message("ERROR: Only single-letter commands supported.\r\n");
 			}
-			cmd_len = 0;
-			console_message("EEM$ ");
-			continue;
+		cmd_len = 0;
+		console_message("EEM$ ");
+		continue;
 		}
 		if (c == '\b' || c == 0x7F) {
 			if (cmd_len > 0) {
@@ -363,7 +339,7 @@ void console_server(void)
 		}
 		if (!is_printable(c)) continue;
 		console_print("%c", c);
-		if (cmd_len < MAX_CMD_LEN) {
+		if (cmd_len < CMD_MAX_LEN) {
 			cmd_buffer[cmd_len++] = c;
 		} else {
 			cmd_len = 0;
