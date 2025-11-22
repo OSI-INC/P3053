@@ -33,6 +33,7 @@ typedef struct {
 typedef int (*tcpip_tasks_type)(SERVER* s);
 
 // TCP/IP procedures.
+void tcpip_tick(void);
 uint32_t tcp_get_ready(TCP_SOCKET s);
 uint32_t tcp_get(TCP_SOCKET s, uint8_t* buffer, uint32_t len);
 uint32_t tcp_put_ready(TCP_SOCKET s);

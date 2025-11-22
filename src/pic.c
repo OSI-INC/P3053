@@ -14,6 +14,7 @@
 #include <string.h>
 #include "configuration.h"
 #include "definitions.h"
+#include "console.h"
 #include "pic.h"
 
 /*

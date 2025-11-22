@@ -40,7 +40,7 @@
 #include "definitions.h"
 #include "utils.h"
 #include "pic.h"
-#include "comms.h"
+#include "server.h"
 #include "console.h"
 
 // Current version number
@@ -95,16 +95,6 @@ SERVER http_server = { INVALID_SOCKET, S_WAIT_STACK, HTTP_PORT, "HTTP" };
 #define ECHO			11
 #define STREAM_WRITE	12
 #define REBOOT			13
-
-
-/*
-	sys_tick maintains the system and returns 1 if socket is still alive.
-*/
-void sys_tick(void) {
-	DRV_MIIM_OBJECT_BASE_Default.DRV_MIIM_Tasks(sysObj.drvMiim_0);
-	TCPIP_STACK_Task(sysObj.tcpip);
-	console_server();
-}
 
 /*
 	swap_u32 reverses the order of four bytes in a thirty-two bit unsigned
@@ -359,7 +349,7 @@ int main ( void ) {
    	// A while loop with a counter to control the state of our LEDs. 
    	i = 0;
 	while (true) {
-		sys_tick();
+		tcpip_tick();
 		console_server();
 		tcpip_server(&lwdaq_server,lwdaq_tasks);
 		tcpip_server(&telnet_server,telnet_tasks);

@@ -16,7 +16,7 @@
 #include "tcpip/tcpip.h"
 #include "tcpip/src/tcpip_private.h"
 #include "tcpip/icmp.h"
-#include "comms.h"
+#include "server.h"
 #include "console.h"
 #include "utils.h"
 
@@ -127,6 +127,14 @@ void net_info(void) {
     console_print("Link    : %s\r\n",
         (TCPIP_STACK_NetIsLinked(netH) ? "UP" : "DOWN"));
     console_message("\r\n");
+}
+
+/*
+	tcpip_tick maintains the TCP/IP stack running.
+*/
+void tcpip_tick(void) {
+	DRV_MIIM_OBJECT_BASE_Default.DRV_MIIM_Tasks(sysObj.drvMiim_0);
+	TCPIP_STACK_Task(sysObj.tcpip);
 }
 
 /*

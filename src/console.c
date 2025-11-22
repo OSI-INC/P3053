@@ -18,7 +18,7 @@
 #include "definitions.h"
 #include "utils.h"
 #include "pic.h"
-#include "comms.h"
+#include "server.h"
 #include "console.h"
 
 static inline bool is_printable(char c) {
