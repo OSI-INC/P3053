@@ -15,31 +15,14 @@
 #include "configuration.h"
 #include "definitions.h"
 #include "pic.h"
+#include "console.h"
+#include "server.h"
 
 /*
-	pic_reset resets the Embedded Etherent Module. It does so by unlocking the
-	PIC32MZ configuration registers and writing to the reset configuration bit.
-	We make three writes to the thirty-two bit SYSKEY register with the correct
-	combination to unlock the configuration bits. Then we set the RSWRSTSET
-	register equal to a value defined in the device pack: "_RSWRST_SWRST_MASK".
-	We read the reset register after that, which completes the initiation of
-	reset. The routine does not return, it puts itself in an infinite loop,
-	trusting that the reset will take place and reboot the system.
-*/
-void pic_reset(void) {
-    SYSKEY = 0x00000000;
-    SYSKEY = 0xAA996655;
-    SYSKEY = 0x556699AA;
-    RSWRSTSET = _RSWRST_SWRST_MASK;
-    (void) RSWRST;
-    while(1);
-}
-
-/*
-	pic_configure sets the PIC32MZ general-purpose input-output pins for our
+	pic_io_initialize configures the general-purpose input-output pins for our
 	application.
 */
-void pic_initialize(void) {
+void pic_io_initialize(void) {
 	// The A3053A is all-digital. so we configure all pins as digital pins. We
 	// don't even bother to check the data sheet to see which pins can be
 	// non-digital, we just set them all to digital even if they are always
@@ -88,5 +71,69 @@ void pic_initialize(void) {
    	GPIO_PortOutputEnable(GPIO_PORT_A,0x00000004);
    	GPIO_PortOutputEnable(GPIO_PORT_C,0x00008000);
 }
+
+/*
+	pic_initialize sets up the embedded microcontroller and its Ethernet interface. It
+	starts up all system modules to support TCP/IP servers, interrupt timers, flash
+	memory use, and the UART console.
+*/
+void pic_initialize(void) {
+
+	// Disable interrupts for initialization.
+	(void)__builtin_disable_interrupts();	
+	
+	// Initialize the system clock and phase locked loops. This must come first.
+	CLK_Initialize();
+	
+	// Enable prefetch for both instructions and data.
+	PRECONbits.PREFEN = 3;
+	
+	// Set the number of program flash memory wait states.
+	PRECONbits.PFMWS = 3;
+	
+	// Configure the flash memory error correction to force correction of
+	// single-bit errors and report double-bit errors.
+	CFGCONbits.ECCCON = 3;
+	
+	// Initialize the non-volatile memory controller, clear NVM error flags.
+	// Necessary if we use the flash memory.
+	NVM_Initialize();
+	
+	// Initialize the hardware core timer routines. These allows us to implement
+	// interrupt-driven timers and delays.
+	CORETIMER_Initialize();
+	
+	// Configure the functions of the gerneral-purpose input and output pins.
+	pic_io_initialize();
+	
+	// Initialize the console, which communicates through a three-wire UART.
+	console_initialize();
+	
+	// Set up the Ethernet physical interface and start up the TCP/IP stack.
+//	tcpip_initialize();
+	
+	// Re-enable interrupts and report initialization complete.
+	(void)__builtin_enable_interrupts();
+}
+
+/*
+	pic_reset resets the Embedded Etherent Module. It does so by unlocking the
+	PIC32MZ configuration registers and writing to the reset configuration bit.
+	We make three writes to the thirty-two bit SYSKEY register with the correct
+	combination to unlock the configuration bits. Then we set the RSWRSTSET
+	register equal to a value defined in the device pack: "_RSWRST_SWRST_MASK".
+	We read the reset register after that, which completes the initiation of
+	reset. The routine does not return, it puts itself in an infinite loop,
+	trusting that the reset will take place and reboot the system.
+*/
+void pic_reset(void) {
+    SYSKEY = 0x00000000;
+    SYSKEY = 0xAA996655;
+    SYSKEY = 0x556699AA;
+    RSWRSTSET = _RSWRST_SWRST_MASK;
+    (void) RSWRST;
+    while(1);
+}
+
 
 
