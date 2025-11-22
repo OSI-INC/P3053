@@ -18,7 +18,6 @@
 #include "definitions.h"
 #include "utils.h"
 #include "pic.h"
-#include "server.h"
 #include "console.h"
 
 // Management of the PIC32MZ.

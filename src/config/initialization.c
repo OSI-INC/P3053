@@ -265,12 +265,6 @@ const DRV_ETHPHY_INIT tcpipPhyInitData_LAN8740 =
     .miimIndex              = 0,
 };
 
-<<<<<<< HEAD
-/*
-	Initialize the TCP/IP stack.
-*/
-void TCPIP_Initialize (void) {
-=======
 static const SYS_TIME_PLIB_INTERFACE sysTimePlibAPI = {
     .timerCallbackSet = (SYS_TIME_PLIB_CALLBACK_REGISTER)CORETIMER_CallbackSet,
     .timerStart = (SYS_TIME_PLIB_START)CORETIMER_Start,
@@ -312,13 +306,10 @@ void ACCESS_Initialize (void)
 */
 void UTILS_Initialize (void)
 {
->>>>>>> parent of e0a9ead (Rearranging initialization routines, compile broken.)
 	sysObj.drvMiim_0 = 
 		DRV_MIIM_OBJECT_BASE_Default.DRV_MIIM_Initialize(
 			DRV_MIIM_DRIVER_INDEX_0,
 			(const SYS_MODULE_INIT *) &drvMiimInitData_0); 
-<<<<<<< HEAD
-=======
 	sysObj.sysTime = 
 		SYS_TIME_Initialize(
 			SYS_TIME_INDEX_0,
@@ -333,7 +324,6 @@ void UTILS_Initialize (void)
 */
 void TCPIP_Initialize (void)
 {
->>>>>>> parent of e0a9ead (Rearranging initialization routines, compile broken.)
 	sysObj.tcpip = TCPIP_STACK_Init();
 	SYS_ASSERT(sysObj.tcpip != SYS_MODULE_OBJ_INVALID, "TCPIP_STACK_Init Failed" );
 	CRYPT_WCCB_Initialize();

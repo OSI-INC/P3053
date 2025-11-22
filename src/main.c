@@ -44,7 +44,7 @@
 #include "console.h"
 
 // Current version number
-#define VERSION_NUM 15
+#define VERSION_NUM 32
 
 // Configuration constants.
 #define ETH_MTU 1514
@@ -347,15 +347,8 @@ int http_tasks(SERVER* s) {
 	return status;
 }
 
-<<<<<<< HEAD
-=======
-
->>>>>>> parent of e0a9ead (Rearranging initialization routines, compile broken.)
 int main ( void ) {
 	int i = 0;
-
-	// Initialize all I/O pins, functions, and drivers.
-	pic_initialize();
 
 	// Disable interrupts for initialization.
 	(void)__builtin_disable_interrupts();	
@@ -379,26 +372,16 @@ int main ( void ) {
 	
 	// Re-enable interrupts and report initialization complete.
 	(void)__builtin_enable_interrupts();
-	console_print("Console initialized, systems starting up in %s.\r\n",__func__);
 	
 	// Turn on the red and green lamps.
    	GPIO_PortSet(GPIO_PORT_A,0x00000004);
    	GPIO_PortSet(GPIO_PORT_C,0x00008000);
-<<<<<<< HEAD
  
- 	// Infinite loop that manages all functions.  	
- 	while (true) {
-	
-		// Service all system tasks.
-		console_server();
-		tcpip_tick();
-=======
-   	
    	// A while loop with a counter to control the state of our LEDs. 
    	i = 0;
 	while (true) {
 		sys_tick();
->>>>>>> parent of e0a9ead (Rearranging initialization routines, compile broken.)
+		console_server();
 		tcpip_server(&lwdaq_server,lwdaq_tasks);
 		tcpip_server(&telnet_server,telnet_tasks);
 		tcpip_server(&http_server,http_tasks);

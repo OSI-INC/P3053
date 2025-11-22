@@ -89,12 +89,12 @@ void pic_initialize(void) {
    	GPIO_PortOutputEnable(GPIO_PORT_C,0x00008000);
 }
 
-<<<<<<< HEAD
 /*
 	pic_initialize sets up the embedded microcontroller and its Ethernet interface. It
 	starts up all system modules to support TCP/IP servers, interrupt timers, flash
 	memory use, and the UART console.
 */
+/*
 void pic_initialize(void) {
 
 	// Disable interrupts for initialization.
@@ -133,27 +133,5 @@ void pic_initialize(void) {
 	// Re-enable interrupts and report initialization complete.
 	(void)__builtin_enable_interrupts();
 }
-
-/*
-	pic_reset resets the Embedded Etherent Module. It does so by unlocking the
-	PIC32MZ configuration registers and writing to the reset configuration bit.
-	We make three writes to the thirty-two bit SYSKEY register with the correct
-	combination to unlock the configuration bits. Then we set the RSWRSTSET
-	register equal to a value defined in the device pack: "_RSWRST_SWRST_MASK".
-	We read the reset register after that, which completes the initiation of
-	reset. The routine does not return, it puts itself in an infinite loop,
-	trusting that the reset will take place and reboot the system.
 */
-void pic_reset(void) {
-    SYSKEY = 0x00000000;
-    SYSKEY = 0xAA996655;
-    SYSKEY = 0x556699AA;
-    RSWRSTSET = _RSWRST_SWRST_MASK;
-    (void) RSWRST;
-    while(1);
-}
-
-
-=======
->>>>>>> parent of e0a9ead (Rearranging initialization routines, compile broken.)
 
