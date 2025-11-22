@@ -40,14 +40,17 @@
 #include "definitions.h"
 #include "utils.h"
 #include "pic.h"
-#include "server.h"
+#include "comms.h"
 #include "console.h"
 
 // Current version number
-#define VERSION_NUM 32
+#define VERSION_NUM 15
 
 // Configuration constants.
-#define TCP_BUFF_SIZE (4096)
+#define ETH_MTU 1514
+#define BUFF_SIZE (ETH_MTU-40)
+#define RAM_BUFF_SIZE (6*BUFF_SIZE)
+#define TCP_BUFF_SIZE (6*BUFF_SIZE)
 #define CONFIG_LENGTH 1024 // bytes for config file buffer
 #define SEPCHARS " :\n,;=" // separator characters in config file
 
@@ -92,6 +95,16 @@ SERVER http_server = { INVALID_SOCKET, S_WAIT_STACK, HTTP_PORT, "HTTP" };
 #define ECHO			11
 #define STREAM_WRITE	12
 #define REBOOT			13
+
+
+/*
+	sys_tick maintains the system and returns 1 if socket is still alive.
+*/
+void sys_tick(void) {
+	DRV_MIIM_OBJECT_BASE_Default.DRV_MIIM_Tasks(sysObj.drvMiim_0);
+	TCPIP_STACK_Task(sysObj.tcpip);
+	console_server();
+}
 
 /*
 	swap_u32 reverses the order of four bytes in a thirty-two bit unsigned
@@ -334,15 +347,44 @@ int http_tasks(SERVER* s) {
 	return status;
 }
 
+<<<<<<< HEAD
+=======
+
+>>>>>>> parent of e0a9ead (Rearranging initialization routines, compile broken.)
 int main ( void ) {
 	int i = 0;
 
 	// Initialize all I/O pins, functions, and drivers.
 	pic_initialize();
 
+	// Disable interrupts for initialization.
+	(void)__builtin_disable_interrupts();	
+	
+	CLK_Initialize();
+	ACCESS_Initialize();
+	pic_initialize();
+	NVM_Initialize();
+	CORETIMER_Initialize();
+	UART2_Initialize();
+	UART_SERIAL_SETUP uart2Setup = {
+		.baudRate = 115200,
+		.dataWidth = UART_DATA_8_BIT,
+		.parity = UART_PARITY_NONE,
+		.stopBits = UART_STOP_1_BIT
+	};
+	UART2_SerialSetup(&uart2Setup, 0);
+	UTILS_Initialize();
+	console_initialize();
+	TCPIP_Initialize();
+	
+	// Re-enable interrupts and report initialization complete.
+	(void)__builtin_enable_interrupts();
+	console_print("Console initialized, systems starting up in %s.\r\n",__func__);
+	
 	// Turn on the red and green lamps.
    	GPIO_PortSet(GPIO_PORT_A,0x00000004);
    	GPIO_PortSet(GPIO_PORT_C,0x00008000);
+<<<<<<< HEAD
  
  	// Infinite loop that manages all functions.  	
  	while (true) {
@@ -350,6 +392,13 @@ int main ( void ) {
 		// Service all system tasks.
 		console_server();
 		tcpip_tick();
+=======
+   	
+   	// A while loop with a counter to control the state of our LEDs. 
+   	i = 0;
+	while (true) {
+		sys_tick();
+>>>>>>> parent of e0a9ead (Rearranging initialization routines, compile broken.)
 		tcpip_server(&lwdaq_server,lwdaq_tasks);
 		tcpip_server(&telnet_server,telnet_tasks);
 		tcpip_server(&http_server,http_tasks);

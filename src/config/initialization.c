@@ -265,14 +265,75 @@ const DRV_ETHPHY_INIT tcpipPhyInitData_LAN8740 =
     .miimIndex              = 0,
 };
 
+<<<<<<< HEAD
 /*
 	Initialize the TCP/IP stack.
 */
 void TCPIP_Initialize (void) {
+=======
+static const SYS_TIME_PLIB_INTERFACE sysTimePlibAPI = {
+    .timerCallbackSet = (SYS_TIME_PLIB_CALLBACK_REGISTER)CORETIMER_CallbackSet,
+    .timerStart = (SYS_TIME_PLIB_START)CORETIMER_Start,
+    .timerStop = (SYS_TIME_PLIB_STOP)CORETIMER_Stop ,
+    .timerFrequencyGet = (SYS_TIME_PLIB_FREQUENCY_GET)CORETIMER_FrequencyGet,
+    .timerPeriodSet = (SYS_TIME_PLIB_PERIOD_SET)NULL,
+    .timerCompareSet = (SYS_TIME_PLIB_COMPARE_SET)CORETIMER_CompareSet,
+    .timerCounterGet = (SYS_TIME_PLIB_COUNTER_GET)CORETIMER_CounterGet,
+};
+
+static const SYS_TIME_INIT sysTimeInitData =
+{
+    .timePlib = &sysTimePlibAPI,
+    .hwTimerIntNum = 0,
+};
+
+static const SYS_DEBUG_INIT debugInit =
+{
+    .moduleInit = {0},
+    .errorLevel = SYS_DEBUG_GLOBAL_ERROR_LEVEL,
+    .consoleIndex = 0,
+};
+
+/*
+	Memory Access Initialization. We enable pre-fetch for both instructions and
+	data. We set the number of program flash memory wait states to a value
+	suited to our clock frequency. We configure flash memory error correction to
+	force correction of single-bit errors and report double-bit errors.
+*/
+void ACCESS_Initialize (void)
+{
+	PRECONbits.PREFEN = 3;
+	PRECONbits.PFMWS = 3;
+	CFGCONbits.ECCCON = 3;
+}
+
+/*
+	Initialize various system utilities.
+*/
+void UTILS_Initialize (void)
+{
+>>>>>>> parent of e0a9ead (Rearranging initialization routines, compile broken.)
 	sysObj.drvMiim_0 = 
 		DRV_MIIM_OBJECT_BASE_Default.DRV_MIIM_Initialize(
 			DRV_MIIM_DRIVER_INDEX_0,
 			(const SYS_MODULE_INIT *) &drvMiimInitData_0); 
+<<<<<<< HEAD
+=======
+	sysObj.sysTime = 
+		SYS_TIME_Initialize(
+			SYS_TIME_INDEX_0,
+			(SYS_MODULE_INIT *)&sysTimeInitData);
+	sysObj.sysDebug = SYS_DEBUG_Initialize(
+		SYS_DEBUG_INDEX_0,
+		(SYS_MODULE_INIT*)&debugInit);
+}
+
+/*
+	Initialize the TCP/IP stack.
+*/
+void TCPIP_Initialize (void)
+{
+>>>>>>> parent of e0a9ead (Rearranging initialization routines, compile broken.)
 	sysObj.tcpip = TCPIP_STACK_Init();
 	SYS_ASSERT(sysObj.tcpip != SYS_MODULE_OBJ_INVALID, "TCPIP_STACK_Init Failed" );
 	CRYPT_WCCB_Initialize();

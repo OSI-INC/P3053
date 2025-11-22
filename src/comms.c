@@ -1,5 +1,5 @@
 /*
-	server.c is a library of communication routines, including network and
+	comms.c is a library of communication routines, including network and
 	console interfaces.
 */
 
@@ -16,19 +16,9 @@
 #include "tcpip/tcpip.h"
 #include "tcpip/src/tcpip_private.h"
 #include "tcpip/icmp.h"
-#include "server.h"
+#include "comms.h"
 #include "console.h"
 #include "utils.h"
-
-/*
-	tcpip_tick maintains the Ethernet physical interface and the TCP/IP stack by calling
-	their two task routines. The routine uses the global sysObj structure declared in
-	the Harmony definitions header.
-*/
-void tcpip_tick(void) {
-	DRV_MIIM_OBJECT_BASE_Default.DRV_MIIM_Tasks(sysObj.drvMiim_0);
-	TCPIP_STACK_Task(sysObj.tcpip);
-}
 
 /*
 	tcp_get_ready returns the number of bytes that are ready to be read out of a
@@ -111,13 +101,11 @@ void ping_gateway(void) {
 /*
 	net_info prints network information to the console.
 */
-void net_info(char* out, uint32_t out_size) {
+void net_info(void) {
     TCPIP_NET_HANDLE netH;
     TCPIP_NET_IF* pNetIf;
     IPV4_ADDR ip, mask, gw;
     uint8_t* mac;
-    uint32_t i = 0;
-    uint32_t n = 0;
 
     netH = TCPIP_STACK_IndexToNet(0);
     pNetIf = _TCPIPStackHandleToNet(netH);
@@ -126,26 +114,19 @@ void net_info(char* out, uint32_t out_size) {
     mask.Val = pNetIf->netMask.Val;
     gw.Val   = pNetIf->netGateway.Val;
     mac = pNetIf->netMACAddr.v;
-	
-	n = snprintf(&out[i],out_size,"\r\nNetwork Info:\r\n");
-	i = i + n;
-	n = snprintf(&out[i],out_size-i,"IP      : %u.%u.%u.%u\r\n",
+
+    console_message("\r\nNetwork Info:\r\n");
+    console_print("IP      : %u.%u.%u.%u\r\n",
         ip.v[0],ip.v[1],ip.v[2],ip.v[3]);
-	i = i + n;
-	n = snprintf(&out[i],out_size-i,"Mask    : %u.%u.%u.%u\r\n",
+    console_print("Mask    : %u.%u.%u.%u\r\n",
         mask.v[0],mask.v[1],mask.v[2],mask.v[3]);
-	i = i + n;
-    n = snprintf(&out[i],out_size-i,"Gateway : %u.%u.%u.%u\r\n",
+    console_print("Gateway : %u.%u.%u.%u\r\n",
         gw.v[0],gw.v[1],gw.v[2],gw.v[3]);
-	i = i + n;
-    n = snprintf(&out[i],out_size-i,"MAC     : %02X:%02X:%02X:%02X:%02X:%02X\r\n",
+    console_print("MAC     : %02X:%02X:%02X:%02X:%02X:%02X\r\n",
         mac[0],mac[1],mac[2],mac[3],mac[4],mac[5]);
-	i = i + n;
-    n = snprintf(&out[i],out_size-i,"Link    : %s\r\n",
+    console_print("Link    : %s\r\n",
         (TCPIP_STACK_NetIsLinked(netH) ? "UP" : "DOWN"));
-	i = i + n;
-    n = snprintf(&out[i],out_size-i,"\r\n");
-	i = i + n;
+    console_message("\r\n");
 }
 
 /*

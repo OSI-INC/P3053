@@ -15,14 +15,31 @@
 #include "configuration.h"
 #include "definitions.h"
 #include "pic.h"
-#include "console.h"
-#include "server.h"
 
 /*
-	pic_io_initialize configures the general-purpose input-output pins for our
+	pic_reset resets the Embedded Etherent Module. It does so by unlocking the
+	PIC32MZ configuration registers and writing to the reset configuration bit.
+	We make three writes to the thirty-two bit SYSKEY register with the correct
+	combination to unlock the configuration bits. Then we set the RSWRSTSET
+	register equal to a value defined in the device pack: "_RSWRST_SWRST_MASK".
+	We read the reset register after that, which completes the initiation of
+	reset. The routine does not return, it puts itself in an infinite loop,
+	trusting that the reset will take place and reboot the system.
+*/
+void pic_reset(void) {
+    SYSKEY = 0x00000000;
+    SYSKEY = 0xAA996655;
+    SYSKEY = 0x556699AA;
+    RSWRSTSET = _RSWRST_SWRST_MASK;
+    (void) RSWRST;
+    while(1);
+}
+
+/*
+	pic_configure sets the PIC32MZ general-purpose input-output pins for our
 	application.
 */
-void pic_io_initialize(void) {
+void pic_initialize(void) {
 	// The A3053A is all-digital. so we configure all pins as digital pins. We
 	// don't even bother to check the data sheet to see which pins can be
 	// non-digital, we just set them all to digital even if they are always
@@ -72,6 +89,7 @@ void pic_io_initialize(void) {
    	GPIO_PortOutputEnable(GPIO_PORT_C,0x00008000);
 }
 
+<<<<<<< HEAD
 /*
 	pic_initialize sets up the embedded microcontroller and its Ethernet interface. It
 	starts up all system modules to support TCP/IP servers, interrupt timers, flash
@@ -136,4 +154,6 @@ void pic_reset(void) {
 }
 
 
+=======
+>>>>>>> parent of e0a9ead (Rearranging initialization routines, compile broken.)
 
