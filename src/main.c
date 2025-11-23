@@ -317,11 +317,17 @@ int lwdaq_tasks(SERVER* s) {
 */
 int telnet_tasks(SERVER* s) {
 	int status = 0;
+	int len = 0;
+    #define MAX_MSG_LEN 1024    
+    static char msg_buffer[MAX_MSG_LEN];
 	 
-	if (debug) console_print("Servicing %s connection on port %u in %s.\r\n",
-		(*s).protocol,(*s).port,__func__);
 	status = -1;
 
+	if (debug) console_print("Servicing %s connection on port %u in %s.\r\n",
+		(*s).protocol,(*s).port,__func__);
+	len = net_info(&msg_buffer[0],MAX_MSG_LEN);
+	tcp_put((*s).socket,&msg_buffer[0],len);
+		
 	return status;
 }
 

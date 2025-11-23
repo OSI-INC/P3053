@@ -39,7 +39,7 @@ uint32_t tcp_get(TCP_SOCKET s, uint8_t* buffer, uint32_t len);
 uint32_t tcp_put_ready(TCP_SOCKET s);
 uint32_t tcp_put(TCP_SOCKET s, const uint8_t* data, uint32_t len);
 void ping_gateway(void);
-void net_info(char* out, uint32_t out_size) ;
+int net_info(char* out, uint32_t max_len);
 void tcpip_server(SERVER* s, tcpip_tasks_type tasks);
 
 

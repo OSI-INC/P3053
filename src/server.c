@@ -99,10 +99,13 @@ void ping_gateway(void) {
 }
 
 /*
-	net_info returns a string ready to print in a console that presents all the
-	current status and configuration of the network interface.
+	net_info composes a string that presents the status and configuration of the
+	network interface. It writes the string to a buffer specified by the calling
+	process. The calling process also provides a maximum size for the stirng.
+	The function returns the number of characters it wrote, and it also terminates
+	the string with null character.
 */
-void net_info(char* out, uint32_t out_size) {
+int net_info(char* out, uint32_t max_len) {
     TCPIP_NET_HANDLE netH;
     TCPIP_NET_IF* pNetIf;
     IPV4_ADDR ip, mask, gw;
@@ -118,25 +121,27 @@ void net_info(char* out, uint32_t out_size) {
     gw.Val   = pNetIf->netGateway.Val;
     mac = pNetIf->netMACAddr.v;
 	
-	n = snprintf(&out[i],out_size,"\r\nNetwork Info:\r\n");
+	n = snprintf(&out[i],max_len,"\r\nNetwork Info:\r\n");
 	i = i + n;
-	n = snprintf(&out[i],out_size-i,"IP      : %u.%u.%u.%u\r\n",
+	n = snprintf(&out[i],max_len-i,"IP      : %u.%u.%u.%u\r\n",
         ip.v[0],ip.v[1],ip.v[2],ip.v[3]);
 	i = i + n;
-	n = snprintf(&out[i],out_size-i,"Mask    : %u.%u.%u.%u\r\n",
+	n = snprintf(&out[i],max_len-i,"Mask    : %u.%u.%u.%u\r\n",
         mask.v[0],mask.v[1],mask.v[2],mask.v[3]);
 	i = i + n;
-    n = snprintf(&out[i],out_size-i,"Gateway : %u.%u.%u.%u\r\n",
+    n = snprintf(&out[i],max_len-i,"Gateway : %u.%u.%u.%u\r\n",
         gw.v[0],gw.v[1],gw.v[2],gw.v[3]);
 	i = i + n;
-    n = snprintf(&out[i],out_size-i,"MAC     : %02X:%02X:%02X:%02X:%02X:%02X\r\n",
+    n = snprintf(&out[i],max_len-i,"MAC     : %02X:%02X:%02X:%02X:%02X:%02X\r\n",
         mac[0],mac[1],mac[2],mac[3],mac[4],mac[5]);
 	i = i + n;
-    n = snprintf(&out[i],out_size-i,"Link    : %s\r\n",
+    n = snprintf(&out[i],max_len-i,"Link    : %s\r\n",
         (TCPIP_STACK_NetIsLinked(netH) ? "UP" : "DOWN"));
 	i = i + n;
-    n = snprintf(&out[i],out_size-i,"\r\n");
+    n = snprintf(&out[i],max_len-i,"\r\n");
 	i = i + n;
+	
+	return i;
 }
 
 /*
