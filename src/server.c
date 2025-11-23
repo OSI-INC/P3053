@@ -153,12 +153,16 @@ void tcpip_tick(void) {
 }
 
 /*
-	server_tick maintains the TCP/IP stack running, and also checks to see if a
-	particular server socket is still open. We use this in server task loops
-	that block all other socket connection tasks. The client can break out of
-	the loop by closing the socket. The routine takes as its argument a server
-	state structure and returns a negative value only when the socket has
-	been closed.
+	server_tick maintains the TCP/IP stack and checks to see if a particular
+	socket is still open. This is the routine that must be called by any
+	protocol task while it is "blocking", which is to say: whenever the protocol
+	task enters a loop waiting for some other event to occur or process to
+	complete. When this routine returns a negative value, the protocol task must
+	stop blocking and return control to the tcpip_server routine that manages
+	the protocol connections. The protocol task must pass back a negative value
+	so that the tcpip_server can close the listening socket and open a new one.
+	The routine takes as its argument a server state structure and returns a
+	negative value only when the socket has been closed.
 */
 int server_tick(SERVER* s) {
 	DRV_MIIM_OBJECT_BASE_Default.DRV_MIIM_Tasks(sysObj.drvMiim_0);
@@ -171,54 +175,69 @@ int server_tick(SERVER* s) {
 	}
 }
 
-
 /*
 	tcpip_server provides management of connection, service, and closure of a
-	TCP/IP protocol. The core actions of waiting for the TCP/IP stack to start
+	TCP/IP protocol.  The core actions of waiting for the TCP/IP stack to start
 	up, waiting for an IP address to be assigned, listening on the port assigned
 	to the protocol, accepting a socket connection on that port, maintaining
 	service of the protocol on that socket by repeatedly calling a task
 	management routine, and closing the socket when the management routine
-	returns an error, are all handled by tcpip_server. 
-	
+	returns an error, are all handled by tcpip_server.
+
+	The tcpip_server is a state machine that does not block its calling
+	procedure, excepting when the protocol task provided to it causes a block.
+	The task procedure is permitted to block, but it must call server_tick while
+	it is blocking, so as to maintain the TCP/IP stack, and to detect closure of
+	the socket by the client. If the client closes the socket, the protocol task
+	must abort and return a negative value. The tcpip_server will close the
+	listening socket and open a new one. By this arrangement, the protocol task
+	can block the servicing of other protocols by other tcpip_server processes
+	indefinitely, but it can block its own server only so long as its client
+	does not close its socket.
+
 	In order to support a particular protocol, we pass into the routine a
 	call-back function. This call-back function takes as a parameter the
 	server's status record, which includes the server state and a handle to the
 	socket. The server procedure calls the task procedure first when the socket
 	is accepted, and then repeatedly every time the server procedure is called
-	by the main event loop. The task procedure can tell whether it should
-	initialize the protocol interaction or continue an existing interaction
-	because it has access to the server state, which will be S_LISTENING for a
-	newly-opened socket and S_SERVING for a pre-existing socket. The task
-	procedure can read and write from the socket using the tcp_get and tcp_put
-	routines. If it encounters an error, or detects that the socket has closed,
-	it should return a negative value. When the server receives this negative
-	value, it closes the socket and starts listening again for the next
-	connection. 
-	
-	The server starts in the S_WAIT_STACK state, where it checks the status of
-	the stack. If the stack initialization failed, the server will move to its
-	error state. The server announces success or failure provided that it is the
-	first server to perform the stack check. Otherwise it proceeds quietly. 
-	
+	by the main event loop.
+
+	The task procedure can tell whether it should initialize the protocol
+	interaction or continue an existing interaction because it has access to the
+	server state, which will be S_LISTENING for a newly-opened socket and
+	S_SERVING for a pre-existing socket. The task procedure can read and write
+	from the socket using the tcp_get and tcp_put routines. If it encounters an
+	error, or detects that the socket has closed, it should return a negative
+	value. When the server receives this negative value, it closes the socket
+	and starts listening again for the next connection.
+
+	In S_WAIT_STACK, the server checks the status of the TCP/IP stack. If the
+	stack initialization failed, the server will move to its error state. The
+	first server to check for success or failure reports its finding to the
+	console.
+
 	In the S_WAIT_IP state, the server waits until the network interface has its
-	IP address. When the IP address is established, the first server to detect the
-	address will attempt to ping the gateway, so as to announce the presence of the
-	ethernet module.
-	
-	In the S_OPEN_SERVER state, the server opens a listening socket. When it receives
-	a connection, it calls its tasks routine, and moves to the next state after that.
-	
+	IP address. When the IP address is established, the first server to detect
+	the establishment pings the gateway, so as to announce the presence of the
+	ethernet module. This same server will report its ping to the console.
+
+	In the S_OPEN_SERVER state, the server opens a listening socket. When it
+	receives a connection, it calls its tasks routine, and moves to the next
+	state after that.
+
 	In S_SERVING, the server checks the connection is still active and calls the
 	tasks routine. If it receives a negative return from the tasks routine, the
 	server moves to its socket close state.
-	
-	In S_Close, the server closes the socket, and in S_ERROR the server sits and 
+
+	In S_CLOSE, the server closes the socket, and in S_ERROR the server sits and
 	makes an occasional heartbeat announcement about its state.
-	
-	At least one server will announce the initialization of the stack and the
-	assigning of an IP address. If the debug flag is cleared, all other
-	announcements will be suppressed.
+
+	In S_ERROR, the server will be stuck in this state until some external agent
+	changes its state. In debug mode, the server will issue a heartbeat report
+	of its error state to the console.
+
+	In the default state, the server remains stuck, and issues a debug heartbeat
+	report of its sitting in an unknown state.
 */
 void tcpip_server(SERVER* s, tcpip_tasks_type tasks) {
 	#define HEARTBEAT_PERIOD 5000000
