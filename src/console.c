@@ -306,10 +306,10 @@ void console_initialize(void)
 	the state of the debug flag.
 */
 void console_server(void) {
-	#define MAX_CMD_LEN 64
-	static char cmd_buffer[MAX_CMD_LEN];
-    #define MAX_MSG_LEN 1024    
-    static char msg_buffer[MAX_MSG_LEN];
+	enum {max_cmd_len=63};
+	static char cmd_buffer[max_cmd_len];
+    enum {max_msg_len=1023};    
+    static char msg_buffer[max_msg_len];
 	static uint32_t cmd_len = 0;
     char c;
 
@@ -331,13 +331,13 @@ void console_server(void) {
 						
 					case 'a':
 						console_message("New IP Address: ");
-						console_readln(msg_buffer,MAX_MSG_LEN);
+						console_readln(msg_buffer,max_msg_len);
 						console_print("%s\r\n",msg_buffer);
 						console_print("This feature not yet implemented.");
 						break;
 						
 					case 'n':
-						net_info(msg_buffer,MAX_MSG_LEN);
+						net_info(msg_buffer,max_msg_len);
 						console_print("%s\r\n",msg_buffer);
 						break;
 					
@@ -371,7 +371,7 @@ void console_server(void) {
 		}
 		if (!is_printable(c)) continue;
 		console_print("%c", c);
-		if (cmd_len < MAX_CMD_LEN) {
+		if (cmd_len < max_cmd_len) {
 			cmd_buffer[cmd_len++] = c;
 		} else {
 			cmd_len = 0;

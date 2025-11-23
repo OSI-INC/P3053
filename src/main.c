@@ -259,76 +259,97 @@ int lwdaq_tasks(SERVER* s) {
 	uint32_t rx_ready = 0;
 	int status;
 
-	status = -1;
-	
 	if ((*s).state == S_LISTENING) {
 		rx_available = 0;
 		if (debug) console_print("Initialized %s connection in %s.\r\n",
 			(*s).protocol,__func__);
-		status = 0;
-		return status;
+		return 0;
 	};
 
-	if ((*s).state == S_SERVING) {
-		rx_ready = TCPIP_TCP_GetIsReady((*s).socket);
-		if (rx_ready>0) {
-			TCPIP_TCP_ArrayGet((*s).socket,&rx_buffer[rx_available],rx_ready);	
-			rx_available = rx_available+rx_ready;
-		}
-		if (rx_available == 0) return 0;
-		if (debug) console_print("rx_ready=%u rx_available=%u in %s.\r\n",
-			rx_ready, rx_available,__func__);
-		if (rx_buffer[0] != START_CODE) {
-			if (rx_buffer[0] == CLOSE_CODE) {
-				if (debug) console_print("Close code received in %s.\r\n",__func__);
-			} else {
-				if (debug) console_print("Invalid start code in %s.\r\n",__func__);
-			}
-			return -1;
-		}
-		if (rx_available<9) return rx_available;		
-		id = load32_be(&rx_buffer[1]);
-		len = load32_be(&rx_buffer[5]);
-		if (debug) console_print("id=%u len=%u in %s.\r\n",id,len,__func__);
-		if (rx_available<len+10) return rx_available;
-		if (rx_buffer[len+9] != END_CODE) {
-			if (debug) console_print("Invalid end code in %s.\r\n",__func__);
-			return -1;
-		}
-		status = lwdaq_process_message(s,id,len,&rx_buffer[9]);
-		if (status<0) return status;
-		if (rx_available>len+10) {
-			if (debug) console_print("Copying %u to %u from %u in %s.\r\n",
-				rx_available-len-10,0,len+10,__func__);
-			memmove(&rx_buffer[0],&rx_buffer[len+10],rx_available-len-10);
-			rx_available = rx_available-len-10;
+	rx_ready = TCPIP_TCP_GetIsReady((*s).socket);
+	if (rx_ready>0) {
+		TCPIP_TCP_ArrayGet((*s).socket,&rx_buffer[rx_available],rx_ready);	
+		rx_available = rx_available+rx_ready;
+	}
+	if (rx_available == 0) return 0;
+	if (debug) console_print("rx_ready=%u rx_available=%u in %s.\r\n",
+		rx_ready, rx_available,__func__);
+	if (rx_buffer[0] != START_CODE) {
+		if (rx_buffer[0] == CLOSE_CODE) {
+			if (debug) console_print("Close code received in %s.\r\n",__func__);
 		} else {
-			rx_available = 0;
+			if (debug) console_print("Invalid start code in %s.\r\n",__func__);
 		}
-		if (debug) console_print("rx_available=%u in %s.\r\n",rx_available,__func__);
-		return rx_available;
-	};
-	
-	return status;
+		return -1;
+	}
+	if (rx_available<9) return rx_available;		
+	id = load32_be(&rx_buffer[1]);
+	len = load32_be(&rx_buffer[5]);
+	if (debug) console_print("id=%u len=%u in %s.\r\n",id,len,__func__);
+	if (rx_available<len+10) return rx_available;
+	if (rx_buffer[len+9] != END_CODE) {
+		if (debug) console_print("Invalid end code in %s.\r\n",__func__);
+		return -1;
+	}
+	status = lwdaq_process_message(s,id,len,&rx_buffer[9]);
+	if (status<0) return status;
+	if (rx_available>len+10) {
+		if (debug) console_print("Copying %u to %u from %u in %s.\r\n",
+			rx_available-len-10,0,len+10,__func__);
+		memmove(&rx_buffer[0],&rx_buffer[len+10],rx_available-len-10);
+		rx_available = rx_available-len-10;
+	} else {
+		rx_available = 0;
+	}
+	if (debug) console_print("rx_available=%u in %s.\r\n",rx_available,__func__);
+	return rx_available;
 }
 
 /*
 	telnet_tasks services a Telnet socket connection.
 */
 int telnet_tasks(SERVER* s) {
-	int status = 0;
-	int len = 0;
-    #define MAX_MSG_LEN 1024    
-    static char msg_buffer[MAX_MSG_LEN];
+//	static uint8_t rx_buffer[TCP_BUFF_SIZE];
+    static char msg_buffer[TCP_BUFF_SIZE];
+    int len;
 	 
-	status = -1;
+	if ((*s).state == S_LISTENING) {
+		if (debug) console_print("Initialized %s connection in %s.\r\n",
+			(*s).protocol,__func__);
+		len = net_info(&msg_buffer[0],TCP_BUFF_SIZE);
+		tcp_put((*s).socket,(const uint8_t*)&msg_buffer[0],len);
+		return 0;
+	};
 
-	if (debug) console_print("Servicing %s connection on port %u in %s.\r\n",
-		(*s).protocol,(*s).port,__func__);
-	len = net_info(&msg_buffer[0],MAX_MSG_LEN);
-	tcp_put((*s).socket,&msg_buffer[0],len);
-		
-	return status;
+/*
+	len = TCPIP_TCP_GetIsReady((*s).socket);
+	if (len>0) {
+		TCPIP_TCP_ArrayGet((*s).socket,&rx_buffer[0],len);	
+		tcp_put((*s).socket,&rx_buffer[0],len);
+		if (debug) console_print("Echoed %u bytes in %s.\r\n",len,__func__);
+		return len;
+	}
+	if (strcmp(cmd, "help") == 0)
+	{
+	do_help();
+	}
+	else if (strcmp(cmd, "netinfo") == 0)
+	{
+	do_netinfo();
+	}
+	else if (strcmp(cmd, "quit") == 0)
+	{
+	do_quit();
+	}
+	else if (strcmp(cmd, "reset") == 0)
+	{
+	do_reset();
+	}
+	else
+	{
+	console_print("Unknown command: %s\r\n", cmd);
+	}*/
+	return 0;
 }
 
 /*
@@ -350,10 +371,10 @@ int main ( void ) {
 	// Initialize the clock, memory, core timers, system timer, UART console,
 	// Ethernet physical interface, and the TCP/IP stack.
 	pic_initialize();
-		
-	// Turn on the red and green lamps.
-   	GPIO_PortSet(GPIO_PORT_A,0x00000004);
-   	GPIO_PortSet(GPIO_PORT_C,0x00008000);
+	
+	// Turn on the green D2 and the red D5 lamps.
+   	pic_d2_on();
+   	pic_d5_on();
  
    	// A while loop with a counter to control the state of our LEDs. 
 	while (true) {
@@ -365,14 +386,10 @@ int main ( void ) {
 		
 		// Flash the lights.
 		i = i+1;
-		if (i % 100 == 0) {
-			GPIO_PortClear(GPIO_PORT_C,0x00008000);
-		}
-		if (i % 1000 == 0) {
-			GPIO_PortSet(GPIO_PORT_C,0x00008000);
-		}
+		if (i % 100 == 0) pic_d2_off();
+		if (i % 1000 == 0) pic_d2_on();
 		if (i == 200000) {
-			GPIO_PortToggle(GPIO_PORT_A,0x00000004);
+			pic_d5_toggle();
 			i = 0;
 		}
 	}

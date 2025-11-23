@@ -7,7 +7,12 @@
 #ifndef PIC_H
 #define PIC_H
 
-// Management of the PIC32MZ.
+void pic_d2_on(void);
+void pic_d2_off(void);
+void pic_d2_toggle(void);
+void pic_d5_on(void);
+void pic_d5_off(void);
+void pic_d5_toggle(void);
 void pic_reset(void);
 void pic_initialize(void);
 

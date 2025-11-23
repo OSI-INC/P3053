@@ -18,6 +18,29 @@
 #include "pic.h"
 
 /*
+	These routines turn on, turn off, and toggle D2 and D5.
+*/
+void pic_d2_on(void) {
+	GPIO_PortSet(GPIO_PORT_C,0x00008000);
+}
+void pic_d2_off(void) {
+	GPIO_PortClear(GPIO_PORT_C,0x00008000);
+}
+void pic_d2_toggle(void) {
+	GPIO_PortToggle(GPIO_PORT_C,0x00008000);
+}
+void pic_d5_on(void) {
+	GPIO_PortSet(GPIO_PORT_A,0x00000004);
+}
+void pic_d5_off(void) {
+	GPIO_PortClear(GPIO_PORT_A,0x00000004);
+}
+void pic_d5_toggle(void) {
+	GPIO_PortToggle(GPIO_PORT_A,0x00000004);
+}
+
+
+/*
 	pic_reset resets the Embedded Etherent Module. It does so by unlocking the
 	PIC32MZ configuration registers and writing to the reset configuration bit.
 	We make three writes to the thirty-two bit SYSKEY register with the correct
@@ -76,8 +99,9 @@ void pic_io_initialize(void) {
 	// Lock the PPS registers.
 	CFGCONbits.IOLOCK = 1U;
 	
-	// Lock the configuration registers.
-	SYSKEY = 0x00000000U;
+	// Lock the configuration registers. We write a value that is not one of
+	// the three key values we use to unlock the registers.
+	SYSKEY = 0x33333333;
 	
 	// So far, on our A3053A, we have have D3 and D4 dedicated to UART2, but D2
 	// and D5 are available as test points. Pin U1-56 is RF3, so we want to set

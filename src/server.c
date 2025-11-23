@@ -153,6 +153,26 @@ void tcpip_tick(void) {
 }
 
 /*
+	server_tick maintains the TCP/IP stack running, and also checks to see if a
+	particular server socket is still open. We use this in server task loops
+	that block all other socket connection tasks. The client can break out of
+	the loop by closing the socket. The routine takes as its argument a server
+	state structure and returns a negative value only when the socket has
+	been closed.
+*/
+int server_tick(SERVER* s) {
+	DRV_MIIM_OBJECT_BASE_Default.DRV_MIIM_Tasks(sysObj.drvMiim_0);
+	TCPIP_STACK_Task(sysObj.tcpip);
+	if (!TCPIP_TCP_IsConnected((*s).socket) ||
+			TCPIP_TCP_WasDisconnected((*s).socket)) {
+		return -1;
+	} else {
+		return 0;
+	}
+}
+
+
+/*
 	tcpip_server provides management of connection, service, and closure of a
 	TCP/IP protocol. The core actions of waiting for the TCP/IP stack to start
 	up, waiting for an IP address to be assigned, listening on the port assigned
