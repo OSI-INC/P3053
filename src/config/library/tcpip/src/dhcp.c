@@ -35,8 +35,11 @@ Microchip or any third party.
 */
 #include <ctype.h>
 #include "tcpip/src/tcpip_private.h"
-
 #include "tcpip/src/dhcp_private.h"
+
+// P3053: Add this stub header to replace cryptography routines.
+#include "stubs.h"
+
 #define TCPIP_THIS_MODULE_ID    TCPIP_MODULE_DHCP_CLIENT
 
 // Unique variables per interface

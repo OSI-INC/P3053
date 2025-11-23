@@ -33,17 +33,13 @@ implied, are granted under any patent or other intellectual property rights of
 Microchip or any third party.
 */
 
-
-
-
-
-
-
-
 #define TCPIP_THIS_MODULE_ID    TCPIP_MODULE_TCP
 
 #include "tcpip/src/tcpip_private.h"
 #include "tcpip/src/tcp_private.h"
+
+// P3053: Add this stub header to replace cryptography routines.
+#include "stubs.h"
 
 #if defined(TCPIP_STACK_USE_TCP)
 

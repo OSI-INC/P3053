@@ -37,9 +37,11 @@ Microchip or any third party.
 */
 
 #include "tcpip/src/tcpip_private.h"
-
-
 #include "tcpip/src/dns_private.h"
+
+// P3053: Add this stub header to replace cryptography routines.
+#include "stubs.h"
+
 #define TCPIP_THIS_MODULE_ID    TCPIP_MODULE_DNS_CLIENT
 
 /****************************************************************************

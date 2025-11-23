@@ -104,8 +104,6 @@ CFLAGS += -mprocessor=$(CPU) \
 	-I"src/config/library" \
 	-I"src/config/library/tcpip/src" \
 	-I"src/config/library/tcpip/src/common" \
-	-I"src/wolfssl" \
-	-I"src/wolfssl/wolfssl" \
 	-Wno-error \
 	-Wno-unused-function \
 	-Wall

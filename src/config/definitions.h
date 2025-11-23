@@ -40,7 +40,6 @@
 #include <stdint.h>
 #include <stddef.h>
 #include <stdbool.h>
-#include "crypto/crypto.h"
 #include "driver/ethmac/drv_ethmac.h"
 #include "peripheral/plib_nvm.h"
 #include "system/time/sys_time.h"
@@ -48,7 +47,6 @@
 #include "peripheral/plib_uart2.h"
 #include "library/tcpip/tcpip.h"
 #include "system/sys_time_h2_adapter.h"
-#include "system/sys_random_h2_adapter.h"
 #include "system/int/sys_int.h"
 #include "system/reset/sys_reset.h"
 #include "osal/osal.h"
@@ -58,7 +56,6 @@
 #include "peripheral/plib_gpio.h"
 #include "peripheral/plib_evic.h"
 #include "driver/miim/drv_miim.h"
-#include "wolfssl/wolfcrypt/port/pic32/crypt_wolfcryptcb.h"
 #include "system/console/sys_console.h"
 
 // Device Information

@@ -52,7 +52,6 @@ Microchip or any third party.
 #include "device.h"
 #include "system_config.h"
 #include "system/debug/sys_debug.h"
-#include "system/sys_random_h2_adapter.h"
 #include "system/sys_time_h2_adapter.h"
 
 #include "osal/osal.h"

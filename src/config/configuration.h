@@ -162,7 +162,7 @@
 #define TCPIP_TCP_QUIET_TIME		        	    0
 #define TCPIP_TCP_COMMANDS							false
 #define TCPIP_TCP_EXTERN_PACKET_PROCESS				false
-#define TCPIP_TCP_DISABLE_CRYPTO_USAGE				false
+#define TCPIP_TCP_DISABLE_CRYPTO_USAGE				true
 
 /*** DHCP Configuration ***/
 #define TCPIP_STACK_USE_DHCP_CLIENT
@@ -267,10 +267,13 @@
 #define DRV_ETHPHY_LAN8740_NEG_DONE_TMO					2000
 #define DRV_ETHPHY_LAN8740_RESET_CLR_TMO				500
 
-/* wolfCrypt Library Configuration */
+/* General-purpose configuration macros. */
 #define MICROCHIP_PIC32
 #define MICROCHIP_MPLAB_HARMONY
 #define MICROCHIP_MPLAB_HARMONY_3
+
+/* wolfCrypt Library Configuration */
+/*
 #define HAVE_MCAPI
 #define SIZEOF_LONG_LONG 8
 #define WOLFSSL_USER_IO
@@ -278,7 +281,6 @@
 #define NO_FILESYSTEM
 #define USE_FAST_MATH
 #define NO_PWDBASED
-#define HAVE_MCAPI
 #define WOLF_CRYPTO_CB 
 #define WOLFCRYPT_ONLY
 #if (__XC32_VERSION > 100000000)
@@ -287,8 +289,6 @@
 #endif
 #undef WOLFSSL_HAVE_MIN
 #undef WOLFSSL_HAVE_MAX
-
-/* Final configuration */
 #define WOLFSSL_AES_SMALL_TABLES
 #define NO_MD4
 #define WOLFSSL_SHA224
@@ -318,6 +318,7 @@
 #define NO_SIG_WRAPPER
 #define NO_ERROR_STRINGS
 #define NO_WOLFSSL_MEMORY
+*/
 
 #define TCPIP_STACK_NETWORK_INTERAFCE_COUNT  	1
 #endif 
