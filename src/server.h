@@ -1,12 +1,28 @@
 /*
-	server.h declares the variables, types, and functions used in our
-	communications routines.
+	server.h declares the variables, types, and functions used in our TCP/IP
+	communication and server routines.
 */
 
 #ifndef SERVER_H
 #define SERVER_H
 
-// A structure that provides names for the states of a TCP/IP server. 
+/*
+	Routines to read and write from sockets. These are wrappers for Harmony routines.
+*/
+uint32_t tcp_get_ready(TCP_SOCKET s);
+uint32_t tcp_get(TCP_SOCKET s, uint8_t* buffer, uint32_t len);
+uint32_t tcp_put_ready(TCP_SOCKET s);
+uint32_t tcp_put(TCP_SOCKET s, const uint8_t* data, uint32_t len);
+
+/*
+	Here are some utility routines for TCP/IP management and reporting.
+*/
+void ping_gateway(void);
+int net_info(char* out, uint32_t max_len);
+
+/*
+ 	The tcpip_server_state structure defines the states of our generic TCP/IP server process.
+*/
 typedef enum {
     S_WAIT_STACK,
     S_WAIT_IP,
@@ -16,31 +32,42 @@ typedef enum {
     S_SERVING,
     S_CLOSE,
     S_ERROR
-} SERVER_STATE;
+} tcpip_server_state_type;
 
-// A structure that provides a complete description of the state, nature, and
-// configurationof a TCP/IP server.
+/*
+	The tcpip_server_type structure provides a complete description of one of
+	our TCP/IP servers. The structure includes the server state, a handle to the
+	socket, which is either invalid, listening or connected, the port number the
+	server should listen on, and the name of the protocol it serves. The only
+	feature of the server that is not encoded in this structure is the protocol
+	tast procedure, which we pass into the server routine as a separate
+	argument.
+*/
 typedef struct {
-    TCP_SOCKET socket;
-    SERVER_STATE state;
-    int port;
-    const char* protocol;
-} SERVER;
+	TCP_SOCKET socket;
+ 	tcpip_server_state_type state;
+	int port;
+	const char* protocol;
+} tcpip_server_type;
 
-// Declare a connection-serving procedure type that we will use in our server
-// procedure. Any library that calls our server routine must pass to it a
-// connection-serving procedure that takes a SERVER structure as an argument.
-typedef int (*tcpip_tasks_type)(SERVER* s);
+/*
+ 	A tcpip_tasks_type is a task that can be called by our generic TCP/IP server. It must
+ 	take as argument a tcpip_server_info structure, and it must conform to the following
+ 	rules. If it blocks the server, it must call server_tick while it is blocking, and 
+ 	if server_tick returns a negative value, the task must abort and return a negative
+ 	value itself.
+*/
+typedef int (*tcpip_tasks_type)(tcpip_server_type* s);
 
-// TCP/IP procedures.
+/*
+	Our generic TCP/IP server procedures. The tcpip_tick and server_tick are for
+	maintaining the stack and Ethernet driver. The tcpip_server is a generic
+	connection management routine that we can use for a variety of protocols, so
+	long as the protocol tasks can be implemented in a non-blocking state
+	machine of its own.
+*/
 void tcpip_tick(void);
-uint32_t tcp_get_ready(TCP_SOCKET s);
-uint32_t tcp_get(TCP_SOCKET s, uint8_t* buffer, uint32_t len);
-uint32_t tcp_put_ready(TCP_SOCKET s);
-uint32_t tcp_put(TCP_SOCKET s, const uint8_t* data, uint32_t len);
-void ping_gateway(void);
-int net_info(char* out, uint32_t max_len);
-void tcpip_server(SERVER* s, tcpip_tasks_type tasks);
-
+int server_tick(tcpip_server_type* s);
+void tcpip_server(tcpip_server_type* s, tcpip_tasks_type tasks);
 
 #endif

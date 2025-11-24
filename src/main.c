@@ -66,9 +66,9 @@ char configuration[CONFIG_LENGTH];
 #define HTTP_PORT 80
 
 // Server state structures.
-SERVER lwdaq_server = { INVALID_SOCKET, S_WAIT_STACK, LWDAQ_PORT, "LWDAQ" };
-SERVER telnet_server = { INVALID_SOCKET, S_WAIT_STACK, TELNET_PORT, "TELNET" };
-SERVER http_server = { INVALID_SOCKET, S_WAIT_STACK, HTTP_PORT, "HTTP" };
+tcpip_server_type lwdaq_server = {INVALID_SOCKET,S_WAIT_STACK,LWDAQ_PORT,"LWDAQ"};
+tcpip_server_type telnet_server = {INVALID_SOCKET,S_WAIT_STACK,TELNET_PORT,"TELNET"};
+tcpip_server_type http_server = {INVALID_SOCKET,S_WAIT_STACK,HTTP_PORT,"HTTP" };
 
 // LWDAQ messages
 #define START_CODE 0xA5 
@@ -125,7 +125,7 @@ static inline uint32_t load32_be(const uint8_t *p)
 /*
 	lwdaq_header sends a data return message header through a socket.
 */
-int lwdaq_header(SERVER* s, uint32_t id, uint32_t len) {
+int lwdaq_header(tcpip_server_type* s, uint32_t id, uint32_t len) {
 	uint8_t buff[15];
 	uint32_t* lp;
 	
@@ -141,7 +141,7 @@ int lwdaq_header(SERVER* s, uint32_t id, uint32_t len) {
 /*
 	lwdaq_footer sends a terminating sequence through a socket.
 */
-int lwdaq_footer(SERVER* s) {
+int lwdaq_footer(tcpip_server_type* s) {
 	uint8_t buff[15];
 	buff[0] = END_CODE;
 	TCPIP_TCP_ArrayPut((*s).socket,buff,1);
@@ -152,7 +152,7 @@ int lwdaq_footer(SERVER* s) {
 	lwdaq_byte sends a data return message through a socket with a single-byte
 	integer as its content.
 */
-int lwdaq_byte(SERVER* s, uint8_t data) {
+int lwdaq_byte(tcpip_server_type* s, uint8_t data) {
 	uint8_t buff[15];
 	lwdaq_header(s,DATA_RETURN,sizeof(data));
 	buff[0] = data;
@@ -165,7 +165,7 @@ int lwdaq_byte(SERVER* s, uint8_t data) {
 	lwdaq_integer sends a data return message through a socket with a four-byte
 	integer as its content.
 */
-int lwdaq_integer(SERVER* s, uint32_t data) {
+int lwdaq_integer(tcpip_server_type* s, uint32_t data) {
 	uint8_t buff[15];
 	uint32_t* lp;
 	lwdaq_header(s,DATA_RETURN,sizeof(data));
@@ -179,7 +179,7 @@ int lwdaq_integer(SERVER* s, uint32_t data) {
 /*
 	lwdaq_data sends a block of data through a socket.
 */
-int lwdaq_data(SERVER* s, uint8_t* block, uint32_t len) {
+int lwdaq_data(tcpip_server_type* s, uint8_t* block, uint32_t len) {
 	lwdaq_header(s,DATA_RETURN,len);
 	TCPIP_TCP_ArrayPut((*s).socket,block,len);
 	lwdaq_footer(s);
@@ -189,7 +189,8 @@ int lwdaq_data(SERVER* s, uint8_t* block, uint32_t len) {
 /*
 	lwdaq_process_message handles an incoming LWDAQ message.
 */
-int lwdaq_process_message (SERVER* s, uint32_t id, uint32_t len, uint8_t* content) {
+int lwdaq_process_message (tcpip_server_type* s, 
+		uint32_t id, uint32_t len, uint8_t* content) {
 	uint8_t register_addr = 0;
 	uint8_t value = 0;
 //	int status;
@@ -206,10 +207,10 @@ int lwdaq_process_message (SERVER* s, uint32_t id, uint32_t len, uint8_t* conten
 
 		case BYTE_READ:{
 			register_addr = content[3];
-			//value = read_controller_byte(register_addr);
+			value = bus_read_byte(register_addr);
 			if (debug) console_print("BYTE_READ from %d of %d in %s.\r\n",
 				register_addr,value,__func__);
-			//lwdaq_byte(value);
+			lwdaq_byte(s,value);
 			break;
 		}
 
@@ -250,9 +251,9 @@ int lwdaq_process_message (SERVER* s, uint32_t id, uint32_t len, uint8_t* conten
 }
 
 /*
-	lwdaq_tasks services a LWDAQ socket connection.
+	lwdaq_tasks services a LWDAQ connection.
 */
-int lwdaq_tasks(SERVER* s) {
+int lwdaq_tasks(tcpip_server_type* s) {
 	uint32_t id,len;
 	static uint8_t rx_buffer[TCP_BUFF_SIZE];
 	static uint32_t rx_available = 0;
@@ -306,9 +307,9 @@ int lwdaq_tasks(SERVER* s) {
 }
 
 /*
-	telnet_tasks services a Telnet socket connection.
+	telnet_tasks services a Telnet connection.
 */
-int telnet_tasks(SERVER* s) {
+int telnet_tasks(tcpip_server_type* s) {
 //	static uint8_t rx_buffer[TCP_BUFF_SIZE];
     static char msg_buffer[TCP_BUFF_SIZE];
     int len;
@@ -353,9 +354,9 @@ int telnet_tasks(SERVER* s) {
 }
 
 /*
-	http_tasks services an HTTP socket connection.
+	http_tasks services an HTTP connection.
 */
-int http_tasks(SERVER* s) {
+int http_tasks(tcpip_server_type* s) {
 	int status = 0;
 	 
 	if (debug) console_print("Servicing %s connection on port %u in %s.\r\n",
@@ -367,6 +368,7 @@ int http_tasks(SERVER* s) {
 
 int main ( void ) {
 	int i = 0;
+//	int j;
 
 	// Initialize the clock, memory, core timers, system timer, UART console,
 	// Ethernet physical interface, and the TCP/IP stack.
@@ -392,6 +394,10 @@ int main ( void ) {
 			pic_d5_toggle();
 			i = 0;
 		}
+//		for (j = 0; j < 100; j++) {
+//			j = bus_read_byte((uint8_t) i % 256);
+//			bus_write_byte(0,j);
+//		}
 	}
 	
 	// Return an error code of the correct type if we get here.

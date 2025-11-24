@@ -12,11 +12,8 @@
 #define CA1_RC2   (1u << 2)     // RC2
 #define CA2_RC3   (1u << 3)     // RC3
 #define CA3_RC4   (1u << 4)     // RC4
-
 #define CA4_RE0   (1u << 0)     // RE0
 #define CA5_RE1   (1u << 1)     // RE1
-
-// Masks grouped by their PORT
 #define CA_MASK_RC   (CA0_RC1 | CA1_RC2 | CA2_RC3 | CA3_RC4)
 #define CA_MASK_RE   (CA4_RE0 | CA5_RE1)
 
@@ -27,17 +24,14 @@
 
 #define CD0_RC13  (1u << 13)
 #define CD1_RC14  (1u << 14)
-
 #define CD2_RE2   (1u << 2)
 #define CD3_RE3   (1u << 3)
 #define CD4_RE4   (1u << 4)
 #define CD5_RE5   (1u << 5)
 #define CD6_RE6   (1u << 6)
 #define CD7_RE7   (1u << 7)
-
 #define CD_MASK_RC   (CD0_RC13 | CD1_RC14)
 #define CD_MASK_RE   (CD2_RE2 | CD3_RE3 | CD4_RE4 | CD5_RE5 | CD6_RE6 | CD7_RE7)
-
 
 // -------------------------
 // Control lines

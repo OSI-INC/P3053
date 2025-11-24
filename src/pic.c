@@ -114,6 +114,27 @@ void pic_io_initialize(void) {
    	GPIO_PortOutputEnable(GPIO_PORT_C,0x00008000);
 }
 
+void bus_init(void) {
+    // Make everything DIGITAL
+    ANSELCCLR = CA_MASK_RC | CD_MASK_RC;
+    ANSELECLR = CA_MASK_RE | CD_MASK_RE;
+    ANSELDCLR = DS_RD4 | CW_RD5;
+
+    // Address lines as outputs
+    TRISCCLR = CA_MASK_RC;   // RC1–RC4
+    TRISECLR = CA_MASK_RE;   // RE0–RE1
+
+    // Control lines as outputs
+    TRISDCLR = DS_RD4 | CW_RD5;
+
+    // Data bus initially inputs
+    TRISCSET = CD_MASK_RC;   // RC13, RC14
+    TRISESET = CD_MASK_RE;   // RE2–RE7
+
+    // Deassert active-low control lines = drive high
+    LATDSET = DS_RD4 | CW_RD5;
+}
+
 /*
 	pic_initialize sets up the embedded microcontroller and its Ethernet interface. It
 	starts up all system modules to support TCP/IP servers, interrupt timers, flash
@@ -151,6 +172,7 @@ void pic_initialize(void) {
 	
 	// Configure the functions of the gerneral-purpose input and output pins.
 	pic_io_initialize();
+	bus_init();
 	
 	// Initialize the console, which communicates through a three-wire UART.
 	console_initialize();

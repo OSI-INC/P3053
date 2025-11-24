@@ -164,7 +164,7 @@ void tcpip_tick(void) {
 	The routine takes as its argument a server state structure and returns a
 	negative value only when the socket has been closed.
 */
-int server_tick(SERVER* s) {
+int server_tick(tcpip_server_type* s) {
 	DRV_MIIM_OBJECT_BASE_Default.DRV_MIIM_Tasks(sysObj.drvMiim_0);
 	TCPIP_STACK_Task(sysObj.tcpip);
 	if (!TCPIP_TCP_IsConnected((*s).socket) ||
@@ -239,7 +239,7 @@ int server_tick(SERVER* s) {
 	In the default state, the server remains stuck, and issues a debug heartbeat
 	report of its sitting in an unknown state.
 */
-void tcpip_server(SERVER* s, tcpip_tasks_type tasks) {
+void tcpip_server(tcpip_server_type* s, tcpip_tasks_type tasks) {
 	#define HEARTBEAT_PERIOD 5000000
 
 	SYS_STATUS tcpip_status;
