@@ -207,7 +207,7 @@ int lwdaq_process_message (tcpip_server_type* s,
 
 		case BYTE_READ:{
 			register_addr = content[3];
-			value = bus_read_byte(register_addr);
+			value = lwdaq_byte_read(register_addr);
 			if (debug) console_print("BYTE_READ from %d of %d in %s.\r\n",
 				register_addr,value,__func__);
 			lwdaq_byte(s,value);
@@ -380,6 +380,7 @@ int main ( void ) {
  
    	// A while loop with a counter to control the state of our LEDs. 
 	while (true) {
+	
 		tcpip_tick();
 		console_server();
 		tcpip_server(&lwdaq_server,lwdaq_tasks);

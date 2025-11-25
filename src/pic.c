@@ -18,29 +18,6 @@
 #include "pic.h"
 
 /*
-	These routines turn on, turn off, and toggle D2 and D5.
-*/
-void pic_d2_on(void) {
-	GPIO_PortSet(GPIO_PORT_C,0x00008000);
-}
-void pic_d2_off(void) {
-	GPIO_PortClear(GPIO_PORT_C,0x00008000);
-}
-void pic_d2_toggle(void) {
-	GPIO_PortToggle(GPIO_PORT_C,0x00008000);
-}
-void pic_d5_on(void) {
-	GPIO_PortSet(GPIO_PORT_A,0x00000004);
-}
-void pic_d5_off(void) {
-	GPIO_PortClear(GPIO_PORT_A,0x00000004);
-}
-void pic_d5_toggle(void) {
-	GPIO_PortToggle(GPIO_PORT_A,0x00000004);
-}
-
-
-/*
 	pic_reset resets the Embedded Etherent Module. It does so by unlocking the
 	PIC32MZ configuration registers and writing to the reset configuration bit.
 	We make three writes to the thirty-two bit SYSKEY register with the correct
@@ -103,6 +80,20 @@ void pic_io_initialize(void) {
 	// the three key values we use to unlock the registers.
 	SYSKEY = 0x33333333;
 	
+    // Configure the LWDAQ Controller address bus lines as outputs.
+    TRISCCLR = LWDAQ_CA_MASK_RC;   // RC1–RC4
+    TRISECLR = LWDAQ_CA_MASK_RE;   // RE0–RE1
+
+	// Configure the LWDAQ Controller data strobe and write lines as outputs.
+	TRISDCLR = LWDAQ_DS_RD4 | LWDAQ_CW_RD5;
+
+    // Set the LWDAQ Controller data bus initially as inputs.
+    TRISCSET = LWDAQ_CD_MASK_RC;   // RC13, RC14
+    TRISESET = LWDAQ_CD_MASK_RE;   // RE2–RE7
+
+    // Unassert LWDAQ Controller data strobe and write.
+    LATDSET = LWDAQ_DS_RD4 | LWDAQ_CW_RD5;
+
 	// So far, on our A3053A, we have have D3 and D4 dedicated to UART2, but D2
 	// and D5 are available as test points. Pin U1-56 is RF3, so we want to set
 	// bit 3 of port F as an output. Pin U1-59 is RA2, so we want to set bit 2
@@ -112,27 +103,6 @@ void pic_io_initialize(void) {
    	GPIO_PortOutputEnable(GPIO_PORT_F,0x00000008);
    	GPIO_PortOutputEnable(GPIO_PORT_A,0x00000004);
    	GPIO_PortOutputEnable(GPIO_PORT_C,0x00008000);
-}
-
-void bus_init(void) {
-    // Make everything DIGITAL
-    ANSELCCLR = CA_MASK_RC | CD_MASK_RC;
-    ANSELECLR = CA_MASK_RE | CD_MASK_RE;
-    ANSELDCLR = DS_RD4 | CW_RD5;
-
-    // Address lines as outputs
-    TRISCCLR = CA_MASK_RC;   // RC1–RC4
-    TRISECLR = CA_MASK_RE;   // RE0–RE1
-
-    // Control lines as outputs
-    TRISDCLR = DS_RD4 | CW_RD5;
-
-    // Data bus initially inputs
-    TRISCSET = CD_MASK_RC;   // RC13, RC14
-    TRISESET = CD_MASK_RE;   // RE2–RE7
-
-    // Deassert active-low control lines = drive high
-    LATDSET = DS_RD4 | CW_RD5;
 }
 
 /*
@@ -172,7 +142,6 @@ void pic_initialize(void) {
 	
 	// Configure the functions of the gerneral-purpose input and output pins.
 	pic_io_initialize();
-	bus_init();
 	
 	// Initialize the console, which communicates through a three-wire UART.
 	console_initialize();
