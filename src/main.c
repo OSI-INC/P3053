@@ -48,11 +48,11 @@
 
 // Configuration constants.
 #define ETH_MTU 1514
-#define BUFF_SIZE (ETH_MTU-40)
-#define RAM_BUFF_SIZE (6*BUFF_SIZE)
-#define TCP_BUFF_SIZE (6*BUFF_SIZE)
+#define TCP_TX_BUFF_SIZE (ETH_MTU-40)
+#define TCP_RX_BUFF_SIZE 4096
 #define CONFIG_LENGTH 1024 // bytes for config file buffer
 #define SEPCHARS " :\n,;=" // separator characters in config file
+#define LWDAQ_DEBUG 0
 
 // Global variables.
 char logged_in;
@@ -97,32 +97,6 @@ tcpip_server_type http_server = {INVALID_SOCKET,S_WAIT_STACK,HTTP_PORT,"HTTP" };
 #define REBOOT			13
 
 /*
-	swap_u32 reverses the order of four bytes in a thirty-two bit unsigned
-	integer so as to convert little-endian to big-endian byte order, and
-	visa-versa.
-*/
-static inline uint32_t swap_u32(uint32_t x)
-{
-    return ((x & 0x000000FFu) << 24) |
-		((x & 0x0000FF00u) <<  8) |
-		((x & 0x00FF0000u) >>  8) |
-		((x & 0xFF000000u) >> 24);
-}
-
-/*
-	load32_be takes a pointer to a byte buffer and reads the byte pointed
-	to and the three after it as the bytes of a four-byte big-endian integer
-	and returns a little-endian uint32_t.
-*/
-static inline uint32_t load32_be(const uint8_t *p)
-{
-	return ((uint32_t)p[0] << 24) 
-		| ((uint32_t)p[1] << 16) 
-		| ((uint32_t)p[2] <<  8) 
-		| (uint32_t)p[3];
-}
-
-/*
 	lwdaq_header sends a data return message header through a socket.
 */
 int lwdaq_header(tcpip_server_type* s, uint32_t id, uint32_t len) {
@@ -131,9 +105,9 @@ int lwdaq_header(tcpip_server_type* s, uint32_t id, uint32_t len) {
 	
 	buff[START_OFFSET] = START_CODE;
 	lp = (uint32_t*)&buff[ID_OFFSET];
-	*lp = swap_u32(id);
+	*lp = flip_bytes_u32(id);
 	lp = (uint32_t*)&buff[CLEN_OFFSET];
-	*lp = swap_u32(len);
+	*lp = flip_bytes_u32(len);
 	TCPIP_TCP_ArrayPut((*s).socket,buff,CONTENT_OFFSET);
 	return 0;
 }
@@ -149,10 +123,10 @@ int lwdaq_footer(tcpip_server_type* s) {
 }
 
 /*
-	lwdaq_byte sends a data return message through a socket with a single-byte
+	lwdaq_byte_return sends a data return message through a socket with a single-byte
 	integer as its content.
 */
-int lwdaq_byte(tcpip_server_type* s, uint8_t data) {
+int lwdaq_byte_return(tcpip_server_type* s, uint8_t data) {
 	uint8_t buff[15];
 	lwdaq_header(s,DATA_RETURN,sizeof(data));
 	buff[0] = data;
@@ -162,24 +136,24 @@ int lwdaq_byte(tcpip_server_type* s, uint8_t data) {
 }
 
 /*
-	lwdaq_integer sends a data return message through a socket with a four-byte
+	lwdaq_integer_return sends a data return message through a socket with a four-byte
 	integer as its content.
 */
-int lwdaq_integer(tcpip_server_type* s, uint32_t data) {
+int lwdaq_integer_return(tcpip_server_type* s, uint32_t data) {
 	uint8_t buff[15];
 	uint32_t* lp;
 	lwdaq_header(s,DATA_RETURN,sizeof(data));
 	lp = (uint32_t*)&buff[0];
-	*lp = swap_u32(data);
+	*lp = flip_bytes_u32(data);
 	TCPIP_TCP_ArrayPut((*s).socket,buff,sizeof(data));
 	lwdaq_footer(s);
 	return 0;
 }
 
 /*
-	lwdaq_data sends a block of data through a socket.
+	lwdaq_data_return sends a block of data through a socket.
 */
-int lwdaq_data(tcpip_server_type* s, uint8_t* block, uint32_t len) {
+int lwdaq_data_return(tcpip_server_type* s, uint8_t* block, uint32_t len) {
 	lwdaq_header(s,DATA_RETURN,len);
 	TCPIP_TCP_ArrayPut((*s).socket,block,len);
 	lwdaq_footer(s);
@@ -193,59 +167,87 @@ int lwdaq_process_message (tcpip_server_type* s,
 		uint32_t id, uint32_t len, uint8_t* content) {
 	uint8_t register_addr = 0;
 	uint8_t value = 0;
-//	int status;
-	
+	uint32_t tx_len = 0;
+	static uint8_t tx_buffer[TCP_TX_BUFF_SIZE];
+	uint32_t i = 0;
+
 	switch (id) {
-		case BYTE_WRITE:{
+		case BYTE_WRITE: {
 			register_addr = content[3];
 			value = content[4];
-			//write_controller_byte(register_addr,value);
 			if (debug) console_print("BYTE_WRITE to %d of %d in %s.\r\n",
 				register_addr,value,__func__);
-			break;
+			lwdaq_byte_write(register_addr,value);
 		}
+		break;
 
-		case BYTE_READ:{
+		case BYTE_READ: {
 			register_addr = content[3];
 			value = lwdaq_byte_read(register_addr);
+			lwdaq_byte_return(s,value);
 			if (debug) console_print("BYTE_READ from %d of %d in %s.\r\n",
 				register_addr,value,__func__);
-			lwdaq_byte(s,value);
-			break;
 		}
+		break;
 
-		case BYTE_POLL:{
+		case BYTE_POLL: {
 			register_addr = content[3];
 			value = content[4];
 			if (debug) console_print("BYTE_POLL of %d for %d in %s.\r\n",
 				register_addr,value,__func__);
-/*
-			while (read_controller_byte(register_addr) != value) {
-				status = buffered_socket_read(&socket,NULL,0);
-				if (status<0) break;
+			while (lwdaq_byte_read(register_addr) != value) {
+				if (server_tick(s)<0) return -1;
 			}
-*/
-			break;
 		}
+		break;
 
-		case VERSION_READ:{
+		case VERSION_READ: {
 			if (debug) console_print("VERSION_READ in %s.\r\n",__func__);
-			lwdaq_integer(s,VERSION_NUM);
-			break;
+			lwdaq_integer_return(s,VERSION_NUM);
 		}
+		break;
+		
+		case STREAM_READ: {
+			register_addr = content[3];
+			tx_len = reverse_load_u32(&content[4]);
+			if (debug) console_print("STREAM_READ from %d of %d bytes in %s.\r\n",
+				register_addr,tx_len,__func__);
+			lwdaq_header(s,DATA_RETURN,tx_len);
+			if (tx_len > 0) {
+				i = 0;
+				for (int j = 0; j < tx_len; j++) {
+					lwdaq_byte_write(62,0);
+					while (lwdaq_byte_read(62) == 0) {
+						if (server_tick(s)<0) return -1;
+					}
+					tx_buffer[i] = lwdaq_byte_read(register_addr);
+					i++;
+					if (i == sizeof(tx_buffer)) {
+						TCPIP_TCP_ArrayPut((*s).socket,&tx_buffer[0],i);
+						if (debug) console_print("Sent %d bytes in %s.\r\n",i,__func__);
+						i = 0;
+					}
+				}
+				TCPIP_TCP_ArrayPut((*s).socket,&tx_buffer[0],i);
+				if (debug) console_print("Sent %d bytes in %s.\r\n",i,__func__);
+			}
+			lwdaq_footer(s);
+			if (debug) console_print("STREAM_READ complete in %s.\r\n",__func__);
+		}
+		break;
 
-		case ECHO:{
+		case ECHO: {
 			if (debug) console_print("ECHO of %u bytes in %s.\r\n",len,__func__);
-			lwdaq_data(s,content,len);
+			lwdaq_data_return(s,content,len);
 			content[len] = 0x00;
 			if (debug) console_print("%s\r\n",content);
-			break;
 		}
+		break;
 
 		default: {
 			if (debug) console_print("Unrecognised message in %s.\r\n",__func__);
-			break;
 		}
+		break;
 	}
 	return 0;
 }
@@ -255,7 +257,7 @@ int lwdaq_process_message (tcpip_server_type* s,
 */
 int lwdaq_tasks(tcpip_server_type* s) {
 	uint32_t id,len;
-	static uint8_t rx_buffer[TCP_BUFF_SIZE];
+	static uint8_t rx_buffer[TCP_RX_BUFF_SIZE];
 	static uint32_t rx_available = 0;
 	uint32_t rx_ready = 0;
 	int status;
@@ -273,7 +275,7 @@ int lwdaq_tasks(tcpip_server_type* s) {
 		rx_available = rx_available+rx_ready;
 	}
 	if (rx_available == 0) return 0;
-	if (debug) console_print("rx_ready=%u rx_available=%u in %s.\r\n",
+	if (debug && LWDAQ_DEBUG) console_print("rx_ready=%u rx_available=%u in %s.\r\n",
 		rx_ready, rx_available,__func__);
 	if (rx_buffer[0] != START_CODE) {
 		if (rx_buffer[0] == CLOSE_CODE) {
@@ -284,9 +286,10 @@ int lwdaq_tasks(tcpip_server_type* s) {
 		return -1;
 	}
 	if (rx_available<9) return rx_available;		
-	id = load32_be(&rx_buffer[1]);
-	len = load32_be(&rx_buffer[5]);
-	if (debug) console_print("id=%u len=%u in %s.\r\n",id,len,__func__);
+	id = reverse_load_u32(&rx_buffer[1]);
+	len = reverse_load_u32(&rx_buffer[5]);
+	if (debug && LWDAQ_DEBUG) console_print(
+		"id=%u len=%u in %s.\r\n",id,len,__func__);
 	if (rx_available<len+10) return rx_available;
 	if (rx_buffer[len+9] != END_CODE) {
 		if (debug) console_print("Invalid end code in %s.\r\n",__func__);
@@ -295,14 +298,16 @@ int lwdaq_tasks(tcpip_server_type* s) {
 	status = lwdaq_process_message(s,id,len,&rx_buffer[9]);
 	if (status<0) return status;
 	if (rx_available>len+10) {
-		if (debug) console_print("Copying %u to %u from %u in %s.\r\n",
+		if (debug && LWDAQ_DEBUG) console_print(
+			"Copying %u to %u from %u in %s.\r\n",
 			rx_available-len-10,0,len+10,__func__);
 		memmove(&rx_buffer[0],&rx_buffer[len+10],rx_available-len-10);
 		rx_available = rx_available-len-10;
 	} else {
 		rx_available = 0;
 	}
-	if (debug) console_print("rx_available=%u in %s.\r\n",rx_available,__func__);
+	if (debug && LWDAQ_DEBUG) console_print(
+		"rx_available=%u in %s.\r\n",rx_available,__func__);
 	return rx_available;
 }
 
@@ -310,14 +315,14 @@ int lwdaq_tasks(tcpip_server_type* s) {
 	telnet_tasks services a Telnet connection.
 */
 int telnet_tasks(tcpip_server_type* s) {
-//	static uint8_t rx_buffer[TCP_BUFF_SIZE];
-    static char msg_buffer[TCP_BUFF_SIZE];
+//	static uint8_t rx_buffer[TCP_RX_BUFF_SIZE];
+    static char msg_buffer[TCP_TX_BUFF_SIZE];
     int len;
 	 
 	if ((*s).state == S_LISTENING) {
 		if (debug) console_print("Initialized %s connection in %s.\r\n",
 			(*s).protocol,__func__);
-		len = net_info(&msg_buffer[0],TCP_BUFF_SIZE);
+		len = net_info(&msg_buffer[0],sizeof(msg_buffer));
 		tcp_put((*s).socket,(const uint8_t*)&msg_buffer[0],len);
 		return 0;
 	};
