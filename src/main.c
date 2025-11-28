@@ -108,7 +108,7 @@ int lwdaq_header(tcpip_server_type* s, uint32_t id, uint32_t len) {
 	*lp = flip_bytes_u32(id);
 	lp = (uint32_t*)&buff[CLEN_OFFSET];
 	*lp = flip_bytes_u32(len);
-	TCPIP_TCP_ArrayPut((*s).socket,buff,CONTENT_OFFSET);
+	tcp_write_all((*s).socket,buff,CONTENT_OFFSET);
 	return 0;
 }
 
@@ -118,7 +118,7 @@ int lwdaq_header(tcpip_server_type* s, uint32_t id, uint32_t len) {
 int lwdaq_footer(tcpip_server_type* s) {
 	uint8_t buff[15];
 	buff[0] = END_CODE;
-	TCPIP_TCP_ArrayPut((*s).socket,buff,1);
+	tcp_write_all((*s).socket,buff,1);
 	return 0;
 }
 
@@ -130,7 +130,7 @@ int lwdaq_byte_return(tcpip_server_type* s, uint8_t data) {
 	uint8_t buff[15];
 	lwdaq_header(s,DATA_RETURN,sizeof(data));
 	buff[0] = data;
-	TCPIP_TCP_ArrayPut((*s).socket,buff,sizeof(data));
+	tcp_write_all((*s).socket,buff,sizeof(data));
 	lwdaq_footer(s);
 	return 0;
 }
@@ -145,7 +145,7 @@ int lwdaq_integer_return(tcpip_server_type* s, uint32_t data) {
 	lwdaq_header(s,DATA_RETURN,sizeof(data));
 	lp = (uint32_t*)&buff[0];
 	*lp = flip_bytes_u32(data);
-	TCPIP_TCP_ArrayPut((*s).socket,buff,sizeof(data));
+	tcp_write_all((*s).socket,buff,sizeof(data));
 	lwdaq_footer(s);
 	return 0;
 }
@@ -155,7 +155,7 @@ int lwdaq_integer_return(tcpip_server_type* s, uint32_t data) {
 */
 int lwdaq_data_return(tcpip_server_type* s, uint8_t* block, uint32_t len) {
 	lwdaq_header(s,DATA_RETURN,len);
-	TCPIP_TCP_ArrayPut((*s).socket,block,len);
+	tcp_write_all((*s).socket,block,len);
 	lwdaq_footer(s);
 	return 0;
 }
@@ -170,6 +170,7 @@ int lwdaq_process_message (tcpip_server_type* s,
 	uint32_t tx_len = 0;
 	static uint8_t tx_buffer[TCP_TX_BUFF_SIZE];
 	uint32_t i = 0;
+	uint32_t status = 0;
 
 	switch (id) {
 		case BYTE_WRITE: {
@@ -196,7 +197,7 @@ int lwdaq_process_message (tcpip_server_type* s,
 			if (debug) console_print("BYTE_POLL of %d for %d in %s.\r\n",
 				register_addr,value,__func__);
 			while (lwdaq_byte_read(register_addr) != value) {
-				if (server_tick(s)<0) return -1;
+				if (socket_tick((*s).socket)<0) return -1;
 			}
 		}
 		break;
@@ -218,17 +219,27 @@ int lwdaq_process_message (tcpip_server_type* s,
 				for (int j = 0; j < tx_len; j++) {
 					lwdaq_byte_write(62,0);
 					while (lwdaq_byte_read(62) == 0) {
-						if (server_tick(s)<0) return -1;
+						if (socket_tick((*s).socket)<0) return -1;
 					}
 					tx_buffer[i] = lwdaq_byte_read(register_addr);
 					i++;
 					if (i == sizeof(tx_buffer)) {
-						TCPIP_TCP_ArrayPut((*s).socket,&tx_buffer[0],i);
+						status=tcp_write_all((*s).socket,&tx_buffer[0],i);
+						if (status < 0) {
+							if (debug) console_print(
+								"Failed to write %d bytes in %s.\r\n",i,__func__);
+							return -1;
+						}
 						if (debug) console_print("Sent %d bytes in %s.\r\n",i,__func__);
 						i = 0;
 					}
 				}
-				TCPIP_TCP_ArrayPut((*s).socket,&tx_buffer[0],i);
+				tcp_write_all((*s).socket,&tx_buffer[0],i);
+				if (status < 0) {
+					if (debug) console_print(
+						"Failed to write %d bytes in %s.\r\n",i,__func__);
+					return -1;
+				}
 				if (debug) console_print("Sent %d bytes in %s.\r\n",i,__func__);
 			}
 			lwdaq_footer(s);
@@ -269,9 +280,9 @@ int lwdaq_tasks(tcpip_server_type* s) {
 		return 0;
 	};
 
-	rx_ready = TCPIP_TCP_GetIsReady((*s).socket);
+	rx_ready = tcp_available((*s).socket);
 	if (rx_ready>0) {
-		TCPIP_TCP_ArrayGet((*s).socket,&rx_buffer[rx_available],rx_ready);	
+		tcp_read((*s).socket,&rx_buffer[rx_available],rx_ready);	
 		rx_available = rx_available+rx_ready;
 	}
 	if (rx_available == 0) return 0;
@@ -323,7 +334,7 @@ int telnet_tasks(tcpip_server_type* s) {
 		if (debug) console_print("Initialized %s connection in %s.\r\n",
 			(*s).protocol,__func__);
 		len = net_info(&msg_buffer[0],sizeof(msg_buffer));
-		tcp_put((*s).socket,(const uint8_t*)&msg_buffer[0],len);
+		tcp_write_all((*s).socket,(const uint8_t*)&msg_buffer[0],len);
 		return 0;
 	};
 

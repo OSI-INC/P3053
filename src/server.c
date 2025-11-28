@@ -21,43 +21,99 @@
 #include "utils.h"
 
 /*
-	tcp_get_ready returns the number of bytes that are ready to be read out of a
-	TCP socket. It is the first of four routines that allow use to manage
-	reading and writing from a socket. These routines are wrappers for Harmony
-	TCP routines. The wrappers stop us from dealing with sixteen-bit unsigned
-	integers in our own code, which are a waste of time on a thirty-two bit
-	machine. And they allow us to adapt our TCP/IP socket reading and writing
-	without changing our protocol handling routines.	
+	tcpip_tick maintains the TCP/IP stack without checking the status of any
+	particular socket. It returns no value. It refers to the global sysObj
+	structure declared in definitions.h of our Harmony library. 
+*/
+void tcpip_tick(void) {
+	DRV_MIIM_OBJECT_BASE_Default.DRV_MIIM_Tasks(sysObj.drvMiim_0);
+	TCPIP_STACK_Task(sysObj.tcpip);
+}
+
+/*
+	socket_tick maintains the TCP/IP stack and checks to see if a particular
+	socket is still open. This routine must be called by any protocol task
+	whenever it enters a loop waiting for some other process to complete. We say
+	the protocol task is "blocking". When this routine returns a negative value,
+	the protocol task must stop blocking and return control to the tcpip_server
+	routine that manages the protocol connections. The protocol task must pass
+	back a negative value so that the tcpip_server can close the listening
+	socket and open a new one. The routine takes as its argument a TCP/IP socket
+	handle and returns a negative value when the socket has been closed or has
+	been determined by the stack to be disconnected.
+*/
+int socket_tick(TCP_SOCKET s) {
+	tcpip_tick();
+	if (!TCPIP_TCP_IsConnected(s) || TCPIP_TCP_WasDisconnected(s)) {
+		return -1;
+	} else {
+		return 0;
+	}
+}
+
+/*
+	tcp_available returns the number of bytes that are ready to be read out of
+	a TCP socket. It is a wrapper for a Harmony routine. It converts sixteen-bit
+	integers to thirty-two bit integers for our thirty-two bit processor. Its
+	name is in our opinion more suitable.	
 */ 
-uint32_t tcp_get_ready(TCP_SOCKET s) {
+uint32_t tcp_available(TCP_SOCKET s) {
 	return TCPIP_TCP_GetIsReady(s);
 }
 
 /*
-	tcp_get attempts to read a specified number of bytes from a TCP socket. It
-	returns the number of bytes it actually read. It takes as arguments a socket
-	handle, a byte buffer pointer, and an unsigned integer length.
+	tcp_read attempts to read a specified number of bytes from a TCP socket. It
+	returns the number of bytes it actually read. It does not block, meaning it
+	does not make the calling process wait until the requested number of bytes
+	is available. It takes as arguments a socket handle, a byte buffer pointer,
+	and an unsigned integer length.
 */
-uint32_t tcp_get(TCP_SOCKET s, uint8_t* buffer, uint32_t len) {
+uint32_t tcp_read(TCP_SOCKET s, uint8_t* buffer, uint32_t len) {
 	return TCPIP_TCP_ArrayGet(s,buffer,len);
 }
 
 /*
-	tcp_put_ready returns how much space we have available for writing to the
+	tcp_write_space returns how much space we have available for writing to the
 	outgoing TCP buffer of a socket. It takes a socket handle.
 */
-uint32_t tcp_put_ready(TCP_SOCKET s) {
+uint32_t tcp_write_space(TCP_SOCKET s) {
 	return TCPIP_TCP_PutIsReady(s);
 }
 
 /*
-	tcp_put attempts to write a specified number of bytes to a TCP socket. It
-	returns the number of bytes it actually wrote. It takes as argument a socket
-	handle, a pointer to the byte buffer containing the data that should be
-	written, and an unsigned integer length.
+	tcp_write writes as many bytes as it can to TCP socket without overflowing
+	the outgoing buffer, stopping only when it has written the specified number
+	of bytes. It returns the number of bytes it actually wrote. It takes as
+	argument a socket handle, a pointer to the byte buffer containing the data
+	that should be written, and an unsigned integer length. The routine does not
+	flush the socket. It does not block.
 */
-uint32_t tcp_put(TCP_SOCKET s, const uint8_t* data, uint32_t len) {
+uint32_t tcp_write(TCP_SOCKET s, const uint8_t* data, uint32_t len) {
 	return TCPIP_TCP_ArrayPut(s,data,len);
+}
+
+/*
+	tcp_write_all attempts to write all the specified bytes by repeatedly
+	writing as many bytes as possible to the outgoing buffer, flushing the
+	socket, and writing more bytes to the buffer until all bytes are sent. While
+	it is waiting for bytes to be transmitted, it calls socket_tick, and if this
+	routine returns an error, the write routine must abort and itself return an
+	error. If it does not return an error, it returns the number of bytes
+	written, which must be the number specified.
+*/
+uint32_t tcp_write_all(TCP_SOCKET s, const uint8_t *buf, uint16_t len)
+{
+    uint32_t total = 0;
+    uint32_t written = 0;
+    while (total < len) {
+        written = tcp_write(s,buf+total,len-total);
+        total = total + written;
+        if (total < len) {
+        	TCPIP_TCP_Flush(s);
+        	if (socket_tick(s) < 0) {return -1;}
+        }
+    }
+    return total;
 }
 
 /*
@@ -145,35 +201,12 @@ int net_info(char* out, uint32_t max_len) {
 }
 
 /*
-	tcpip_tick maintains the TCP/IP stack running.
+	tcpip_write takes a socket handle, a pointer to a byte array, and a number
+	of bytes we want to write from the array. The routine attempts to write all
+	the data by repeatedly writing however many bytes the transmit buffer will
+	accept, and flushing the transmit buffer. Each time we flush the socket,
+	we also call the 
 */
-void tcpip_tick(void) {
-	DRV_MIIM_OBJECT_BASE_Default.DRV_MIIM_Tasks(sysObj.drvMiim_0);
-	TCPIP_STACK_Task(sysObj.tcpip);
-}
-
-/*
-	server_tick maintains the TCP/IP stack and checks to see if a particular
-	socket is still open. This is the routine that must be called by any
-	protocol task while it is "blocking", which is to say: whenever the protocol
-	task enters a loop waiting for some other event to occur or process to
-	complete. When this routine returns a negative value, the protocol task must
-	stop blocking and return control to the tcpip_server routine that manages
-	the protocol connections. The protocol task must pass back a negative value
-	so that the tcpip_server can close the listening socket and open a new one.
-	The routine takes as its argument a server state structure and returns a
-	negative value only when the socket has been closed.
-*/
-int server_tick(tcpip_server_type* s) {
-	DRV_MIIM_OBJECT_BASE_Default.DRV_MIIM_Tasks(sysObj.drvMiim_0);
-	TCPIP_STACK_Task(sysObj.tcpip);
-	if (!TCPIP_TCP_IsConnected((*s).socket) ||
-			TCPIP_TCP_WasDisconnected((*s).socket)) {
-		return -1;
-	} else {
-		return 0;
-	}
-}
 
 /*
 	tcpip_server provides management of connection, service, and closure of a
@@ -186,7 +219,7 @@ int server_tick(tcpip_server_type* s) {
 
 	The tcpip_server is a state machine that does not block its calling
 	procedure, excepting when the protocol task provided to it causes a block.
-	The task procedure is permitted to block, but it must call server_tick while
+	The task procedure is permitted to block, but it must call socket_tick while
 	it is blocking, so as to maintain the TCP/IP stack, and to detect closure of
 	the socket by the client. If the client closes the socket, the protocol task
 	must abort and return a negative value. The tcpip_server will close the

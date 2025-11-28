@@ -7,18 +7,23 @@
 #define SERVER_H
 
 /*
-	Routines to read and write from sockets. These are wrappers for Harmony routines.
+	Two procedures that maintain the TCP/IP stack, including the Ethernet
+	physical interface driver. The first, tcpip_tick, takes no arguments and
+	returns no value. This procedure can be called anywhere without specifying a
+	socket. The second takes a TCP/IP socket as its argument and returns a
+	negative value if and only if the socket is closed or disconnected.
 */
-uint32_t tcp_get_ready(TCP_SOCKET s);
-uint32_t tcp_get(TCP_SOCKET s, uint8_t* buffer, uint32_t len);
-uint32_t tcp_put_ready(TCP_SOCKET s);
-uint32_t tcp_put(TCP_SOCKET s, const uint8_t* data, uint32_t len);
+void tcpip_tick(void);
+int socket_tick(TCP_SOCKET s);
 
 /*
-	Here are some utility routines for TCP/IP management and reporting.
+	Routines to read and write from sockets. These are wrappers for Harmony routines.
 */
-void ping_gateway(void);
-int net_info(char* out, uint32_t max_len);
+uint32_t tcp_available(TCP_SOCKET s);
+uint32_t tcp_read(TCP_SOCKET s, uint8_t* buffer, uint32_t len);
+uint32_t tcp_write_space(TCP_SOCKET s);
+uint32_t tcp_write(TCP_SOCKET s, const uint8_t* data, uint32_t len);
+uint32_t tcp_write_all(TCP_SOCKET s, const uint8_t *buf, uint16_t len);
 
 /*
  	The tcpip_server_state structure defines the states of our generic TCP/IP server process.
@@ -51,23 +56,26 @@ typedef struct {
 } tcpip_server_type;
 
 /*
- 	A tcpip_tasks_type is a task that can be called by our generic TCP/IP server. It must
- 	take as argument a tcpip_server_info structure, and it must conform to the following
- 	rules. If it blocks the server, it must call server_tick while it is blocking, and 
- 	if server_tick returns a negative value, the task must abort and return a negative
- 	value itself.
+	Here are some utility routines for TCP/IP management and reporting.
+*/
+void ping_gateway(void);
+int net_info(char* out, uint32_t max_len);
+
+/*
+ 	A tcpip_tasks_type is the type of procedure that will be called by our
+ 	generic TCP/IP server. It must take as argument a tcpip_server_info
+ 	structure. If it blocks the server, it must call socket_tick while it is
+ 	blocking. If socket_tick returns a negative value, the task must abort and
+ 	return a negative value itself.
 */
 typedef int (*tcpip_tasks_type)(tcpip_server_type* s);
 
 /*
-	Our generic TCP/IP server procedures. The tcpip_tick and server_tick are for
-	maintaining the stack and Ethernet driver. The tcpip_server is a generic
+	Our generic TCP/IP server procedure. The tcpip_server is a generic
 	connection management routine that we can use for a variety of protocols, so
 	long as the protocol tasks can be implemented in a non-blocking state
 	machine of its own.
 */
-void tcpip_tick(void);
-int server_tick(tcpip_server_type* s);
 void tcpip_server(tcpip_server_type* s, tcpip_tasks_type tasks);
 
 #endif
