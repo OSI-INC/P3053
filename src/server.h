@@ -23,7 +23,8 @@ uint32_t tcp_available(TCP_SOCKET s);
 uint32_t tcp_read(TCP_SOCKET s, uint8_t* buffer, uint32_t len);
 uint32_t tcp_write_space(TCP_SOCKET s);
 uint32_t tcp_write(TCP_SOCKET s, const uint8_t* data, uint32_t len);
-uint32_t tcp_write_all(TCP_SOCKET s, const uint8_t *buf, uint16_t len);
+void tcp_flush(TCP_SOCKET s);
+int tcp_write_all(TCP_SOCKET s, const uint8_t *buf, uint16_t len);
 
 /*
  	The tcpip_server_state structure defines the states of our generic TCP/IP server process.

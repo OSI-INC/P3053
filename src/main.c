@@ -46,12 +46,15 @@
 // Current version number
 #define VERSION_NUM 32
 
-// Configuration constants.
-#define ETH_MTU 1514
-#define TCP_TX_BUFF_SIZE (ETH_MTU-40)
+// TCP buffers sizes
+#define TCP_TX_BUFF_SIZE 4096
 #define TCP_RX_BUFF_SIZE 4096
+
+// Configuration file control constants
 #define CONFIG_LENGTH 1024 // bytes for config file buffer
 #define SEPCHARS " :\n,;=" // separator characters in config file
+
+// Turn on and off deeper debugging of the LWDAQ server.
 #define LWDAQ_DEBUG 0
 
 // Global variables.
@@ -170,7 +173,6 @@ int lwdaq_process_message (tcpip_server_type* s,
 	uint32_t tx_len = 0;
 	static uint8_t tx_buffer[TCP_TX_BUFF_SIZE];
 	uint32_t i = 0;
-	uint32_t status = 0;
 
 	switch (id) {
 		case BYTE_WRITE: {
@@ -223,24 +225,18 @@ int lwdaq_process_message (tcpip_server_type* s,
 					}
 					tx_buffer[i] = lwdaq_byte_read(register_addr);
 					i++;
-					if (i == sizeof(tx_buffer)) {
-						status=tcp_write_all((*s).socket,&tx_buffer[0],i);
-						if (status < 0) {
+					if ((i == sizeof(tx_buffer)) || (j == tx_len - 1)) {
+						tcp_write_all((*s).socket,&tx_buffer[0],i);
+						if (socket_tick((*s).socket) < 0) {
 							if (debug) console_print(
 								"Failed to write %d bytes in %s.\r\n",i,__func__);
 							return -1;
 						}
-						if (debug) console_print("Sent %d bytes in %s.\r\n",i,__func__);
+						if (debug && LWDAQ_DEBUG) console_print(
+							"Wrote %u bytes in %s.\r\n",i,__func__);
 						i = 0;
 					}
 				}
-				tcp_write_all((*s).socket,&tx_buffer[0],i);
-				if (status < 0) {
-					if (debug) console_print(
-						"Failed to write %d bytes in %s.\r\n",i,__func__);
-					return -1;
-				}
-				if (debug) console_print("Sent %d bytes in %s.\r\n",i,__func__);
 			}
 			lwdaq_footer(s);
 			if (debug) console_print("STREAM_READ complete in %s.\r\n",__func__);
@@ -260,6 +256,7 @@ int lwdaq_process_message (tcpip_server_type* s,
 		}
 		break;
 	}
+	
 	return 0;
 }
 
@@ -287,7 +284,7 @@ int lwdaq_tasks(tcpip_server_type* s) {
 	}
 	if (rx_available == 0) return 0;
 	if (debug && LWDAQ_DEBUG) console_print("rx_ready=%u rx_available=%u in %s.\r\n",
-		rx_ready, rx_available,__func__);
+		rx_ready,rx_available,__func__);
 	if (rx_buffer[0] != START_CODE) {
 		if (rx_buffer[0] == CLOSE_CODE) {
 			if (debug) console_print("Close code received in %s.\r\n",__func__);
@@ -407,14 +404,11 @@ int main ( void ) {
 		i = i+1;
 		if (i % 100 == 0) pic_d2_off();
 		if (i % 1000 == 0) pic_d2_on();
-		if (i == 200000) {
-			pic_d5_toggle();
+		if (i % 10000 == 0) pic_d5_off();
+		if (i == 500000) {
+			pic_d5_on();
 			i = 0;
 		}
-//		for (j = 0; j < 100; j++) {
-//			j = bus_read_byte((uint8_t) i % 256);
-//			bus_write_byte(0,j);
-//		}
 	}
 	
 	// Return an error code of the correct type if we get here.

@@ -20,6 +20,7 @@
 #include "console.h"
 #include "utils.h"
 
+
 /*
 	tcpip_tick maintains the TCP/IP stack without checking the status of any
 	particular socket. It returns no value. It refers to the global sysObj
@@ -93,6 +94,14 @@ uint32_t tcp_write(TCP_SOCKET s, const uint8_t* data, uint32_t len) {
 }
 
 /*
+	tcp_flush forces the TCP/IP stack to transmit all bytes in the outgoing
+	buffer as soon as it can.
+*/
+void tcp_flush(TCP_SOCKET s) {
+	TCPIP_TCP_Flush(s);
+}
+
+/*
 	tcp_write_all attempts to write all the specified bytes by repeatedly
 	writing as many bytes as possible to the outgoing buffer, flushing the
 	socket, and writing more bytes to the buffer until all bytes are sent. While
@@ -101,19 +110,18 @@ uint32_t tcp_write(TCP_SOCKET s, const uint8_t* data, uint32_t len) {
 	error. If it does not return an error, it returns the number of bytes
 	written, which must be the number specified.
 */
-uint32_t tcp_write_all(TCP_SOCKET s, const uint8_t *buf, uint16_t len)
-{
+int tcp_write_all(TCP_SOCKET s, const uint8_t *buf, uint16_t len) {
     uint32_t total = 0;
     uint32_t written = 0;
     while (total < len) {
         written = tcp_write(s,buf+total,len-total);
         total = total + written;
         if (total < len) {
-        	TCPIP_TCP_Flush(s);
         	if (socket_tick(s) < 0) {return -1;}
         }
     }
-    return total;
+    tcp_flush(s);
+    return (int)total;
 }
 
 /*
@@ -273,7 +281,7 @@ int net_info(char* out, uint32_t max_len) {
 	report of its sitting in an unknown state.
 */
 void tcpip_server(tcpip_server_type* s, tcpip_tasks_type tasks) {
-	#define HEARTBEAT_PERIOD 5000000
+	#define HEARTBEAT_PERIOD 50000000
 
 	SYS_STATUS tcpip_status;
 	IPV4_ADDR ip_addr;
@@ -335,7 +343,7 @@ void tcpip_server(tcpip_server_type* s, tcpip_tasks_type tasks) {
 			(*s).socket = TCPIP_TCP_ServerOpen(IP_ADDRESS_TYPE_IPV4,(*s).port,0);
 			if ((*s).socket == INVALID_SOCKET) {
 				if (debug) console_print(
-					"Could not open %s server on port %d in %s.\r\n",
+					"Failed to open %s server on port %d in %s.\r\n",
 					(*s).protocol,(*s).port,__func__);
 				(*s).state = S_ERROR;
 			} else {
@@ -397,10 +405,6 @@ void tcpip_server(tcpip_server_type* s, tcpip_tasks_type tasks) {
 		break;
 		
 		case S_ERROR: {
-			if (rand() % HEARTBEAT_PERIOD == 0) {
-				if (debug) console_print("Failed to start %s server in %s.\r\n",
-					(*s).protocol,__func__);
-			}		
 		}
 		break;
 		

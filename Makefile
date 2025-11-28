@@ -39,6 +39,7 @@ CPU=32MZ2048EFH100
 CPU_FAMILY=pic32mz_ef_sk
 DFP_DIR=/Users/kevan/Code/Microchip/PIC32MZ-EF_DFP/1.3.58
 CPULD=$(DFP_DIR)/xc32/$(CPU)/p$(CPU).ld
+HEAPSIZE=200000
 
 #
 # Colors for text output during the build.
@@ -112,7 +113,7 @@ ASFLAGS += -mprocessor=$(CPU)  \
 	-mdfp="$(DFP_DIR)"
 LDFLAGS += -mprocessor=$(CPU) \
 	-Wl,--script=$(CPULD) \
-	-Wl,--defsym=_min_heap_size=64960 \
+	-Wl,--defsym=_min_heap_size=$(HEAPSIZE) \
 	-Wl,--gc-sections \
 	-Wl,--no-code-in-dinit \
 	-Wl,--no-dinit-in-serial-mem \

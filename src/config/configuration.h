@@ -10,7 +10,7 @@
   Description:
     An MPLAB Project may have multiple configurations.  This file defines the
     build-time options for a single configuration.
-
+ 
   Remarks:
     This configuration header must not define any prototypes or data
     definitions (or include any files that do).  It only provides macro
@@ -143,8 +143,8 @@
 
 /*** TCP Configuration ***/
 #define TCPIP_TCP_MAX_SEG_SIZE_TX		        	1460
-#define TCPIP_TCP_SOCKET_DEFAULT_TX_SIZE			512
-#define TCPIP_TCP_SOCKET_DEFAULT_RX_SIZE			512
+#define TCPIP_TCP_SOCKET_DEFAULT_TX_SIZE			8192
+#define TCPIP_TCP_SOCKET_DEFAULT_RX_SIZE			1024
 #define TCPIP_TCP_DYNAMIC_OPTIONS             		true
 #define TCPIP_TCP_START_TIMEOUT_VAL		        	1000
 #define TCPIP_TCP_DELAYED_ACK_TIMEOUT		    	100
@@ -217,7 +217,7 @@
 
 /*** TCPIP Heap Configuration ***/
 #define TCPIP_STACK_USE_INTERNAL_HEAP
-#define TCPIP_STACK_DRAM_SIZE						39250
+#define TCPIP_STACK_DRAM_SIZE						131072
 #define TCPIP_STACK_DRAM_RUN_LIMIT					2048
 #define TCPIP_STACK_MALLOC_FUNC						malloc
 #define TCPIP_STACK_CALLOC_FUNC						calloc
