@@ -183,7 +183,7 @@ int console_readln(char* buf, int maxlen)
 	pass it a pointer to the byte array and we specify the size of the array.
 */
 void SYS_CONSOLE_Write(int index, const void* buff, size_t size) {
-    console_write(buff,size);
+    console_write(buff, size);
 }
 
 /*
@@ -308,6 +308,10 @@ void console_initialize(void)
 void console_server(void) {
 	enum {max_cmd_len=63};
 	static char cmd_buffer[max_cmd_len];
+	enum {max_str_len=31};
+	static char ip_str[max_str_len];
+	static char gw_str[max_str_len];
+	static char mask_str[max_str_len];
     enum {max_msg_len=1023};    
     static char msg_buffer[max_msg_len];
 	static uint32_t cmd_len = 0;
@@ -331,14 +335,17 @@ void console_server(void) {
 						
 					case 'a':
 						console_message("New IP Address: ");
-						console_readln(msg_buffer,max_msg_len);
-						console_print("%s\r\n",msg_buffer);
-						console_print("This feature not yet implemented.");
+						console_readln(ip_str, sizeof(ip_str));
+						console_message("New IP Mask: ");
+						console_readln(mask_str, sizeof(mask_str));
+						console_message("New Gateway: ");
+						console_readln(gw_str, sizeof(gw_str));
+						server_set_ip(ip_str, gw_str, mask_str);
 						break;
 						
 					case 'n':
-						net_info(msg_buffer,max_msg_len);
-						console_print("%s\r\n",msg_buffer);
+						net_info(msg_buffer, max_msg_len);
+						console_print("%s\r\n", msg_buffer);
 						break;
 					
 					case 'p':

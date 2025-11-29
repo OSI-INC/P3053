@@ -60,6 +60,7 @@ typedef struct {
 	Here are some utility routines for TCP/IP management and reporting.
 */
 void ping_gateway(void);
+int server_set_ip(const char* ip_str, const char* gw_str, const char* mk_str);
 int net_info(char* out, uint32_t max_len);
 
 /*

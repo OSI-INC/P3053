@@ -70,7 +70,7 @@ uint32_t tcp_available(TCP_SOCKET s) {
 	and an unsigned integer length.
 */
 uint32_t tcp_read(TCP_SOCKET s, uint8_t* buffer, uint32_t len) {
-	return TCPIP_TCP_ArrayGet(s,buffer,len);
+	return TCPIP_TCP_ArrayGet(s, buffer, len);
 }
 
 /*
@@ -90,7 +90,7 @@ uint32_t tcp_write_space(TCP_SOCKET s) {
 	flush the socket. It does not block.
 */
 uint32_t tcp_write(TCP_SOCKET s, const uint8_t* data, uint32_t len) {
-	return TCPIP_TCP_ArrayPut(s,data,len);
+	return TCPIP_TCP_ArrayPut(s, data, len);
 }
 
 /*
@@ -114,7 +114,7 @@ int tcp_write_all(TCP_SOCKET s, const uint8_t *buf, uint16_t len) {
     uint32_t total = 0;
     uint32_t written = 0;
     while (total < len) {
-        written = tcp_write(s,buf+total,len-total);
+        written = tcp_write(s, buf+total, len-total);
         total = total + written;
         if (total < len) {
         	if (socket_tick(s) < 0) {return -1;}
@@ -144,7 +144,7 @@ void ping_gateway(void) {
     TCPIP_MAC_ADDR fakeMac = { .v = { 0x02, 0x00, 0x00, 0x00, 0x00, 0x01 } };
 	TCPIP_ARP_EntrySet(netH, &gwAddr, &fakeMac, true);
     console_print("Pinging %d.%d.%d.%d in %s...\r\n",
-        gwAddr.v[0],gwAddr.v[1],gwAddr.v[2],gwAddr.v[3],__func__);
+        gwAddr.v[0], gwAddr.v[1], gwAddr.v[2], gwAddr.v[3], __func__);
     memset(&echoReq, 0, sizeof(echoReq));
     echoReq.netH            = netH;
     echoReq.targetAddr      = gwAddr;
@@ -156,10 +156,61 @@ void ping_gateway(void) {
     echoReq.param           = NULL;
     res = TCPIP_ICMP_EchoRequest(&echoReq, &reqHandle);
     if (res == ICMP_ECHO_OK) {
-    	console_print("Ping succeeded in %s.\r\n",__func__);
+    	console_print("Ping succeeded in %s.\r\n", __func__);
 	} else {
-    	console_print("Ping failed with code %u in %s.\r\n",res,__func__);
+    	console_print("Ping failed with code %u in %s.\r\n", res, __func__);
     }
+}
+
+/*
+	server_set_ip reconfigures the network interface with a new IP address, a new
+	gateway address, and a new network mask. We pass it three strings that specify
+	these three IP addresses, and the routine translates these into IPV4_ADDR types
+	and applies them. It also makes sure that DHCP is turned off.
+*/
+int server_set_ip(const char* ip_str, const char* gw_str, const char* mask_str) {
+    IPV4_ADDR ip_addr;
+    IPV4_ADDR mask_addr;
+    IPV4_ADDR gw_addr;
+    TCPIP_NET_HANDLE net_hdl;
+
+    if (!TCPIP_Helper_StringToIPAddress(ip_str, &ip_addr)) {
+        console_print("Invalid IP address: %s\r\n", ip_str);
+        return -1;
+    }
+
+    if (!TCPIP_Helper_StringToIPAddress(gw_str, &gw_addr)) {
+        console_print("Invalid Gateway address: %s\r\n", gw_str);
+        return -1;
+    }
+
+	if (!TCPIP_Helper_StringToIPAddress(mask_str, &mask_addr)) {
+        console_print("Invalid netmask: %s\r\n", mask_str);
+        return false;
+    }
+    
+    net_hdl = TCPIP_STACK_IndexToNet(0);
+    if (net_hdl == 0) {
+        console_print("Could not get network interface handle.\r\n");
+        return -1;
+    }
+
+	console_print("Disabling DHCP...\r\n");
+	TCPIP_DHCP_Disable(net_hdl);
+	
+	console_print("Setting IP and Mask: %s and %s\r\n", ip_str, mask_str);
+	if (!TCPIP_STACK_NetAddressSet(net_hdl, &ip_addr, &mask_addr, true)) {
+		console_print("NetAddressSet failed.\r\n");
+		return -1;
+	}
+	
+	console_print("Setting Gatweay: %s\r\n", gw_str);
+	if (!TCPIP_STACK_NetAddressGatewaySet(net_hdl, &gw_addr)) {
+        console_print("NetAddressGatewaySet failed.\r\n");
+        return -1;
+    }
+    
+    return 0;
 }
 
 /*
@@ -170,39 +221,41 @@ void ping_gateway(void) {
 	the string with null character.
 */
 int net_info(char* out, uint32_t max_len) {
-    TCPIP_NET_HANDLE netH;
+    TCPIP_NET_HANDLE net_hdl;
     TCPIP_NET_IF* pNetIf;
     IPV4_ADDR ip, mask, gw;
     uint8_t* mac;
     uint32_t i = 0;
     uint32_t n = 0;
+    const char* name;
 
-    netH = TCPIP_STACK_IndexToNet(0);
-    pNetIf = _TCPIPStackHandleToNet(netH);
+    net_hdl = TCPIP_STACK_IndexToNet(0);
+    pNetIf = _TCPIPStackHandleToNet(net_hdl);
 
     ip.Val  = pNetIf->netIPAddr.Val;
     mask.Val = pNetIf->netMask.Val;
     gw.Val   = pNetIf->netGateway.Val;
     mac = pNetIf->netMACAddr.v;
+    name = TCPIP_STACK_NetNameGet(net_hdl);
 	
-	n = snprintf(&out[i],max_len,"\r\nNetwork Info:\r\n");
+	n = snprintf(&out[i], max_len, "\r\nNetwork Info:\r\n");
 	i = i + n;
-	n = snprintf(&out[i],max_len-i,"IP      : %u.%u.%u.%u\r\n",
-        ip.v[0],ip.v[1],ip.v[2],ip.v[3]);
+	n = snprintf(&out[i], max_len-i, "Interface : %s\r\n", name);
 	i = i + n;
-	n = snprintf(&out[i],max_len-i,"Mask    : %u.%u.%u.%u\r\n",
-        mask.v[0],mask.v[1],mask.v[2],mask.v[3]);
+	n = snprintf(&out[i], max_len-i, "IP        : %u.%u.%u.%u\r\n",
+        ip.v[0], ip.v[1], ip.v[2], ip.v[3]);
 	i = i + n;
-    n = snprintf(&out[i],max_len-i,"Gateway : %u.%u.%u.%u\r\n",
-        gw.v[0],gw.v[1],gw.v[2],gw.v[3]);
+	n = snprintf(&out[i], max_len-i, "Mask      : %u.%u.%u.%u\r\n",
+        mask.v[0], mask.v[1], mask.v[2], mask.v[3]);
 	i = i + n;
-    n = snprintf(&out[i],max_len-i,"MAC     : %02X:%02X:%02X:%02X:%02X:%02X\r\n",
-        mac[0],mac[1],mac[2],mac[3],mac[4],mac[5]);
+    n = snprintf(&out[i], max_len-i, "Gateway   : %u.%u.%u.%u\r\n",
+        gw.v[0], gw.v[1], gw.v[2], gw.v[3]);
 	i = i + n;
-    n = snprintf(&out[i],max_len-i,"Link    : %s\r\n",
-        (TCPIP_STACK_NetIsLinked(netH) ? "UP" : "DOWN"));
+    n = snprintf(&out[i], max_len-i, "MAC       : %02X:%02X:%02X:%02X:%02X:%02X\r\n",
+        mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
 	i = i + n;
-    n = snprintf(&out[i],max_len-i,"\r\n");
+    n = snprintf(&out[i], max_len-i, "Link      : %s\r\n",
+        (TCPIP_STACK_NetIsLinked(net_hdl) ? "UP" : "DOWN"));
 	i = i + n;
 	
 	return i;
@@ -329,7 +382,7 @@ void tcpip_server(tcpip_server_type* s, tcpip_tasks_type tasks) {
 					console_print(
 						"Interface %s assigned IP address %d.%d.%d.%d in %s.\r\n", 
 						interface_name,
-						ip_addr.v[0],ip_addr.v[1],ip_addr.v[2],ip_addr.v[3],
+						ip_addr.v[0], ip_addr.v[1], ip_addr.v[2], ip_addr.v[3],
 						__func__);
 					ping_gateway();
 				}
@@ -340,16 +393,16 @@ void tcpip_server(tcpip_server_type* s, tcpip_tasks_type tasks) {
 		break;
 
 		case S_OPEN_SERVER: {
-			(*s).socket = TCPIP_TCP_ServerOpen(IP_ADDRESS_TYPE_IPV4,(*s).port,0);
+			(*s).socket = TCPIP_TCP_ServerOpen(IP_ADDRESS_TYPE_IPV4, (*s).port, 0);
 			if ((*s).socket == INVALID_SOCKET) {
 				if (debug) console_print(
 					"Failed to open %s server on port %d in %s.\r\n",
-					(*s).protocol,(*s).port,__func__);
+					(*s).protocol, (*s).port, __func__);
 				(*s).state = S_ERROR;
 			} else {
 				if (debug) console_print(
 					"Listening for %s connection on port %d in %s.\r\n",
-					(*s).protocol,(*s).port,__func__);
+					(*s).protocol, (*s).port, __func__);
 				(*s).state = S_LISTENING;
 			}
 		}
@@ -357,15 +410,15 @@ void tcpip_server(tcpip_server_type* s, tcpip_tasks_type tasks) {
 
 		case S_LISTENING: {
 			if (TCPIP_TCP_IsConnected((*s).socket)) {
-				if (TCPIP_TCP_SocketInfoGet((*s).socket,&sock_info)) {
+				if (TCPIP_TCP_SocketInfoGet((*s).socket, &sock_info)) {
 					IPV4_ADDR ip = sock_info.remoteIPaddress.v4Add;
 					if (debug) console_print(
 						"%s connection from %u.%u.%u.%u in %s.\r\n",
-						(*s).protocol,ip.v[0],ip.v[1],ip.v[2],ip.v[3],__func__);
+						(*s).protocol, ip.v[0], ip.v[1], ip.v[2], ip.v[3], __func__);
 				} else {
 					if (debug) console_print(
 						"%s connection from unknown peer in %s.\r\n",
-						(*s).protocol,__func__);
+						(*s).protocol, __func__);
 				}
 				status = tasks(s);
 				if (status >= 0) {
@@ -373,7 +426,7 @@ void tcpip_server(tcpip_server_type* s, tcpip_tasks_type tasks) {
 				} else {
 					if (debug) console_print(
 						"%s socket closed pre-emptively by server in %s.\r\n",
-						(*s).protocol,__func__);			
+						(*s).protocol, __func__);			
 					(*s).state = S_CLOSE;
 				}
 			}
@@ -384,13 +437,13 @@ void tcpip_server(tcpip_server_type* s, tcpip_tasks_type tasks) {
 			if (!TCPIP_TCP_IsConnected((*s).socket) ||
 					TCPIP_TCP_WasDisconnected((*s).socket)) {
 				if (debug) console_print("%s socket closed by client in %s.\r\n",
-					(*s).protocol,__func__);
+					(*s).protocol, __func__);
 				(*s).state = S_CLOSE;
 			} else {
 				status = tasks(s);
 				if (status < 0) {
 					if (debug) console_print("%s socket closed by server in %s.\r\n",
-						(*s).protocol,__func__);			
+						(*s).protocol, __func__);			
 					(*s).state = S_CLOSE;
 				}
 			}
@@ -411,7 +464,7 @@ void tcpip_server(tcpip_server_type* s, tcpip_tasks_type tasks) {
 		default: {
 			if (rand() % HEARTBEAT_PERIOD == 0) {
 				if (debug) console_print("Unknown state %u for % server in %s.\r\n",
-					(*s).protocol,(*s).state,__func__);
+					(*s).protocol, (*s).state, __func__);
 			}		
 		}
 		break;

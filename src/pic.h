@@ -12,12 +12,12 @@
 	static inline so they can be fast, which we like when we use these outputs
 	as test points.
 */
-static inline void pic_d2_on(void) {GPIO_PortSet(GPIO_PORT_C,0x00008000);}
-static inline void pic_d2_off(void) {GPIO_PortClear(GPIO_PORT_C,0x00008000);}
-static inline void pic_d2_toggle(void) {GPIO_PortToggle(GPIO_PORT_C,0x00008000);}
-static inline void pic_d5_on(void) {GPIO_PortSet(GPIO_PORT_A,0x00000004);}
-static inline void pic_d5_off(void) {GPIO_PortClear(GPIO_PORT_A,0x00000004);}
-static inline void pic_d5_toggle(void) {GPIO_PortToggle(GPIO_PORT_A,0x00000004);}
+static inline void pic_d2_on(void) {GPIO_PortSet(GPIO_PORT_C, 0x00008000);}
+static inline void pic_d2_off(void) {GPIO_PortClear(GPIO_PORT_C, 0x00008000);}
+static inline void pic_d2_toggle(void) {GPIO_PortToggle(GPIO_PORT_C, 0x00008000);}
+static inline void pic_d5_on(void) {GPIO_PortSet(GPIO_PORT_A, 0x00000004);}
+static inline void pic_d5_off(void) {GPIO_PortClear(GPIO_PORT_A, 0x00000004);}
+static inline void pic_d5_toggle(void) {GPIO_PortToggle(GPIO_PORT_A, 0x00000004);}
 
 /*
 	We define masks for the LWDAQ Controller interface address lines, data

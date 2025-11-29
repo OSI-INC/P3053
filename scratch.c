@@ -1,19 +1,6 @@
-uint16_t TCP_WriteAll(TCP_SOCKET s, const uint8_t *buf, uint16_t len)
-{
-    uint16_t total = 0;
-    while (total < len)
-    {
-        uint16_t written = TCPIP_TCP_ArrayPut(s, buf + total, len - total);
-        if (written == 0)
-        {
-            // No space right now — must wait
-            TCPIP_TCP_Flush(s);
-            break;
-        }
-        total += written;
-    }
-    return total;
-}
+	n = snprintf(&out[i],max_len-i,"Interface : %s\r\n",
+		name);
+	i = i + n;
 
 /*
 	Routines to set up our parallel bus.
