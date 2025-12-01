@@ -36,7 +36,6 @@ $(info MODE=$(MODE))
 # that are provided by our Microchip Device Package repository.
 #
 CPU=32MZ2048EFH100
-CPU_FAMILY=pic32mz_ef_sk
 DFP_DIR=/Users/kevan/Code/Microchip/PIC32MZ-EF_DFP/1.3.58
 CPULD=$(DFP_DIR)/xc32/$(CPU)/p$(CPU).ld
 HEAPSIZE=200000

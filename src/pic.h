@@ -226,7 +226,7 @@ static inline uint8_t lwdaq_byte_read_repeat(void) {
 */
 void pic_reset(void);
 void pic_initialize(void);
-
-
+int config_save_string(const char* config);
+int config_load_string(char* out, uint32_t out_size);
 
 #endif

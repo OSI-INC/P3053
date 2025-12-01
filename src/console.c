@@ -316,6 +316,7 @@ void console_server(void) {
     static char msg_buffer[max_msg_len];
 	static uint32_t cmd_len = 0;
     char c;
+    int status;
 
 	while (console_readcount() > 0) {
 		c = console_getchar();
@@ -326,14 +327,38 @@ void console_server(void) {
 				switch (cmd) {
 					case 'h':
 						console_message("Commands:\r\n");
-						console_message("  a - new ip addr\r\n");
-						console_message("  h - print help\r\n");
+						console_message("  c - save string to flash\r\n");
+						console_message("  d - read string from flash\r\n");
+						console_message("  i - new ip addr\r\n");
 						console_message("  n - net info\r\n");
 						console_message("  p - ping gateway\r\n");
 						console_message("  r - software reset\r\n");
+						console_message("  h - print help\r\n");
 						break;
 						
-					case 'a':
+					case 'c':
+						console_message("String: ");
+						console_readln(msg_buffer, sizeof(msg_buffer));
+						status = config_save_string(msg_buffer);
+						if (status >= 0) {
+							console_print("Wrote: %s\r\n", msg_buffer);
+						
+						} else {
+							console_message("String write failed.\r\n");
+						}	
+						break;
+						
+					case 'd':
+						console_message("Reading string...\r\n");
+						status = config_load_string(msg_buffer, sizeof(msg_buffer));
+						if (status >= 0) {
+							console_print("String: %s\r\n", msg_buffer);
+						} else {
+							console_message("String read failed.\r\n");
+						}
+						break;
+						
+					case 'i':
 						console_message("New IP Address: ");
 						console_readln(ip_str, sizeof(ip_str));
 						console_message("New IP Mask: ");
@@ -344,7 +369,7 @@ void console_server(void) {
 						break;
 						
 					case 'n':
-						net_info(msg_buffer, max_msg_len);
+						net_info(msg_buffer, sizeof(msg_buffer));
 						console_print("%s\r\n", msg_buffer);
 						break;
 					
@@ -359,7 +384,9 @@ void console_server(void) {
 						break;
 					
 					default:
-						console_print("ERROR: Unknown command '%c'.\r\n", cmd);
+						console_print(
+							"ERROR: Unknown command '%c', type 'h' for help.\r\n",
+							cmd);
 						break;
 				}
 			} else if (cmd_len > 1) {

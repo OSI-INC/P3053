@@ -18,6 +18,13 @@
 #include "pic.h"
 
 /*
+	Define some macros for the configuration routines.
+*/
+#define CONFIG_MAX_LEN			512
+#define CONFIG_FLASH_PAGE_ADDR  0x9D100000u
+#define CONFIG_FLASH_ROW_ADDR   0x9D100000u
+
+/*
 	pic_reset resets the Embedded Etherent Module. It does so by unlocking the
 	PIC32MZ configuration registers and writing to the reset configuration bit.
 	We make three writes to the thirty-two bit SYSKEY register with the correct
@@ -152,4 +159,49 @@ void pic_initialize(void) {
 	// Re-enable interrupts and report initialization complete.
 	(void)__builtin_enable_interrupts();
 }
+
+int config_save_string(const char* config) {
+    uint8_t row[CONFIG_MAX_LEN];
+    size_t len = strlen(config);
+
+console_print("Before erase, first byte = %02X\r\n", 
+              *(uint8_t*)CONFIG_FLASH_ROW_ADDR );
+
+    if (len >= CONFIG_MAX_LEN) {len = CONFIG_MAX_LEN - 1;}
+    memcpy(row, config, len);
+    row[len] = '\0';
+    for (size_t i = len + 1; i < CONFIG_MAX_LEN; i++) {
+        row[i] = 0xFF;
+    }
+    if (!NVM_PageErase(CONFIG_FLASH_PAGE_ADDR)) {
+        return -1;
+    }
+    while (NVM_IsBusy()) { ; }
+    if (!NVM_RowWrite((uint32_t*)row, CONFIG_FLASH_ROW_ADDR)) {
+        return -1;
+    }
+    while (NVM_IsBusy()) { ; }
+console_print("After write, first byte = %02X\r\n", 
+              *(uint8_t*)CONFIG_FLASH_ROW_ADDR );
+	return 0;
+}
+
+int config_load_string(char* out, uint32_t out_size) {
+    const uint8_t* row = (const uint8_t*)CONFIG_FLASH_ROW_ADDR;
+    uint32_t i = 0;
+    while ((i < CONFIG_MAX_LEN) && (row[i] != '\0')) {
+    	i++;
+    }
+   	if (i == CONFIG_MAX_LEN) {
+        return -1;
+    }
+    if (i + 1 > out_size) {
+        return -1;
+    }
+    memcpy(out, row, i + 1);
+	return 0;
+}
+
+
+
 
