@@ -12,6 +12,7 @@
 #include <stdarg.h>
 #include <ctype.h>
 #include <string.h>
+#include "sys/kmem.h"
 #include "configuration.h"
 #include "definitions.h"
 #include "console.h"
@@ -20,10 +21,14 @@
 /*
 	Define some macros for the configuration routines.
 */
-#define CONFIG_MAX_LEN			512
-#define CONFIG_FLASH_PAGE_ADDR  0x9D100000u
-#define CONFIG_FLASH_ROW_ADDR   0x9D100000u
-
+#define CONFIG_ROW_SIZE   2048u
+#define CONFIG_MAX_LEN    (CONFIG_ROW_SIZE - 1u)
+#define CONFIG_FLASH_PHYS   0x1D100000
+#define CONFIG_FLASH_K0     0x9D100000
+#define CONFIG_FLASH_K1     0xBD100000
+static uint8_t config_row_buf[CONFIG_ROW_SIZE]
+    __attribute__((coherent, aligned(16)));
+    
 /*
 	pic_reset resets the Embedded Etherent Module. It does so by unlocking the
 	PIC32MZ configuration registers and writing to the reset configuration bit.
@@ -161,45 +166,66 @@ void pic_initialize(void) {
 }
 
 int config_save_string(const char* config) {
-    uint8_t row[CONFIG_MAX_LEN];
+//    uint8_t row[CONFIG_ROW_SIZE];
     size_t len = strlen(config);
+    uint32_t i = 0;
 
-console_print("Before erase, first byte = %02X\r\n", 
-              *(uint8_t*)CONFIG_FLASH_ROW_ADDR );
-
-    if (len >= CONFIG_MAX_LEN) {len = CONFIG_MAX_LEN - 1;}
-    memcpy(row, config, len);
-    row[len] = '\0';
-    for (size_t i = len + 1; i < CONFIG_MAX_LEN; i++) {
-        row[i] = 0xFF;
+    if (len >= CONFIG_MAX_LEN) {len = CONFIG_MAX_LEN;}
+    memcpy(config_row_buf, config, len);
+    config_row_buf[len] = '\0';
+    for (i = len + 1; i < CONFIG_ROW_SIZE; i++) {
+        config_row_buf[i] = 0xFF;
     }
-    if (!NVM_PageErase(CONFIG_FLASH_PAGE_ADDR)) {
+
+	console_print("row string: %s\r\n",config_row_buf);
+	console_print("len=%u, i=%u\r\n",len,i);
+  	console_print("CONFIG_FLASH_PAGE_ADDR= 0x%08X\r\n", CONFIG_FLASH_K0);
+    console_print("KVA_TO_PA= 0x%08X\r\n", KVA_TO_PA(CONFIG_FLASH_K0));
+    console_print("NVMCON before erase = 0x%08X\r\n", NVMCON);
+    console_print("Before erase, first byte = %02X\r\n",
+                  *(volatile const uint8_t*)CONFIG_FLASH_K1);
+
+
+  if (!NVM_PageErase(CONFIG_FLASH_K0)) {   // K0 is fine; PLIB does KVA_TO_PA
         return -1;
     }
-    while (NVM_IsBusy()) { ; }
-    if (!NVM_RowWrite((uint32_t*)row, CONFIG_FLASH_ROW_ADDR)) {
+    while (NVM_IsBusy()) {;}
+
+    console_print("NVMCON after erase = 0x%08X\r\n", NVMCON);
+    console_print("After erase, first byte = %02X\r\n",
+                  *(volatile const uint8_t*)CONFIG_FLASH_K1);
+
+    if (!NVM_RowWrite((uint32_t*)config_row_buf, CONFIG_FLASH_K0)) {
         return -1;
     }
-    while (NVM_IsBusy()) { ; }
-console_print("After write, first byte = %02X\r\n", 
-              *(uint8_t*)CONFIG_FLASH_ROW_ADDR );
+    while (NVM_IsBusy()) {;}
+
+    console_print("NVMCON after write = 0x%08X\r\n", NVMCON);
+	console_print("NVMADDR after write = 0x%08X\r\n", NVMADDR);
+    console_print("After write, first byte = %02X\r\n",
+                  *(volatile const uint8_t*)CONFIG_FLASH_K1);
 	return 0;
 }
 
 int config_load_string(char* out, uint32_t out_size) {
-    const uint8_t* row = (const uint8_t*)CONFIG_FLASH_ROW_ADDR;
+   const uint8_t* row = (const uint8_t*)CONFIG_FLASH_K1;   // uncached alias
     uint32_t i = 0;
-    while ((i < CONFIG_MAX_LEN) && (row[i] != '\0')) {
-    	i++;
+
+   while ((i < CONFIG_ROW_SIZE) && (row[i] != '\0')) {
+        i++;
     }
-   	if (i == CONFIG_MAX_LEN) {
+
+    if (i == CONFIG_ROW_SIZE) {
+        // no terminator → treat as invalid
         return -1;
     }
+
     if (i + 1 > out_size) {
         return -1;
     }
+
     memcpy(out, row, i + 1);
-	return 0;
+    return 0;
 }
 
 

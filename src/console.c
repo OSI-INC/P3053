@@ -115,7 +115,7 @@ void console_message(const char *s) {
 	vsnprintf, and va_end.
 */
 void console_print(const char* fmt, ...) {
-    char buf[256];
+    char buf[2048];
     va_list args;
     va_start(args, fmt);
     vsnprintf(buf, sizeof(buf), fmt, args);
@@ -211,7 +211,7 @@ void SYS_CONSOLE_Message(int index, const char* msg) {
 */
 void SYS_CONSOLE_Print(int index, const char* fmt, ...) {
 	(void) index;
-	char buffer[256];
+	char buffer[2048];
 	va_list ap;
 	va_start(ap, fmt);
 	vsnprintf(buffer, sizeof(buffer), fmt, ap);
@@ -312,7 +312,7 @@ void console_server(void) {
 	static char ip_str[max_str_len];
 	static char gw_str[max_str_len];
 	static char mask_str[max_str_len];
-    enum {max_msg_len=1023};    
+    enum {max_msg_len=2048};    
     static char msg_buffer[max_msg_len];
 	static uint32_t cmd_len = 0;
     char c;
