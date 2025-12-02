@@ -1,7 +1,7 @@
 /*
-	utils.c is a library of utility routines that communicate with the PIC32MZ
-	registers, read and write throught he MPCIE parallel port, and perform
-	various mundane tasks with strings and buffers.
+	pic.c is a library of utility routines that communicate with the PIC32MZ
+	registers, read and write throught he MPCIE parallel port, and read and
+	write to the non-volatile memory (NVM).
 */
 
 #include <stdio.h>
@@ -25,35 +25,42 @@
 	the NVM, these being NVM_PageErase, NVM_IsBusy, and NVM_RowWrite. In order
 	to write to NVM, we need a row-sized buffer in RAM that we can fill with the
 	content we wish to write, and then we will pass a pointer to this buffer
-	into the RowWrite routine. Most of the dynamic random-access memory (DRAM)
-	available to the CPU is accessed by the CPU indirectly through a faster
-	cache memory. Pages of DRAM are read into the cache and the CPU operates
-	upon the cached copies. Every now and then, the microcontroller's memory
-	management system writes the cached page to DRAM so that it can read a new
-	page from DRAM into the cache for the CPU to use. When RowWrite copies from
-	our RAM buffer to NVM, it uses the direct memory access (DMA) hardware in
-	the microcontroller. The DMA hardware operates upon the DRAM, not upon the
-	cache. If our buffer resides in the DRAM cache, we will write our row to the
-	cache, and the DMA will operate upon the DRAM. Instead of seeing the row we
-	just copied to our buffer appearing in NVM, we will see some row we copied
-	previously appear in our NVM. In the PIC32MZ2048EFH, we have both cached and
-	non-chached copies of the same 512 KByte of DRAM. The cached copy is at
-	0x80000000 to 0x8007FFFFF and the non-cached is at 0x80000000 to
-	0x8007FFFFF. The "coherent" declaration attribute tells the compiler to
-	place a variable in the non-chached copy. Accesses to the non-cached copy
-	will be direct, so we will write directly into the DRAM and the DMA will
-	copy directly from DRAM into NVM. We also specify the "aligned" attribute
-	with the value "32", which puts the buffer's first byte on a 32-byte
-	boundary. We have done this not because we have observed ill-effects from
-	failing to specify a 32-byte boundary, but because we want to avoid some
-	pernicious bug in the future that arises from our buffer being mis-aligned
-	with the boundaries expected by an NVM write routine. We have no evidence
-	that failing to place the buffer on a 32-byte boundary will cause any
-	problems, but we read passages in the code comments stating that there will
-	be a problem if the buffer is not on a 4-byte boundary. So we're not taking
-	any chances.
+	into the RowWrite routine.
+
+	Most of the dynamic random-access memory (DRAM) available to the CPU is
+	accessed by the CPU indirectly through a faster cache memory. Pages of DRAM
+	are read into the cache and the CPU operates upon the cached copies. Every
+	now and then, the microcontroller's memory management system writes the
+	cached page to DRAM so that it can read a new page from DRAM into the cache
+	for the CPU to use. When RowWrite copies from our RAM buffer to NVM, it uses
+	the direct memory access (DMA) hardware in the microcontroller. The DMA
+	hardware operates upon the DRAM, not upon the cache. If our buffer resides
+	in the DRAM cache, we will write our row to the cache, and the DMA will
+	operate upon the DRAM. Instead of seeing the row we just copied to our
+	buffer appearing in NVM, we will see some row we copied previously appear in
+	our NVM.
+
+	In the PIC32MZ2048EFH, we have both cached and non-chached copies of the
+	same 512 KByte of DRAM. The cached copy is at 0x80000000 to 0x8007FFFFF and
+	the non-cached is at 0x80000000 to 0x8007FFFFF. The "coherent" declaration
+	attribute tells the compiler to place a variable in the non-chached copy.
+	Accesses to the non-cached copy will be direct, so we will write directly
+	into the DRAM and the DMA will copy directly from DRAM into NVM.
+
+	We also specify the "aligned" attribute with the value "32", which puts the
+	buffer's first byte on a 32-byte boundary. We have done this not because we
+	have observed ill-effects from failing to specify a 32-byte boundary, but
+	because we want to avoid some pernicious bug in the future that arises from
+	our buffer being mis-aligned with the boundaries expected by an NVM write
+	routine. We have no evidence that failing to place the buffer on a 32-byte
+	boundary will cause any problems, but we read passages in the code comments
+	stating that there will be a problem if the buffer is not on a 4-byte
+	boundary. So we're not taking any chances.
+
+	We use our non-cached and aligned buffer in our pic_flash_write and
+	pic_flash_read routines.
 */
-static uint8_t flash_write_buff[NVM_FLASH_ROWSIZE]
+static uint8_t pic_nvm_write_buff[NVM_FLASH_ROWSIZE]
     __attribute__((coherent, aligned(32)));
 
 /*
@@ -75,6 +82,51 @@ static uint8_t flash_write_buff[NVM_FLASH_ROWSIZE]
 	will suffer no loss of performance from reading direction from NVM.
 */
 #define FLASH_CONFIG_ADDR	0xBD100000
+
+/*
+	pic_nvm_writestr takes a pointer to a null-terminated string buffer and an
+	address in non-volatile memory (NVM, or "flash memory") and copies the
+	string from the buffer to flash memory. The buffer must reside in
+	non-chached RAM. The NVM memory location can be either in the cashed or
+	non-cached program flash address ranges. If we want to read the string back
+	immediately and see what we just wrote, we should choose the non-cached
+	address range. If we want to read repeatedly from the flash memory, we
+	should choose the cached address range and somehow force a refresh of the
+	page from flash after writing, although we have not yet figured out how to
+	force such a refresh, other than to reset the microcontroller.
+*/
+int pic_nvm_writestr(const char* str, uint32_t flash_addr) {
+    size_t len = strlen(str);
+    uint32_t i = 0;
+    if (len >= (NVM_FLASH_ROWSIZE - 1u)) {len = (NVM_FLASH_ROWSIZE - 1u);}
+    memcpy(pic_nvm_write_buff, str, len);
+    pic_nvm_write_buff[len] = '\0';
+    for (i = len + 1; i < NVM_FLASH_ROWSIZE; i++) {pic_nvm_write_buff[i] = 0xFF;}
+	if (!NVM_PageErase(flash_addr)) {return -1;}
+	while (NVM_IsBusy()) {;}
+    if (!NVM_RowWrite((uint32_t*)pic_nvm_write_buff, flash_addr)) {return -1;}
+    while (NVM_IsBusy()) {;}
+	return 0;
+}
+
+/*
+	pic_nvm_readstr reads a null-terminated string from non-volatile memory
+	(NVM) and copies the string into a buffer we provide. We pass as arguments
+	the NVM address (flash memory address) we wish to read from, a pointer to
+	the buffer we want to copy into, and the maximum size of the output buffer.
+	If the flash address we specify is in the cached range of program flash, we
+	will read from the cached copy of the NVM. If the address is in the
+	non-cached range, we will read directly from NVM.
+*/
+int pic_nvm_readstr(uint32_t flash_addr, char* out, uint32_t out_size) {
+	const uint8_t* row = (const uint8_t*)flash_addr;
+	uint32_t i = 0;
+	while ((i < NVM_FLASH_ROWSIZE) && (row[i] != '\0')) {i++;}
+	if (i == NVM_FLASH_ROWSIZE) {return -1;}
+	if (i + 1 > out_size) {return -1;}
+	memcpy(out, row, i + 1);
+	return 0;
+}
 
 /*
 	pic_reset resets the Embedded Etherent Module. It does so by unlocking the
@@ -99,7 +151,7 @@ void pic_reset(void) {
 	pic_configure sets the PIC32MZ general-purpose input-output pins for our
 	application.
 */
-void pic_io_initialize(void) {
+void pic_gpio_initialize(void) {
 	// The A3053A is all-digital. so we configure all pins as digital pins. We
 	// don't even bother to check the data sheet to see which pins can be
 	// non-digital, we just set them all to digital even if they are always
@@ -200,7 +252,7 @@ void pic_initialize(void) {
 	SYSTIME_Initialize();
 	
 	// Configure the functions of the gerneral-purpose input and output pins.
-	pic_io_initialize();
+	pic_gpio_initialize();
 	
 	// Initialize the console, which communicates through a three-wire UART.
 	console_initialize();
@@ -212,30 +264,19 @@ void pic_initialize(void) {
 	(void)__builtin_enable_interrupts();
 }
 
-int config_save_string(const char* config) {
-    size_t len = strlen(config);
-    uint32_t i = 0;
-    if (len >= (NVM_FLASH_ROWSIZE - 1u)) {len = (NVM_FLASH_ROWSIZE - 1u);}
-    memcpy(flash_write_buff, config, len);
-    flash_write_buff[len] = '\0';
-    for (i = len + 1; i < NVM_FLASH_ROWSIZE; i++) {flash_write_buff[i] = 0xFF;}
-	if (!NVM_PageErase(FLASH_CONFIG_ADDR)) {return -1;}
-	while (NVM_IsBusy()) {;}
-    if (!NVM_RowWrite((uint32_t*)flash_write_buff, FLASH_CONFIG_ADDR)) { return -1; }
-    while (NVM_IsBusy()) {;}
-	return 0;
+
+/*
+	pic_config_write writes a null-terminated string to the configuration
+	location in non-volatile memory.
+*/
+int pic_config_write(const char* config) {
+	return pic_nvm_writestr(config, FLASH_CONFIG_ADDR);
 }
 
-int config_load_string(char* out, uint32_t out_size) {
-	const uint8_t* row = (const uint8_t*)FLASH_CONFIG_ADDR;
-	uint32_t i = 0;
-	while ((i < NVM_FLASH_ROWSIZE) && (row[i] != '\0')) { i++; }
-	if (i == NVM_FLASH_ROWSIZE) { return -1; }
-	if (i + 1 > out_size) { return -1; }
-	memcpy(out, row, i + 1);
-	return 0;
+/*
+	pic_config_read reads a null-terminated string from the configuration
+	location in non-volatile memory.
+*/
+int pic_config_read(char* out, uint32_t out_size) {
+	return pic_nvm_readstr(FLASH_CONFIG_ADDR, out, out_size);
 }
-
-
-
-

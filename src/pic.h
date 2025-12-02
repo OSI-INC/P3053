@@ -222,11 +222,17 @@ static inline uint8_t lwdaq_byte_read_repeat(void) {
 }
 
 /*
-	The following routines reset and configure.
+	Reading and writing from non-volatile memory.
+*/
+int pic_nvm_writestr(const char* config, uint32_t flash_addr);
+int pic_nvm_readstr(uint32_t flash_addr, char* out, uint32_t out_size);
+
+/*
+	Reset and initialization routines.
 */
 void pic_reset(void);
 void pic_initialize(void);
-int config_save_string(const char* config);
-int config_load_string(char* out, uint32_t out_size);
+int pic_config_write(const char* config);
+int pic_config_read(char* out, uint32_t out_size);
 
 #endif
