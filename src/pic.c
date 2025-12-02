@@ -12,23 +12,70 @@
 #include <stdarg.h>
 #include <ctype.h>
 #include <string.h>
-#include "sys/kmem.h"
 #include "configuration.h"
 #include "definitions.h"
 #include "console.h"
 #include "pic.h"
 
 /*
-	Define some macros for the configuration routines.
+	The buffer we use when writing to non-volatile memory (NVM). We are reading
+	plib_nvm.h through definitions.h. The NVM header file declares the constants
+	that define the address range, erase page size and write row size of the
+	program flash memory, as well as the routines we use to erase and write to
+	the NVM, these being NVM_PageErase, NVM_IsBusy, and NVM_RowWrite. In order
+	to write to NVM, we need a row-sized buffer in RAM that we can fill with the
+	content we wish to write, and then we will pass a pointer to this buffer
+	into the RowWrite routine. Most of the dynamic random-access memory (DRAM)
+	available to the CPU is accessed by the CPU indirectly through a faster
+	cache memory. Pages of DRAM are read into the cache and the CPU operates
+	upon the cached copies. Every now and then, the microcontroller's memory
+	management system writes the cached page to DRAM so that it can read a new
+	page from DRAM into the cache for the CPU to use. When RowWrite copies from
+	our RAM buffer to NVM, it uses the direct memory access (DMA) hardware in
+	the microcontroller. The DMA hardware operates upon the DRAM, not upon the
+	cache. If our buffer resides in the DRAM cache, we will write our row to the
+	cache, and the DMA will operate upon the DRAM. Instead of seeing the row we
+	just copied to our buffer appearing in NVM, we will see some row we copied
+	previously appear in our NVM. In the PIC32MZ2048EFH, we have both cached and
+	non-chached copies of the same 512 KByte of DRAM. The cached copy is at
+	0x80000000 to 0x8007FFFFF and the non-cached is at 0x80000000 to
+	0x8007FFFFF. The "coherent" declaration attribute tells the compiler to
+	place a variable in the non-chached copy. Accesses to the non-cached copy
+	will be direct, so we will write directly into the DRAM and the DMA will
+	copy directly from DRAM into NVM. We also specify the "aligned" attribute
+	with the value "32", which puts the buffer's first byte on a 32-byte
+	boundary. We have done this not because we have observed ill-effects from
+	failing to specify a 32-byte boundary, but because we want to avoid some
+	pernicious bug in the future that arises from our buffer being mis-aligned
+	with the boundaries expected by an NVM write routine. We have no evidence
+	that failing to place the buffer on a 32-byte boundary will cause any
+	problems, but we read passages in the code comments stating that there will
+	be a problem if the buffer is not on a 4-byte boundary. So we're not taking
+	any chances.
 */
-#define CONFIG_ROW_SIZE   2048u
-#define CONFIG_MAX_LEN    (CONFIG_ROW_SIZE - 1u)
-#define CONFIG_FLASH_PHYS   0x1D100000
-#define CONFIG_FLASH_K0     0x9D100000
-#define CONFIG_FLASH_K1     0xBD100000
-static uint8_t config_row_buf[CONFIG_ROW_SIZE]
-    __attribute__((coherent, aligned(16)));
-    
+static uint8_t flash_write_buff[NVM_FLASH_ROWSIZE]
+    __attribute__((coherent, aligned(32)));
+
+/*
+	The location of our configuration string in non-volatile memory (NVM). The
+	PIC32MZ2048EFH's 2 MByte of NVM appears twice in the CPU's virtual address
+	space. Once in the range 0x9D000000 to 0x9D0FFFFF, in which range the NVM is
+	accessed by the CPU indirectly through a cache memory, and again in the
+	range 0xBD000000 to 0xBD0FFFFF, in which range the CPU accesses the NVM
+	directly, without a cache. We want to put our string in the un-cached copy
+	so that we can write with the direct memory access (DMA) hardware and read
+	back immediately from the physical NVM rather than getting a stale copy of
+	the NVM from cache. So we place our string in the 0xBD range. In that range,
+	we must make sure we are above the program itself. In our case, our program
+	is less than 256 KByte, so anywhere above 0xBD040000 will be fine. The NVM
+	pages are 16 Kbyte in the PIC32MZ, and NVM rows are 2 KByte. So we must pick
+	a location that is on a 16-KByte boundary. Reading repeatedly from un-cached
+	NVM is far slower than reading repeatedly from a cached copy of an NVM page,
+	but we do not plan to read repeatedly from our configuration string, so we
+	will suffer no loss of performance from reading direction from NVM.
+*/
+#define FLASH_CONFIG_ADDR	0xBD100000
+
 /*
 	pic_reset resets the Embedded Etherent Module. It does so by unlocking the
 	PIC32MZ configuration registers and writing to the reset configuration bit.
@@ -166,66 +213,27 @@ void pic_initialize(void) {
 }
 
 int config_save_string(const char* config) {
-//    uint8_t row[CONFIG_ROW_SIZE];
     size_t len = strlen(config);
     uint32_t i = 0;
-
-    if (len >= CONFIG_MAX_LEN) {len = CONFIG_MAX_LEN;}
-    memcpy(config_row_buf, config, len);
-    config_row_buf[len] = '\0';
-    for (i = len + 1; i < CONFIG_ROW_SIZE; i++) {
-        config_row_buf[i] = 0xFF;
-    }
-
-	console_print("row string: %s\r\n",config_row_buf);
-	console_print("len=%u, i=%u\r\n",len,i);
-  	console_print("CONFIG_FLASH_PAGE_ADDR= 0x%08X\r\n", CONFIG_FLASH_K0);
-    console_print("KVA_TO_PA= 0x%08X\r\n", KVA_TO_PA(CONFIG_FLASH_K0));
-    console_print("NVMCON before erase = 0x%08X\r\n", NVMCON);
-    console_print("Before erase, first byte = %02X\r\n",
-                  *(volatile const uint8_t*)CONFIG_FLASH_K1);
-
-
-  if (!NVM_PageErase(CONFIG_FLASH_K0)) {   // K0 is fine; PLIB does KVA_TO_PA
-        return -1;
-    }
+    if (len >= (NVM_FLASH_ROWSIZE - 1u)) {len = (NVM_FLASH_ROWSIZE - 1u);}
+    memcpy(flash_write_buff, config, len);
+    flash_write_buff[len] = '\0';
+    for (i = len + 1; i < NVM_FLASH_ROWSIZE; i++) {flash_write_buff[i] = 0xFF;}
+	if (!NVM_PageErase(FLASH_CONFIG_ADDR)) {return -1;}
+	while (NVM_IsBusy()) {;}
+    if (!NVM_RowWrite((uint32_t*)flash_write_buff, FLASH_CONFIG_ADDR)) { return -1; }
     while (NVM_IsBusy()) {;}
-
-    console_print("NVMCON after erase = 0x%08X\r\n", NVMCON);
-    console_print("After erase, first byte = %02X\r\n",
-                  *(volatile const uint8_t*)CONFIG_FLASH_K1);
-
-    if (!NVM_RowWrite((uint32_t*)config_row_buf, CONFIG_FLASH_K0)) {
-        return -1;
-    }
-    while (NVM_IsBusy()) {;}
-
-    console_print("NVMCON after write = 0x%08X\r\n", NVMCON);
-	console_print("NVMADDR after write = 0x%08X\r\n", NVMADDR);
-    console_print("After write, first byte = %02X\r\n",
-                  *(volatile const uint8_t*)CONFIG_FLASH_K1);
 	return 0;
 }
 
 int config_load_string(char* out, uint32_t out_size) {
-   const uint8_t* row = (const uint8_t*)CONFIG_FLASH_K1;   // uncached alias
-    uint32_t i = 0;
-
-   while ((i < CONFIG_ROW_SIZE) && (row[i] != '\0')) {
-        i++;
-    }
-
-    if (i == CONFIG_ROW_SIZE) {
-        // no terminator → treat as invalid
-        return -1;
-    }
-
-    if (i + 1 > out_size) {
-        return -1;
-    }
-
-    memcpy(out, row, i + 1);
-    return 0;
+	const uint8_t* row = (const uint8_t*)FLASH_CONFIG_ADDR;
+	uint32_t i = 0;
+	while ((i < NVM_FLASH_ROWSIZE) && (row[i] != '\0')) { i++; }
+	if (i == NVM_FLASH_ROWSIZE) { return -1; }
+	if (i + 1 > out_size) { return -1; }
+	memcpy(out, row, i + 1);
+	return 0;
 }
 
 
