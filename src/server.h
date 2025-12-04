@@ -7,6 +7,12 @@
 #define SERVER_H
 
 /*
+	Buffer sizes we recommend for server tasks.
+*/
+#define TCP_TX_BUFF_SIZE 4096
+#define TCP_RX_BUFF_SIZE 4096
+
+/*
 	Two procedures that maintain the TCP/IP stack, including the Ethernet
 	physical interface driver. The first, tcpip_tick, takes no arguments and
 	returns no value. This procedure can be called anywhere without specifying a
