@@ -233,6 +233,6 @@ int pic_nvm_readstr(uint32_t flash_addr, char* out, uint32_t out_size);
 void pic_reset(void);
 void pic_initialize(void);
 int pic_config_write(const char* config);
-int pic_config_read(char* out, uint32_t out_size);
+int pic_config_read(char* config, uint32_t config_size);
 
 #endif

@@ -51,7 +51,7 @@
 #define TCP_RX_BUFF_SIZE 4096
 
 // Configuration file control constants
-#define CONFIG_LENGTH 1024 // bytes for config file buffer
+#define CONFIG_LENGTH 1023 // bytes for config file buffer
 #define SEPCHARS " :\n,;=" // separator characters in config file
 
 // Turn on and off deeper debugging of the LWDAQ server.
@@ -173,6 +173,10 @@ int lwdaq_process_message (tcpip_server_type* s,
 	uint32_t tx_len = 0;
 	static uint8_t tx_buffer[TCP_TX_BUFF_SIZE];
 	uint32_t i = 0;
+	static int logged_in = 0;
+	static int security_level = 0;
+	static char password[32] = "LWDAQ";
+	static char configuration[CONFIG_LENGTH];
 
 	switch (id) {
 		case BYTE_WRITE: {
@@ -240,6 +244,64 @@ int lwdaq_process_message (tcpip_server_type* s,
 			}
 			lwdaq_footer(s);
 			if (debug) console_print("STREAM_READ complete in %s.\r\n", __func__);
+		}
+		break;
+
+		case LOGIN:{
+			if (debug) console_print("LOGIN in %s.\r\n", __func__);
+			if (len<1) {
+			  logged_in=0;
+				if (debug) console_print("Failed with empty password in %s.\r\n");
+			}
+			if (!strcmp(password,(char*) content)) {
+				logged_in=1;
+				if (debug) console_print("Logged in with password: %s.\r\n", content);
+			} else {
+			  logged_in=0;
+				if (debug) console_print("Failed with password: %s.\r\n", content);
+			}
+			lwdaq_byte_return(s, logged_in);
+		}
+		break;
+
+		case CONFIG_READ:{
+			if (debug) console_print("CONFIG_READ in %s.\r\n", __func__);
+			if ((logged_in==1) || (security_level==0)) {
+				pic_config_read(configuration, sizeof(configuration));
+			  	lwdaq_data_return(s, (uint8_t*) configuration, strlen(configuration));
+				if (debug) console_print(
+					"Transmitted configuration of %d characters.\r\n",
+					strlen(configuration));
+			} else {
+				if (debug) console_print("Rejected: not logged in.\r\n");
+				return -1;
+			}
+		}
+		break;
+
+		case CONFIG_WRITE:{
+			if (debug) console_print("CONFIG_WRITE in %s.\r\n",__func__);
+			if ((logged_in==1) || (security_level==0)) {
+				if (len<CONFIG_LENGTH) {
+					if (debug) console_print("Accepted: config %d characters.\r\n",len);
+					content[len]=0x00;
+					console_print("%s",(char*) content);
+					pic_config_write((char*) content);
+				} else {
+					if (debug) console_print("Rejected: %d characters too long.\r\n",len);
+					return -1;
+				}
+			} else {
+				if (debug) console_print("Rejected: not logged in.\r\n");
+				return -1;
+			}
+		}
+		break;
+
+		case MAC_READ:{
+			if (debug) console_print("MAC_READ in %s.\r\n", __func__);
+			server_mac(tx_buffer);
+			lwdaq_data_return(s, tx_buffer, strlen((char*) tx_buffer));
 		}
 		break;
 
@@ -325,13 +387,13 @@ int lwdaq_tasks(tcpip_server_type* s) {
 int telnet_tasks(tcpip_server_type* s) {
 //	static uint8_t rx_buffer[TCP_RX_BUFF_SIZE];
     static char msg_buffer[TCP_TX_BUFF_SIZE];
-    int len;
 	 
 	if ((*s).state == S_LISTENING) {
 		if (debug) console_print("Initialized %s connection in %s.\r\n",
 			(*s).protocol, __func__);
-		len = net_info(&msg_buffer[0], sizeof(msg_buffer));
-		tcp_write_all((*s).socket, (const uint8_t*)&msg_buffer[0], len);
+		server_info(&msg_buffer[0], sizeof(msg_buffer));
+		tcp_write_all((*s).socket, (const uint8_t*) &msg_buffer[0], 
+			strlen(msg_buffer));
 		return 0;
 	};
 

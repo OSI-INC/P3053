@@ -214,13 +214,33 @@ int server_set_ip(const char* ip_str, const char* gw_str, const char* mask_str) 
 }
 
 /*
-	net_info composes a string that presents the status and configuration of the
+	server_mac returns the network interface's media access control (MAC) address as
+	a six-byte block.
+*/
+void server_mac(uint8_t* out) {
+    TCPIP_NET_HANDLE net_hdl;
+    TCPIP_NET_IF* pNetIf;
+    uint8_t* mac;
+
+    net_hdl = TCPIP_STACK_IndexToNet(0);
+    pNetIf = _TCPIPStackHandleToNet(net_hdl);
+    mac = pNetIf->netMACAddr.v;
+	out[0] = mac[0];
+	out[1] = mac[1];
+	out[2] = mac[2];
+	out[3] = mac[3];
+	out[4] = mac[4];
+	out[5] = mac[5];
+}
+
+/*
+	server_info composes a string that presents the status and configuration of the
 	network interface. It writes the string to a buffer specified by the calling
 	process. The calling process also provides a maximum size for the stirng.
 	The function returns the number of characters it wrote, and it also terminates
 	the string with null character.
 */
-int net_info(char* out, uint32_t max_len) {
+void server_info(char* out, uint32_t max_len) {
     TCPIP_NET_HANDLE net_hdl;
     TCPIP_NET_IF* pNetIf;
     IPV4_ADDR ip, mask, gw;
@@ -257,8 +277,6 @@ int net_info(char* out, uint32_t max_len) {
     n = snprintf(&out[i], max_len-i, "Link      : %s\r\n",
         (TCPIP_STACK_NetIsLinked(net_hdl) ? "UP" : "DOWN"));
 	i = i + n;
-	
-	return i;
 }
 
 /*

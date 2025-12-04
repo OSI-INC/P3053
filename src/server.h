@@ -61,7 +61,8 @@ typedef struct {
 */
 void ping_gateway(void);
 int server_set_ip(const char* ip_str, const char* gw_str, const char* mk_str);
-int net_info(char* out, uint32_t max_len);
+void server_mac(uint8_t* out);
+void server_info(char* out, uint32_t max_len);
 
 /*
  	A tcpip_tasks_type is the type of procedure that will be called by our

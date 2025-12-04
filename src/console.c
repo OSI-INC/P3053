@@ -368,7 +368,7 @@ void console_server(void) {
 						break;
 						
 					case 'n':
-						net_info(msg_buffer, sizeof(msg_buffer));
+						server_info(msg_buffer, sizeof(msg_buffer));
 						console_print("%s\r\n", msg_buffer);
 						break;
 					
