@@ -46,6 +46,7 @@
 #define CLEN_OFFSET 5
 #define CONTENT_OFFSET 9
 #define FRAME_SIZE 10
+#define FRAME_BUFF_SIZE 15
 
 // Message Identifiers
 #define VERSION_READ	0
@@ -67,23 +68,28 @@
 #define CONFIG_LENGTH 1023
 #define LWDAQ_DEBUG 0
 
-// The LWDAQ server structure.
-tcpip_server_type lwdaq_server = 
-	{INVALID_SOCKET, S_WAIT_STACK, LWDAQ_PORT, "LWDAQ"};
+// The LWDAQ server record.
+tcpip_server_type lwdaq_server = {
+	INVALID_SOCKET,
+	S_WAIT_STACK,
+	LWDAQ_PORT,
+	"LWDAQ"
+};
 	
 /*
 	lwdaq_header sends a data return message header through a socket.
 */
 int lwdaq_header(TCP_SOCKET s, uint32_t id, uint32_t len) {
-	uint8_t buff[15];
+	uint8_t buff[FRAME_BUFF_SIZE];
 	uint32_t* lp;
 	
 	buff[START_OFFSET] = START_CODE;
-	lp = (uint32_t*)&buff[ID_OFFSET];
+	lp = (uint32_t*) &buff[ID_OFFSET];
 	*lp = flip_bytes_u32(id);
-	lp = (uint32_t*)&buff[CLEN_OFFSET];
+	lp = (uint32_t*) &buff[CLEN_OFFSET];
 	*lp = flip_bytes_u32(len);
 	tcp_write_all(s, buff, CONTENT_OFFSET);
+	
 	return 0;
 }
 
@@ -91,9 +97,11 @@ int lwdaq_header(TCP_SOCKET s, uint32_t id, uint32_t len) {
 	lwdaq_footer sends a terminating sequence through a socket.
 */
 int lwdaq_footer(TCP_SOCKET s) {
-	uint8_t buff[15];
+	uint8_t buff[FRAME_BUFF_SIZE];
+	
 	buff[0] = END_CODE;
 	tcp_write_all(s, buff, 1);
+	
 	return 0;
 }
 
@@ -102,11 +110,13 @@ int lwdaq_footer(TCP_SOCKET s) {
 	integer as its content.
 */
 int lwdaq_byte_return(TCP_SOCKET s, uint8_t data) {
-	uint8_t buff[15];
+	uint8_t buff[FRAME_BUFF_SIZE];
+	
 	lwdaq_header(s, DATA_RETURN, sizeof(data));
 	buff[0] = data;
 	tcp_write_all(s, buff, sizeof(data));
 	lwdaq_footer(s);
+	
 	return 0;
 }
 
@@ -115,13 +125,15 @@ int lwdaq_byte_return(TCP_SOCKET s, uint8_t data) {
 	integer as its content.
 */
 int lwdaq_integer_return(TCP_SOCKET s, uint32_t data) {
-	uint8_t buff[15];
+	uint8_t buff[FRAME_BUFF_SIZE];
 	uint32_t* lp;
+	
 	lwdaq_header(s, DATA_RETURN, sizeof(data));
-	lp = (uint32_t*)&buff[0];
+	lp = (uint32_t*) &buff[0];
 	*lp = flip_bytes_u32(data);
 	tcp_write_all(s, buff, sizeof(data));
 	lwdaq_footer(s);
+	
 	return 0;
 }
 
@@ -132,13 +144,17 @@ int lwdaq_data_return(TCP_SOCKET s, uint8_t* block, uint32_t len) {
 	lwdaq_header(s, DATA_RETURN, len);
 	tcp_write_all(s, block, len);
 	lwdaq_footer(s);
+	
 	return 0;
 }
 
 /*
-	lwdaq_process_message handles an incoming LWDAQ message.
+	lwdaq_handle_message handles an incoming LWDAQ message. We pass the routine
+	a socket handle, which allows it to respond to the command when a response
+	is required. We pass the LWDAQ message identifier, the length of the message
+	content, and a pointer to the content buffer.
 */
-int lwdaq_process_message (TCP_SOCKET s, uint32_t id, uint32_t len, uint8_t* content) {
+int lwdaq_handle_message (TCP_SOCKET s, uint32_t id, uint32_t len, uint8_t* content) {
 	uint8_t register_addr = 0;
 	uint8_t value = 0;
 	uint32_t tx_len = 0;
@@ -294,15 +310,61 @@ int lwdaq_process_message (TCP_SOCKET s, uint32_t id, uint32_t len, uint8_t* con
 }
 
 /*
-	lwdaq_tasks services a LWDAQ connection.
+	lwdaq_tasks services a LWDAQ connection. When the LWDAQ server starts
+	listening for a socket, the tasks routine resets its received byte counter,
+	and is ready to receive a fresh LWDAQ message stream. While serving an open
+	socket, it reads bytes from the socket and stores them in its own receiving
+	buffer. When it has accumulated a complete and correct LWDAQ message in its
+	buffer, it passes the message to the LWDAQ message-handling routine.
+	
+	The LWDAQ task manager is not supposed to block the LWDAQ server that calls
+	it, but it will block for however long it takes to handle one LWDAQ message.
+	If ten messages arrive at once, they will be handled once per call to the
+	task manager. If one of the tasks is to wait for a delay, or to read out a
+	large image sensor, the message handler could be blocking for one or two
+	seconds. During this time the message hanlder must be calling the routines
+	that maintain the TCP/IP stack, the Ethernet PHY driver, and the console.
+
+	A LWDAQ message begins with a start code, which is a single byte, followed
+	by a four-byte, big-endian message identifier, which will be something like
+	0x00000001, which stands for "byte read", or "read a single byte form the
+	eight-bit parallel interface that connects the LWDAQ relay to the LWDAQ
+	controller". After that we have a four-byte, big-endian unsigned integer for
+	the length of the message content. Once the task routine has the length, it
+	waits until it accumulates the required number of content bytes. The LWDAQ
+	message must then be terminated with a close code. The byte read instruction
+	has for its content the address that should be read, and this address we
+	specify with another four-byte, big-endian unsigned integer. The content
+	length is therefore "4". On a "byte write", the content length is "5"
+	because we follow the address with the byte value we want to write to the
+	eight-bit bus.
+
+	If the incoming byte stream deviates in any way from the LWDAQ message
+	protocol, the tasks routine will return a negative value. If the
+	message-handler returns a negative value, the task routine aborts itself
+	with a negative value. Our assumption is that when the task returns a
+	negative value, the LWDAQ server will close the LWDAQ client's socket.
+	Neither the task procedure nor the message-handling procedure are allowed to
+	close the socket themselves.
+	
+	The routine takes as input a tcpip server structure, which contains not
+	only the socket handle but also the server state, which allows the tasks
+	manager to determine when to reset its buffer.
 */
 int lwdaq_tasks(tcpip_server_type* s) {
-	uint32_t id, len;
 	static uint8_t rx_buffer[TCP_RX_BUFF_SIZE];
 	static uint32_t rx_available = 0;
-	uint32_t rx_ready = 0;
+	uint32_t id, len, rx_ready;
 	int status;
 
+	/*
+		When the server is listening for a new connection, and it receives a
+		connection, it calls the task routine. So when we check for the server
+		being in its listening state, we are checking to see if a new socket has
+		just been opened. We reset our input buffer. As some point, we would
+		like to introduce an idle timer her as well, so we can close the sockeet
+		when it is idle for too long. Here we would start the timer.
+	*/
 	if ((*s).state == S_LISTENING) {
 		rx_available = 0;
 		if (debug) console_print("Initialized %s connection in %s.\r\n",
@@ -310,12 +372,24 @@ int lwdaq_tasks(tcpip_server_type* s) {
 		return 0;
 	};
 
+	/*
+		If we get here, the server is handling an existing, open socket. Our input
+		buffer counter is persistent from one call to the next, so we know how many
+		bytes we have in our buffer. We start by finding out how many bytes are
+		available for us to read from the socket and add to our buffer.
+	*/
 	rx_ready = tcp_available((*s).socket);
 	if (rx_ready>0) {
 		tcp_read((*s).socket, &rx_buffer[rx_available], rx_ready);	
 		rx_available = rx_available+rx_ready;
 	}
 	if (rx_available == 0) return 0;
+	
+	/*
+		We have at least one byte, so we will check to see if we have a complete
+		message. We need at least nine bytes: the start code, the four-byte
+		message identifier, and the four-byte length.
+	*/
 	if (debug && LWDAQ_DEBUG) console_print("rx_ready=%u rx_available=%u in %s.\r\n",
 		rx_ready, rx_available, __func__);
 	if (rx_buffer[0] != START_CODE) {
@@ -326,29 +400,64 @@ int lwdaq_tasks(tcpip_server_type* s) {
 		}
 		return -1;
 	}
-	if (rx_available<9) return rx_available;		
+	if (rx_available<CONTENT_OFFSET) return rx_available;
+	
+	/*
+		We have a complete header, so extract the message identifier and length. Once
+		we have these, we can see if we have the content bytes in our buffer already. 
+		If not, we return the number of byts available and do nothing more.
+	*/
 	id = reverse_load_u32(&rx_buffer[1]);
 	len = reverse_load_u32(&rx_buffer[5]);
 	if (debug && LWDAQ_DEBUG) console_print(
 		"id=%u len=%u in %s.\r\n", id, len, __func__);
-	if (rx_available<len+10) return rx_available;
-	if (rx_buffer[len+9] != END_CODE) {
+	if (rx_available<len+FRAME_SIZE) return rx_available;
+	
+	/*
+		We have all the content bytes we need, and a byte afterwards for the end
+		code. Check to see if the end code is valie. If not, we return a
+		negative value to indicate an error.
+	*/
+	if (rx_buffer[len+CONTENT_OFFSET] != END_CODE) {
 		if (debug) console_print("Invalid end code in %s.\r\n", __func__);
 		return -1;
 	}
-	status = lwdaq_process_message((*s).socket, id, len, &rx_buffer[9]);
+	
+	/*
+		We appear to have a valid and complete LWDAQ message, so pass it to the
+		message handler. We point the message handler to the tenth byte in our
+		buffer, which is byte nine, and corresponds to the first byte of the
+		message content. If the message handler returns an error, we exit with
+		the same error code.
+	*/
+	status = lwdaq_handle_message((*s).socket, id, len, &rx_buffer[9]);
 	if (status<0) return status;
-	if (rx_available>len+10) {
+	
+	/*
+		Because we always read from our socket as many bytes as it has to give,
+		we can read more than one message into our receive buffer at a time. If
+		we have received bytes following the message we just handled, copy all
+		the bytes to the front of the buffer, so we can begin our message
+		accumulation process again.
+	*/
+	if (rx_available>len+FRAME_SIZE) {
 		if (debug && LWDAQ_DEBUG) console_print(
 			"Copying %u to %u from %u in %s.\r\n",
-			rx_available-len-10, 0, len+10, __func__);
-		memmove(&rx_buffer[0], &rx_buffer[len+10], rx_available-len-10);
-		rx_available = rx_available-len-10;
+			rx_available-len-FRAME_SIZE, 0, len+FRAME_SIZE, __func__);
+		memmove(&rx_buffer[0], 
+			&rx_buffer[len+FRAME_SIZE], 
+			rx_available-len-FRAME_SIZE);
+		rx_available = rx_available-len-FRAME_SIZE;
 	} else {
 		rx_available = 0;
 	}
 	if (debug && LWDAQ_DEBUG) console_print(
 		"rx_available=%u in %s.\r\n", rx_available, __func__);
+		
+	/*
+		Return the number of bytes available. This will certainly be zero or greater,
+		so not an error.
+	*/
 	return rx_available;
 }
 

@@ -1,19 +1,17 @@
 /*
 	The Embedded Ethernet Module (EEM) Main Program.
 
-	This program implements a LWDAQ server in our A3053 family of EEMs.
-
-	This main program is part of the P3053 repository, which began as a copy of
+	This main program is part of the P3053A repository, which began as a copy of
 	a Microchip Harmony3 echo server example application. We consolidated and
 	dramatically simplified the build system. There is only one Makefile left.
-	We transformed the application code to create our own LWDAQ server. We have
-	consolidated all higher level functions int this one file, main.c. The lower
-	level source files remain, for the most part, untouched with their Microchip
-	copyright statements intact. We release this program under the GNU General
-	Public License, which is more strict than the Microsoft license.
+	We transformed the application code to create our own LWDAQ and Telnet
+	servers with UART console. The lower level source files remain, for the most
+	part, untouched with their Microchip copyright statements intact. We release
+	this program under the GNU General Public License, which is more strict than
+	the Microsoft license.
 
-	Copyright (C) 2018 Microchip Technology Inc. and its subsidiaries. Copyright
-	(C) 2025, Kevan Hashemi, Open Source Instruments Inc.
+	Copyright (C) 2018 Microchip Technology Inc. and its subsidiaries. 
+	Copyright (C) 2025, Kevan Hashemi, Open Source Instruments Inc.
 
 	This program is free software: you can redistribute it and/or modify it
 	under the terms of the GNU General Public License as published by the Free
@@ -50,13 +48,18 @@
 	A3053, provided that the VERBOSE_CONSOLE macro is defined, which is our way
 	of enabling debugging features.
 */
+#define TELNET_PORT 23
+tcpip_server_type telnet_server = {
+	INVALID_SOCKET,
+	S_WAIT_STACK,
+	TELNET_PORT,
+	"TELNET"
+};
 #ifdef VERBOSE_CONSOLE
 static const bool telnet_enable = true;
 #else
 static const bool telnet_enable = false;
 #endif
-#define TELNET_PORT 23
-tcpip_server_type telnet_server = {INVALID_SOCKET, S_WAIT_STACK, TELNET_PORT, "TELNET"};
 
 /*
 	telnet_tasks services a Telnet connection.
@@ -86,22 +89,43 @@ int telnet_tasks(tcpip_server_type* s) {
 	return 0;
 }
 
-
+/*
+	The main program, from which all other programs are called. In our case, we 
+	initialize the PIC processes, then enter an infinite loop from which there
+	should be no escape. So far as we can tell, the main program should return
+	an integer, so we return EXIT_FAILURE if ever the program escapes our loop.
+*/
 int main (void) {
 	int i = 0;
-//	int j;
 
-	// Initialize the clock, memory, core timers, system timer, UART console,
-	// Ethernet physical interface, and the TCP/IP stack.
+	/*
+		Initialize the microcontroller and its peripherals, which include clock,
+		memory, core timers, system timer, UART console, Ethernet physical
+		interface, and the TCP/IP stack. Configure the general-purpose
+		input-output pins to communicate with indicator lamps, test pins, and
+		the eight-bit parallel bus.
+	*/
 	pic_initialize();
 	
-	// Turn on the green D2 and the red D5 lamps.
+	/*
+		Set up the embedded ethernet module for this particular appliction. Here
+		we turn on both the green LED (D2) and the red LED (D5) on an A3053A.
+		The white and blue LED pins are used for our UART2 console. We will use
+		D2 as a power indicator, turning it on for 10% of the time so quickly
+		that it looks constant and dim so long as the loop is executing quickly.
+		We will use D5 as a heartbeat, flashing it every one or two seconds.
+		This flash will be disrupted if the loop tasks start to take hundreds of
+		milliseconds to complete.
+	*/
    	pic_d2_on();
    	pic_d5_on();
  
-   	// A while loop with a counter to control the state of our LEDs. 
+   	/*
+   		This loop should never terminate. We perform maintenance tasks one after
+   		another. A loop counter allows us to blink lights to show heartbeat and 
+   		power.
+   	*/
 	while (true) {
-	
 		tcpip_tick();
 		console_server();
 		tcpip_server(&lwdaq_server, lwdaq_tasks);
@@ -109,7 +133,6 @@ int main (void) {
 			tcpip_server(&telnet_server, telnet_tasks);
 		}
 
-		// Flash the lights.
 		i = i+1;
 		if (i % 100 == 0) pic_d2_off();
 		if (i % 1000 == 0) pic_d2_on();
@@ -120,7 +143,6 @@ int main (void) {
 		}
 	}
 	
-	// Return an error code of the correct type if we get here.
 	return (EXIT_FAILURE);
 }
 
