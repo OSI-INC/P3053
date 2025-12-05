@@ -39,9 +39,12 @@ void console_putchar(char c) {
 }
 
 /*
-	console_flush waits until the UART2 has transmitted all pending characters. It first
-	waits for the software ring buffer to empty, then waits until the UART's internal
-	buffer is empty, then waits until the UART's transmit shift register is empty.
+	console_flush waits until the UART2 has transmitted all pending characters.
+	It first waits for the software ring buffer to empty, then waits until the
+	UART's internal buffer is empty, then waits until the UART's transmit shift
+	register is empty. We use this routine when we want to pause before doing
+	some other task until all pending console printing is done, such as before
+	we reset the PIC.
 */
 void console_flush(void) {
     while (UART2_WriteCountGet() != 0) { ; }
@@ -95,10 +98,32 @@ void console_write(const void* buff, size_t size) {
 	console_message writes an entire null-terminated string of characters to the
 	console. We pass the routine a pointer to a string, and it keeps reading
 	characters from the string and writing them to the console until it reaches
-	a null character, which it does not write.
+	a null character, which it does not write. One additional service this
+	routine provides is to handle different protocols for carriage returns and
+	line feeds. The routine always prints CRLF ("\r\n") for a new line. If it
+	sees just CR on its own, or LF on its own, it prints CRLF. But if it sees
+	CRLF, it prints only one CRLF, not two CRLFs.
 */
 void console_message(const char *s) {
-    while (*s) console_putchar(*s++);
+    bool expect_lf = false;
+
+    while (*s) {
+        if (*s == '\r') {
+            console_putchar('\r');
+            console_putchar('\n');
+            expect_lf = true;
+        } else if (*s == '\n') {
+            if (!expect_lf) {
+                console_putchar('\r');
+                console_putchar('\n');
+            }
+            expect_lf = false;
+        } else {
+            console_putchar(*s);
+            expect_lf = false;
+        }
+        s++;
+    }
 }
 
 /*
@@ -170,7 +195,8 @@ int console_readln(char* buf, int maxlen)
         } else if (idx < maxlen - 1) {
         	if (!is_printable(c)) continue;
 			console_putchar(c);
-			buf[idx++] = c;
+			buf[idx] = c;
+			idx++;
         }
     }
 }
@@ -290,9 +316,9 @@ void console_initialize(void)
 	console_print("===========================================================\r\n");
 	console_print("Command interface running, 'h' for help, 'r' for reset.\r\n");
 	if (debug) {
-		console_print("Diagnostic announcements to the console are enabled.\r\n");
+		console_print("Console is verbose for diagnostic reporting.\r\n");
 	} else {
-		console_print("Diagnostic announcements to the console are disabled.\r\n");	
+		console_print("Console is quiet to suppress diagnosic reporting.\r\n");	
 	}
 }
 
@@ -306,109 +332,128 @@ void console_initialize(void)
 	the state of the debug flag.
 */
 void console_server(void) {
-	enum {max_cmd_len=63};
+	enum {max_cmd_len=255};
 	static char cmd_buffer[max_cmd_len];
+	static uint32_t cmd_len = 0;
+    char c;
+    
 	enum {max_str_len=31};
 	static char ip_str[max_str_len];
 	static char gw_str[max_str_len];
 	static char mask_str[max_str_len];
+	
     enum {max_msg_len=2048};    
     static char msg_buffer[max_msg_len];
-	static uint32_t cmd_len = 0;
-    char c;
+    
     int status;
+	bool ignore_lf = false;
+	bool process_command = false;    
+    
 
 	while (console_readcount() > 0) {
 		c = console_getchar();
-		if (c == '\r' || c == '\n') {
-			console_message("\r\n");
-			if (cmd_len == 1) {
-				char cmd = cmd_buffer[0];
-				switch (cmd) {
-					case 'h':
-						console_message("Commands:\r\n");
-						console_message("  c - save string to flash\r\n");
-						console_message("  d - read string from flash\r\n");
-						console_message("  i - new ip addr\r\n");
-						console_message("  n - net info\r\n");
-						console_message("  p - ping gateway\r\n");
-						console_message("  r - software reset\r\n");
-						console_message("  h - print help\r\n");
-						break;
-						
-					case 'c':
-						console_message("String: ");
-						console_readln(msg_buffer, sizeof(msg_buffer));
-						status = pic_config_write(msg_buffer);
-						if (status >= 0) {
-							console_print("Wrote: %s\r\n", msg_buffer);
-						} else {
-							console_message("String write failed.\r\n");
-						}	
-						break;
-						
-					case 'd':
-						console_message("Reading string...\r\n");
-						status = pic_config_read(msg_buffer, sizeof(msg_buffer));
-						if (status >= 0) {
-							console_print("String: %s\r\n", msg_buffer);
-						} else {
-							console_message("String read failed.\r\n");
-						}
-						break;
-						
-					case 'i':
-						console_message("New IP Address: ");
-						console_readln(ip_str, sizeof(ip_str));
-						console_message("New IP Mask: ");
-						console_readln(mask_str, sizeof(mask_str));
-						console_message("New Gateway: ");
-						console_readln(gw_str, sizeof(gw_str));
-						server_set_ip(ip_str, gw_str, mask_str);
-						break;
-						
-					case 'n':
-						server_info(msg_buffer, sizeof(msg_buffer));
-						console_print("%s\r\n", msg_buffer);
-						break;
-					
-					case 'p':
-						ping_gateway();
-						break;
-					
-					case 'r':
-						console_message("Resetting... \r\n");
-						console_flush();
-						pic_reset();
-						break;
-					
-					default:
-						console_print(
-							"ERROR: Unknown command '%c', type 'h' for help.\r\n",
-							cmd);
-						break;
-				}
-			} else if (cmd_len > 1) {
-				console_message("ERROR: Only single-letter commands supported.\r\n");
+		if (c == '\r') {
+			process_command = true;
+			ignore_lf = true;
+		} else if (c == '\n') {
+			if (!ignore_lf) {
+				process_command = true;
+			} else {
+				ignore_lf = false;
 			}
-			cmd_len = 0;
-			console_message("EEM$ ");
-			continue;
-		}
-		if (c == '\b' || c == 0x7F) {
+		} else if (c == '\b' || c == 0x7F) {
 			if (cmd_len > 0) {
-			cmd_len--;
-			console_message("\b \b");
+				cmd_len--;
+				console_message("\b \b");
 			}
-			continue;
+		} else if (is_printable(c)) {
+			console_print("%c", c);
+			if (cmd_len < max_cmd_len) {
+				cmd_buffer[cmd_len] = c;
+				cmd_len++;
+			} else {
+				cmd_len = 0;
+				console_print("\r\nERROR: Have cmd_len>%d in %s.\r\n",
+					max_cmd_len,__func__);
+			}
 		}
-		if (!is_printable(c)) continue;
-		console_print("%c", c);
-		if (cmd_len < max_cmd_len) {
-			cmd_buffer[cmd_len++] = c;
-		} else {
-			cmd_len = 0;
-			console_message("\r\nError: command too long\r\n> ");
+		
+		if (!process_command) {continue;}
+		
+		console_message("\r\n");
+		if (cmd_len == 1) {
+			char cmd = cmd_buffer[0];
+			switch (cmd) {
+				case 'h':
+					console_message("Commands:\r\n");
+					console_message("  c - save string to flash\r\n");
+					console_message("  d - read string from flash\r\n");
+					console_message("  i - new ip addr\r\n");
+					console_message("  n - net info\r\n");
+					console_message("  p - ping gateway\r\n");
+					console_message("  r - software reset\r\n");
+					console_message("  h - print help\r\n");
+					break;
+					
+				case 'c':
+					console_message("String: ");
+					console_readln(msg_buffer, sizeof(msg_buffer));
+					status = pic_config_write(msg_buffer);
+					if (status >= 0) {
+						console_print("Wrote: %s\r\n", msg_buffer);
+					} else {
+						console_print("ERROR: String write failed in %s.\r\n",
+							__func__);
+					}	
+					break;
+					
+				case 'd':
+					console_message("Reading string...\r\n");
+					status = pic_config_read(msg_buffer, sizeof(msg_buffer));
+					if (status >= 0) {
+						console_print("String: %s\r\n", msg_buffer);
+					} else {
+						console_print("ERROR: String read failed in %s.\r\n",
+							__func__);
+					}
+					break;
+					
+				case 'i':
+					console_message("New IP Address: ");
+					console_readln(ip_str, sizeof(ip_str));
+					console_message("New IP Mask: ");
+					console_readln(mask_str, sizeof(mask_str));
+					console_message("New Gateway: ");
+					console_readln(gw_str, sizeof(gw_str));
+					server_set_ip(ip_str, gw_str, mask_str);
+					break;
+					
+				case 'n':
+					server_info(msg_buffer, sizeof(msg_buffer));
+					console_print("%s\r\n", msg_buffer);
+					break;
+				
+				case 'p':
+					ping_gateway();
+					break;
+				
+				case 'r':
+					console_message("Resetting... \r\n");
+					console_flush();
+					pic_reset();
+					break;
+				
+				default:
+					console_print(
+						"ERROR: Unknown command '%c', type 'h' for help in %s.\r\n",
+						cmd, __func__);
+					break;
+			}
+		} else if (cmd_len > 1) {
+			console_print("ERROR: Single-letter commands only in %s.\r\n",
+				__func__);
 		}
+		cmd_len = 0;
+		console_message("EEM$ ");
 	}
 }

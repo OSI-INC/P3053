@@ -62,8 +62,9 @@ tcpip_server_type telnet_server = {INVALID_SOCKET, S_WAIT_STACK, TELNET_PORT, "T
 	telnet_tasks services a Telnet connection.
 */
 int telnet_tasks(tcpip_server_type* s) {
-//	static uint8_t rx_buffer[TCP_RX_BUFF_SIZE];
+	static uint8_t rx_buffer[TCP_RX_BUFF_SIZE];
     static char msg_buffer[TCP_TX_BUFF_SIZE];
+    int len = 0;
 	 
 	if ((*s).state == S_LISTENING) {
 		if (debug) console_print("Initialized %s connection in %s.\r\n",
@@ -74,34 +75,14 @@ int telnet_tasks(tcpip_server_type* s) {
 		return 0;
 	};
 
-/*
 	len = TCPIP_TCP_GetIsReady((*s).socket);
 	if (len>0) {
 		TCPIP_TCP_ArrayGet((*s).socket, &rx_buffer[0], len);	
-		tcp_put((*s).socket, &rx_buffer[0], len);
+		tcp_write_all((*s).socket, &rx_buffer[0], len);
 		if (debug) console_print("Echoed %u bytes in %s.\r\n", len, __func__);
 		return len;
 	}
-	if (strcmp(cmd, "help") == 0)
-	{
-	do_help();
-	}
-	else if (strcmp(cmd, "netinfo") == 0)
-	{
-	do_netinfo();
-	}
-	else if (strcmp(cmd, "quit") == 0)
-	{
-	do_quit();
-	}
-	else if (strcmp(cmd, "reset") == 0)
-	{
-	do_reset();
-	}
-	else
-	{
-	console_print("Unknown command: %s\r\n", cmd);
-	}*/
+
 	return 0;
 }
 

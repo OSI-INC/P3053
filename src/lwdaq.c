@@ -74,7 +74,7 @@ tcpip_server_type lwdaq_server =
 /*
 	lwdaq_header sends a data return message header through a socket.
 */
-int lwdaq_header(tcpip_server_type* s, uint32_t id, uint32_t len) {
+int lwdaq_header(TCP_SOCKET s, uint32_t id, uint32_t len) {
 	uint8_t buff[15];
 	uint32_t* lp;
 	
@@ -83,17 +83,17 @@ int lwdaq_header(tcpip_server_type* s, uint32_t id, uint32_t len) {
 	*lp = flip_bytes_u32(id);
 	lp = (uint32_t*)&buff[CLEN_OFFSET];
 	*lp = flip_bytes_u32(len);
-	tcp_write_all((*s).socket, buff, CONTENT_OFFSET);
+	tcp_write_all(s, buff, CONTENT_OFFSET);
 	return 0;
 }
 
 /*
 	lwdaq_footer sends a terminating sequence through a socket.
 */
-int lwdaq_footer(tcpip_server_type* s) {
+int lwdaq_footer(TCP_SOCKET s) {
 	uint8_t buff[15];
 	buff[0] = END_CODE;
-	tcp_write_all((*s).socket, buff, 1);
+	tcp_write_all(s, buff, 1);
 	return 0;
 }
 
@@ -101,11 +101,11 @@ int lwdaq_footer(tcpip_server_type* s) {
 	lwdaq_byte_return sends a data return message through a socket with a single-byte
 	integer as its content.
 */
-int lwdaq_byte_return(tcpip_server_type* s, uint8_t data) {
+int lwdaq_byte_return(TCP_SOCKET s, uint8_t data) {
 	uint8_t buff[15];
 	lwdaq_header(s, DATA_RETURN, sizeof(data));
 	buff[0] = data;
-	tcp_write_all((*s).socket, buff, sizeof(data));
+	tcp_write_all(s, buff, sizeof(data));
 	lwdaq_footer(s);
 	return 0;
 }
@@ -114,13 +114,13 @@ int lwdaq_byte_return(tcpip_server_type* s, uint8_t data) {
 	lwdaq_integer_return sends a data return message through a socket with a four-byte
 	integer as its content.
 */
-int lwdaq_integer_return(tcpip_server_type* s, uint32_t data) {
+int lwdaq_integer_return(TCP_SOCKET s, uint32_t data) {
 	uint8_t buff[15];
 	uint32_t* lp;
 	lwdaq_header(s, DATA_RETURN, sizeof(data));
 	lp = (uint32_t*)&buff[0];
 	*lp = flip_bytes_u32(data);
-	tcp_write_all((*s).socket, buff, sizeof(data));
+	tcp_write_all(s, buff, sizeof(data));
 	lwdaq_footer(s);
 	return 0;
 }
@@ -128,9 +128,9 @@ int lwdaq_integer_return(tcpip_server_type* s, uint32_t data) {
 /*
 	lwdaq_data_return sends a block of data through a socket.
 */
-int lwdaq_data_return(tcpip_server_type* s, uint8_t* block, uint32_t len) {
+int lwdaq_data_return(TCP_SOCKET s, uint8_t* block, uint32_t len) {
 	lwdaq_header(s, DATA_RETURN, len);
-	tcp_write_all((*s).socket, block, len);
+	tcp_write_all(s, block, len);
 	lwdaq_footer(s);
 	return 0;
 }
@@ -138,8 +138,7 @@ int lwdaq_data_return(tcpip_server_type* s, uint8_t* block, uint32_t len) {
 /*
 	lwdaq_process_message handles an incoming LWDAQ message.
 */
-int lwdaq_process_message (tcpip_server_type* s, 
-		uint32_t id, uint32_t len, uint8_t* content) {
+int lwdaq_process_message (TCP_SOCKET s, uint32_t id, uint32_t len, uint8_t* content) {
 	uint8_t register_addr = 0;
 	uint8_t value = 0;
 	uint32_t tx_len = 0;
@@ -175,7 +174,7 @@ int lwdaq_process_message (tcpip_server_type* s,
 			if (debug) console_print("BYTE_POLL of %d for %d in %s.\r\n",
 				register_addr, value, __func__);
 			while (lwdaq_byte_read(register_addr) != value) {
-				if (socket_tick((*s).socket)<0) return -1;
+				if (socket_tick(s)<0) return -1;
 			}
 		}
 		break;
@@ -197,13 +196,13 @@ int lwdaq_process_message (tcpip_server_type* s,
 				for (int j = 0; j < tx_len; j++) {
 					lwdaq_byte_write(62, 0);
 					while (lwdaq_byte_read(62) == 0) {
-						if (socket_tick((*s).socket)<0) return -1;
+						if (socket_tick(s)<0) return -1;
 					}
 					tx_buffer[i] = lwdaq_byte_read(register_addr);
 					i++;
 					if ((i == sizeof(tx_buffer)) || (j == tx_len - 1)) {
-						tcp_write_all((*s).socket, &tx_buffer[0], i);
-						if (socket_tick((*s).socket) < 0) {
+						tcp_write_all(s, &tx_buffer[0], i);
+						if (socket_tick(s) < 0) {
 							if (debug) console_print(
 								"Failed to write %d bytes in %s.\r\n", i, __func__);
 							return -1;
@@ -337,7 +336,7 @@ int lwdaq_tasks(tcpip_server_type* s) {
 		if (debug) console_print("Invalid end code in %s.\r\n", __func__);
 		return -1;
 	}
-	status = lwdaq_process_message(s, id, len, &rx_buffer[9]);
+	status = lwdaq_process_message((*s).socket, id, len, &rx_buffer[9]);
 	if (status<0) return status;
 	if (rx_available>len+10) {
 		if (debug && LWDAQ_DEBUG) console_print(
