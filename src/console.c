@@ -389,6 +389,7 @@ void console_server(void) {
 					console_message("  c - save string to flash\r\n");
 					console_message("  d - read string from flash\r\n");
 					console_message("  i - new ip addr\r\n");
+					console_message("  m - machine configurationr\n");
 					console_message("  n - net info\r\n");
 					console_message("  p - ping gateway\r\n");
 					console_message("  r - software reset\r\n");
@@ -428,6 +429,12 @@ void console_server(void) {
 					server_set_ip(ip_str, gw_str, mask_str);
 					break;
 					
+				case 'm':
+					sprintf(msg_buffer,"System Timer Frequency (MHz): %.1f.",
+						(SYS_TMR_TickCounterFrequencyGet()*0.000001));
+					console_print("%s\r\n", msg_buffer);
+					break;
+				
 				case 'n':
 					server_info(msg_buffer, sizeof(msg_buffer));
 					console_print("%s\r\n", msg_buffer);
