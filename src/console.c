@@ -21,6 +21,9 @@
 #include "server.h"
 #include "console.h"
 
+/*
+	An in-line routine to test a character to see if it is printable.
+*/
 static inline bool is_printable(char c) {
     return (c >= 32 && c <= 126);
 }
@@ -177,8 +180,7 @@ int console_getchar(void) {
 	more than maxlen-1 characters to the buffer, and it terminates the string
 	with a null character.
 */
-int console_readln(char* buf, int maxlen)
-{
+int console_readln(char* buf, int maxlen) {
     int idx = 0;
 
 	while (1) {
@@ -463,4 +465,149 @@ void console_server(void) {
 		cmd_len = 0;
 		console_message("EEM$ ");
 	}
+}
+
+/*
+	cli_putchar writes a single character to a CLI channel. Any CLI command procedure
+	can call this routine to write to its output. The routine does not distinguishe
+	between binary and text characters. It does not perform CRLF checking.
+*/
+void cli_putchar(cli_chan_type *ch, char c) {
+    ch->putbytes(ch->context, (const uint8_t *) &c, 1);
+}
+
+/*
+	cli_message writes a null-terminated string to a CLI channel. It checks
+	every character in the string to make sure that all CR and LF become a
+	contiguous CRLF. The routine takes as arguments a channel pointer and
+	a pointer to the string. It writes the string one character at a time
+	to the output, using the cli_putchar routine.
+*/
+void cli_message(cli_chan_type *ch, const char *s) {
+    bool expect_lf = false;
+    while (*s) {
+        char c = *s;
+        if (c == '\r') {
+            cli_putchar(ch, '\r');
+            cli_putchar(ch, '\n');
+            expect_lf = true;
+        }
+        else if (c == '\n') {
+            if (!expect_lf) {
+                cli_putchar(ch, '\r');
+                cli_putchar(ch, '\n');
+            }
+            expect_lf = false;
+        }
+        else {
+            cli_putchar(ch, c);
+            expect_lf = false;
+        }
+        s++;
+    }
+    ch->flush(ch->context);
+}
+
+/*
+	cli_print composes a string of characters based upon a string containing
+	text and formatting characters, followed by zero or more arguments, and
+	prints the string it composes to the output of a CLI channel. For each
+	literal argument there must be a conversion specification in the string. The
+	conversion specifier begins with a percent symbol. Simple examples are
+	percent symbol followed by: "d" for signed integer, "u" for unsigned
+	integer, "x" for hexadecimal, "s" for a null-terminated string, "c" for a
+	character, "f" for a floating point number or or a double-length floating
+	point number. In the case of the "f" format specifier, we can have
+	percent-symbol followed by "10.3f" for width ten characters, padded with
+	spaces on the left, and three digits after the decimal point. The routine
+	uses the machinery provided by stdarg.h to go through the format
+	specficiations and literal arguments. This machinery is: va_start, va_list,
+	vsnprintf, and va_end.
+*/
+void cli_print(cli_chan_type* ch, const char* fmt, ...) {
+    char buff[511];
+    va_list args;
+    va_start(args, fmt);
+    vsnprintf(buff, sizeof(buff), fmt, args);
+    va_end(args);
+    cli_message(ch, buff);
+}
+
+/*
+	Command line interpreter (CLI) command list. See the accompanying header file
+	for the declaration of the command procedure type. We keep track of the number
+	of commands registered so we will know where to register the next command in
+	our list, and so we will be able to avoid overflowing the list.
+*/
+static cli_command_entry cli_commands[CLI_MAX_COMMANDS];
+static int cli_num_commands = 0;
+
+/*
+	cli_cmd_register adds a command to our command-line interface (CLI). We pass
+	name of the command and a pointer to the procedure that implements the
+	command. The command must all be of type cli_cmd_proc, and it must obey the
+	CLI command procedure rules. The registration routine returns 0 for success,
+	-1 for a null argument, and -2 if the command list is full.
+*/
+int cli_cmd_register(const char *name, cli_cmd_proc proc) {
+    if (name == NULL || proc == NULL) {
+        return -1;
+    }
+    if (cli_num_commands >= CLI_MAX_COMMANDS) {
+        return -2; 
+    }
+    cli_commands[cli_num_commands].name = name;
+    cli_commands[cli_num_commands].proc = proc;
+    cli_num_commands++;
+    return 0;
+}
+
+/*
+	cli_cmd_dummy is an example CLI procedure in the correct format, showing
+	how we must define the response to the four operation codes.
+*/
+int cli_cmd_dummy (cli_chan_type *ch, const char *args) {
+    if(strcmp(args, "--info") == 0) {
+        cli_print(ch, "A dummy procedure for the CLI.\r\n");
+        return 0;
+    }
+    if(strcmp(args, "--help") == 0) {
+        cli_print(ch,
+            "Usage: dummy <value> [options]\r\n"
+            "Options:\r\n"
+            "  --info        One-line summary\r\n"
+            "  --help        Detailed help\r\n");
+        return 0;
+    }
+    cli_print(ch, "Unknown option .\r\n");
+    return -1;
+}
+
+/*
+	cli_cmd_find takes a command name and returns a pointer to the procedure that 
+	implements the functionality of the named command.
+*/
+static cli_cmd_proc cli_cmd_find(const char *name) {
+    for (int i = 0; i < cli_num_commands; i++) {
+        if (strcmp(cli_commands[i].name, name) == 0) {
+            return cli_commands[i].proc;
+        }
+    }
+    return NULL;
+}
+
+/*
+	cli_initialize initializes a command-line interpreter. We pass to it a completed
+	channel structure.
+*/
+void cli_initialize(cli_chan_type* ch) {
+	ch->rx_len = 0;
+	cli_cmd_register("dummy",cli_cmd_dummy);
+}
+
+/*
+	cli_server maintains a command-line interpreter on the specified channel.
+*/
+void cli_server(cli_chan_type* ch) {
+	;
 }
