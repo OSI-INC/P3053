@@ -38,7 +38,7 @@ static inline bool is_printable(char c) {
 	for all characters to be transmitted, we use our flush procedure.
 */
 void console_putchar(char c) {
-    while (UART2_Write((uint8_t*)&c, 1) == 0); 
+	uart2_putbytes(NULL, (uint8_t*)&c, 1); 
 }
 
 /*
@@ -50,9 +50,7 @@ void console_putchar(char c) {
 	we reset the PIC.
 */
 void console_flush(void) {
-    while (UART2_WriteCountGet() != 0) { ; }
-    while (U2STAbits.UTXBF == 1) { ; }
-    while (U2STAbits.TRMT == 0) { ; }
+	uart2_flush(NULL);
 }
 
 /*
@@ -143,12 +141,12 @@ void console_message(const char *s) {
 	vsnprintf, and va_end.
 */
 void console_print(const char* fmt, ...) {
-    char buf[2048];
+    char buff[2048];
     va_list args;
     va_start(args, fmt);
-    vsnprintf(buf, sizeof(buf), fmt, args);
+    vsnprintf(buff, sizeof(buff), fmt, args);
     va_end(args);
-    console_message(buf);
+    console_message(buff);
 }
 
 /*
@@ -156,20 +154,19 @@ void console_print(const char* fmt, ...) {
 	console receive buffer.
 */
 int console_readcount(void) {
-    return UART2_ReadCountGet();
+    return uart2_readcount(NULL);
 }
 
 /*
 	console_getchar reads one character from the console. It uses the UART2_Read
-	routine, defined in plib_uart2.c. It returns either a character or the value
-	minus one, which indicates no character was read. This routine can be
-	polled, so that when it returns characters, we keep reading until we get a
-	minus one.
+	routine, defined in plib_uart2.c. It returns either a character or minus
+	one, which indicates no character was read. This routine can be polled, so
+	that when it returns characters, we keep reading until we get a minus one.
 */
 int console_getchar(void) {
     uint8_t c;
-    if (UART2_Read(&c, 1) == 1) return c;
-    return -1; 
+    if (uart2_getbytes(NULL, &c, 1) == 1) return c;
+    return -1;
 }
 
 /*
@@ -180,14 +177,14 @@ int console_getchar(void) {
 	more than maxlen-1 characters to the buffer, and it terminates the string
 	with a null character.
 */
-int console_readln(char* buf, int maxlen) {
+int console_readln(char* buff, int maxlen) {
     int idx = 0;
 
 	while (1) {
         char c = console_getchar();
         if (c == '\r' || c == '\n') {
             console_message("\r\n");
-            buf[idx] = '\0';
+            buff[idx] = '\0';
             return idx;
         } else if (c == '\b' || c == 0x7F) {
             if (idx > 0) {
@@ -197,7 +194,7 @@ int console_readln(char* buf, int maxlen) {
         } else if (idx < maxlen - 1) {
         	if (!is_printable(c)) continue;
 			console_putchar(c);
-			buf[idx] = c;
+			buff[idx] = c;
 			idx++;
         }
     }
@@ -239,12 +236,12 @@ void SYS_CONSOLE_Message(int index, const char* msg) {
 */
 void SYS_CONSOLE_Print(int index, const char* fmt, ...) {
 	(void) index;
-	char buffer[2048];
+	char buff[2048];
 	va_list ap;
 	va_start(ap, fmt);
-	vsnprintf(buffer, sizeof(buffer), fmt, ap);
+	vsnprintf(buff, sizeof(buff), fmt, ap);
 	va_end(ap);
-	console_message(buffer);
+	console_message(buff);
 }
 
 /*
@@ -335,7 +332,7 @@ void console_initialize(void)
 */
 void console_server(void) {
 	enum {max_cmd_len=255};
-	static char cmd_buffer[max_cmd_len];
+	static char cmd_buff[max_cmd_len];
 	static uint32_t cmd_len = 0;
     char c;
     
@@ -345,7 +342,7 @@ void console_server(void) {
 	static char mask_str[max_str_len];
 	
     enum {max_msg_len=2048};    
-    static char msg_buffer[max_msg_len];
+    static char msg_buff[max_msg_len];
     
     int status;
 	bool ignore_lf = false;
@@ -371,7 +368,7 @@ void console_server(void) {
 		} else if (is_printable(c)) {
 			console_print("%c", c);
 			if (cmd_len < max_cmd_len) {
-				cmd_buffer[cmd_len] = c;
+				cmd_buff[cmd_len] = c;
 				cmd_len++;
 			} else {
 				cmd_len = 0;
@@ -384,7 +381,7 @@ void console_server(void) {
 		
 		console_message("\r\n");
 		if (cmd_len == 1) {
-			char cmd = cmd_buffer[0];
+			char cmd = cmd_buff[0];
 			switch (cmd) {
 				case 'h':
 					console_message("Commands:\r\n");
@@ -400,10 +397,10 @@ void console_server(void) {
 					
 				case 'c':
 					console_message("String: ");
-					console_readln(msg_buffer, sizeof(msg_buffer));
-					status = pic_config_write(msg_buffer);
+					console_readln(msg_buff, sizeof(msg_buff));
+					status = pic_config_write(msg_buff);
 					if (status >= 0) {
-						console_print("Wrote: %s\r\n", msg_buffer);
+						console_print("Wrote: %s\r\n", msg_buff);
 					} else {
 						console_print("ERROR: String write failed in %s.\r\n",
 							__func__);
@@ -412,9 +409,9 @@ void console_server(void) {
 					
 				case 'd':
 					console_message("Reading string...\r\n");
-					status = pic_config_read(msg_buffer, sizeof(msg_buffer));
+					status = pic_config_read(msg_buff, sizeof(msg_buff));
 					if (status >= 0) {
-						console_print("String: %s\r\n", msg_buffer);
+						console_print("String: %s\r\n", msg_buff);
 					} else {
 						console_print("ERROR: String read failed in %s.\r\n",
 							__func__);
@@ -432,14 +429,14 @@ void console_server(void) {
 					break;
 					
 				case 'm':
-					sprintf(msg_buffer,"System Timer Frequency (MHz): %.1f.",
+					sprintf(msg_buff,"System Timer Frequency (MHz): %.1f.",
 						(SYS_TMR_TickCounterFrequencyGet()*0.000001));
-					console_print("%s\r\n", msg_buffer);
+					console_print("%s\r\n", msg_buff);
 					break;
 				
 				case 'n':
-					server_info(msg_buffer, sizeof(msg_buffer));
-					console_print("%s\r\n", msg_buffer);
+					server_info(msg_buff, sizeof(msg_buff));
+					console_print("%s\r\n", msg_buff);
 					break;
 				
 				case 'p':
@@ -583,6 +580,7 @@ int cli_cmd_dummy (cli_chan_type *ch, const char *args) {
     return -1;
 }
 
+
 /*
 	cli_cmd_find takes a command name and returns a pointer to the procedure that 
 	implements the functionality of the named command.
@@ -603,11 +601,155 @@ static cli_cmd_proc cli_cmd_find(const char *name) {
 void cli_initialize(cli_chan_type* ch) {
 	ch->rx_len = 0;
 	cli_cmd_register("dummy",cli_cmd_dummy);
+	cli_message(ch, "\r\n");
+	cli_message(ch, "------------------------\r\n");
+	cli_message(ch, "Command-Line Interpreter\r\n");
+	cli_message(ch, "------------------------\r\n");
 }
 
 /*
 	cli_server maintains a command-line interpreter on the specified channel.
 */
-void cli_server(cli_chan_type* ch) {
-	;
+void cli_server(cli_chan_type *ch)
+{
+    /*---------------------------------------------------------------
+      1. Read available bytes from channel into rx_buff
+    ----------------------------------------------------------------*/
+    int available = ch->readcount(ch->context);
+    if (available > 0) {
+
+        /* Read as many bytes as will fit in the buffer */
+        int space = (CLI_RX_SIZE - 1) - (int)ch->rx_len;
+        if (space < 0) space = 0;
+
+        int to_read = available;
+        if (to_read > space) {
+            to_read = space;
+        }
+
+        if (to_read > 0) {
+            int got = ch->getbytes(ch->context,
+                                   &ch->rx_buff[ch->rx_len],
+                                   (uint32_t)to_read);
+            if (got > 0) {
+                ch->rx_len += (uint32_t)got;
+            }
+        }
+
+        /* Always maintain a terminator for convenience */
+        ch->rx_buff[ch->rx_len] = '\0';
+    }
+
+    /*---------------------------------------------------------------
+      2. Look for a newline in the receive buffer
+         Accept either '\n', '\r', or CRLF
+    ----------------------------------------------------------------*/
+    uint8_t *buff = ch->rx_buff;
+    uint32_t len = ch->rx_len;
+    uint32_t i;
+
+    for (i = 0; i < len; i++) {
+        if (buff[i] == '\n' || buff[i] == '\r') {
+            break;
+        }
+    }
+
+    if (i == len) {
+        /* No newline yet — command not complete */
+        return;
+    }
+
+    /*---------------------------------------------------------------
+      3. We found a newline at buff[i].
+         Extract the full command line.
+    ----------------------------------------------------------------*/
+
+    /* Identify end of line region (skip CRLF or LFCR) */
+    uint32_t eol = i;
+    uint32_t consume = 1;
+
+    if (buff[i] == '\r' && i + 1 < len && buff[i+1] == '\n') {
+        consume = 2;
+    }
+    else if (buff[i] == '\n' && i + 1 < len && buff[i+1] == '\r') {
+        consume = 2;
+    }
+
+    /* Copy token (command) and args into local buffers */
+    char token[32];
+    char linebuff[256];
+
+    {
+        /* skip leading whitespace in the received command */
+        uint32_t p = 0;
+        while (p < eol && (buff[p] == ' ' || buff[p] == '\t'))
+            p++;
+
+        /* extract token */
+        uint32_t t = 0;
+        while (p < eol &&
+               buff[p] != ' ' &&
+               buff[p] != '\t' &&
+               t < sizeof(token) - 1)
+        {
+            token[t++] = (char)buff[p++];
+        }
+        token[t] = '\0';
+
+        /* skip whitespace after token */
+        while (p < eol && (buff[p] == ' ' || buff[p] == '\t'))
+            p++;
+
+        /* copy the rest into linebuff */
+        uint32_t l = 0;
+        while (p < eol && l < sizeof(linebuff) - 1) {
+            linebuff[l++] = (char)buff[p++];
+        }
+        linebuff[l] = '\0';
+    }
+
+    /*---------------------------------------------------------------
+      4. Shift remaining characters down in rx_buff
+         Remove the processed line including CR/LF
+    ----------------------------------------------------------------*/
+    {
+        uint32_t shift = eol + consume;
+        uint32_t remain = ch->rx_len - shift;
+
+        if (remain > 0) {
+            memmove(buff, &buff[shift], remain);
+        }
+
+        ch->rx_len = remain;
+        buff[ch->rx_len] = '\0';
+    }
+
+    /*---------------------------------------------------------------
+      5. Look up the command in the registry
+    ----------------------------------------------------------------*/
+    cli_cmd_proc proc = NULL;
+	proc = cli_cmd_find(token);
+
+    /*---------------------------------------------------------------
+      6. Execute or report error
+    ----------------------------------------------------------------*/
+    if (proc == NULL) {
+        cli_message(ch, "ERR: unknown command\r\n");
+    }
+    else {
+        int rc = proc(ch, linebuff);
+
+        if (rc == 0) {
+            cli_message(ch, "OK\r\n");
+        }
+        else {
+            cli_message(ch, "ERR\r\n");
+        }
+    }
+
+    /*---------------------------------------------------------------
+      7. Print new prompt
+    ----------------------------------------------------------------*/
+    cli_message(ch, "$ ");
 }
+

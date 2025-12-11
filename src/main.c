@@ -96,7 +96,6 @@ int telnet_tasks(tcpip_server_type* s) {
 	an integer, so we return EXIT_FAILURE if ever the program escapes our loop.
 */
 int main (void) {
-	int i = 0;
 
 	/*
 		Initialize the microcontroller and its peripherals, which include clock,
@@ -125,6 +124,7 @@ int main (void) {
    		another. A loop counter allows us to blink lights to show heartbeat and 
    		power.
    	*/
+	int i = 0;
 	while (true) {
 		tcpip_tick();
 		console_server();

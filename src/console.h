@@ -55,11 +55,16 @@ void console_server(void);
 	input from the CLI directly, not by reading from the channel. The CLI
 	commands can and should write to the CLI channel, but they must do so with
 	the cli_putchar, cli_message and cli_print routines, declared farther down.
+	These four routines all return integers. In the case of readcount, the
+	return is the number of bytes available, or a negative value for error. For
+	getbytes the return is the number of bytes read, or negative for an error.
+	For butbytes it is the number of bytes written, or negative for error. For
+	flush it is a zero for success and negative for error.
 */
 typedef int (*cli_readcount_func)(void *context);
 typedef int (*cli_getbytes_func)(void *context, uint8_t* buff, uint32_t len);
-typedef void (*cli_putbytes_proc)(void *context, const uint8_t* buyff, uint32_t len);
-typedef void (*cli_flush_proc)(void *context);
+typedef int (*cli_putbytes_proc)(void *context, const uint8_t* buff, uint32_t len);
+typedef int (*cli_flush_proc)(void *context);
 
 /*
 	The cli_chan_type holds all the information one of our comman-line

@@ -118,13 +118,13 @@ int pic_nvm_writestr(const char* str, uint32_t flash_addr) {
 	will read from the cached copy of the NVM. If the address is in the
 	non-cached range, we will read directly from NVM.
 */
-int pic_nvm_readstr(uint32_t flash_addr, char* out, uint32_t out_size) {
+int pic_nvm_readstr(uint32_t flash_addr, char* str, uint32_t str_size) {
 	const uint8_t* row = (const uint8_t*)flash_addr;
 	uint32_t i = 0;
 	while ((i < NVM_FLASH_ROWSIZE) && (row[i] != '\0')) {i++;}
 	if (i == NVM_FLASH_ROWSIZE) {return -1;}
-	if (i + 1 > out_size) {return -1;}
-	memcpy(out, row, i + 1);
+	if (i + 1 > str_size) {return -1;}
+	memcpy(str, row, i + 1);
 	return 0;
 }
 
@@ -304,4 +304,58 @@ int pic_config_read(char* config, uint32_t config_size) {
 		strcat(config,scratch);		
 	}
 	return status;
+}
+
+/*
+	uart2_readcount returns the number of bytes ready to be read in the UART2
+	interface. It is the first of four routines that communicate with the UART2
+	interface, which we enable and assign to pins during our initialization.
+	These routines are designed for deployment in our general-purpose
+	command-line interpreter (CLI), so they accept a context pointer. But they
+	do not use this pointer, so we declare them as "void" in each routine to
+	avoid a compiler warning.
+*/
+int uart2_readcount(void *context) {
+    (void) context;
+	return UART2_ReadCountGet();
+}
+
+/*
+	uart2_getbytes attempts to read the specified number of bytes from the UART2
+	interface into a buffer. The routine will block until it receives all bytes
+	it wants. We assume that the number of bytes requested has been set by the
+	readcount routine, so the bytes are all waiting to be read.
+*/
+int uart2_getbytes(void *context, uint8_t* buff, uint32_t len) {
+    (void) context;
+    int num_got = (int) UART2_Read(buff, len);
+    return num_got;
+}
+
+/*
+	uart2_putbytes attempts to write a specified number of bytes to the UART2
+	interface. It waits until all bytes have been written. It never returns an
+	error. We trust it will not block or hang. One detail in the code: Harmony's
+	UART2 write routine expects a buffer that is declared modifiable, even
+	though it does not write to the buffer. So we must type-cast the buffer into
+	a modifiable buffer to avoid a compiler warning.
+*/
+int uart2_putbytes(void *context, const uint8_t* buff, uint32_t len) {
+    (void)context;
+    for (uint32_t i = 0; i < len; i++) {
+        while (UART2_Write((uint8_t*) &buff[i], 1) == 0) { ; }
+    }
+    return (int) len;
+}
+
+/*
+	uart2_flush waits until all bytes waiting to be transmitted by the UART2
+	have been transmitted, and then returns. It never returns an error.
+*/
+int uart2_flush(void *context) {
+    (void) context;
+    while (UART2_WriteCountGet() != 0) { ; }
+    while (U2STAbits.UTXBF == 1) { ; }
+    while (U2STAbits.TRMT == 0) { ; }
+    return 0;
 }

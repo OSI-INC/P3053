@@ -224,15 +224,26 @@ static inline uint8_t lwdaq_byte_read_repeat(void) {
 /*
 	Reading and writing from non-volatile memory.
 */
-int pic_nvm_writestr(const char* config, uint32_t flash_addr);
-int pic_nvm_readstr(uint32_t flash_addr, char* out, uint32_t out_size);
+int pic_nvm_writestr(const char* str, uint32_t flash_addr);
+int pic_nvm_readstr(uint32_t flash_addr, char* str, uint32_t str_size);
 
 /*
-	Reset and initialization routines.
+	Reset, initialization, and configuration routines.
 */
 void pic_reset(void);
 void pic_initialize(void);
 int pic_config_write(const char* config);
 int pic_config_read(char* config, uint32_t config_size);
+
+/*
+	Routines that allow a command-line interpreter (CLI) use the UART2 interface. All
+	CLI communication routines take a context pointer argument, which is required by
+	some communication routines, but not our UART2 routines. So our UART2 routines 
+	accept the pointer, but make no use of it.
+*/
+int uart2_readcount(void *context);
+int uart2_getbytes(void *context, uint8_t* buff, uint32_t len);
+int uart2_putbytes(void *context, const uint8_t* buff, uint32_t len);
+int uart2_flush(void *context);
 
 #endif
