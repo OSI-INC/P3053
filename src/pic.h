@@ -1,7 +1,10 @@
 /*
-	utils.h declares variables, types, and functions used to interact with the
-	system hardware, including the MPCIE connector parallel interface and the
-	registers inside the PIC32MZ.
+	pic.h -- Interface of the PIC32MZ Utility library for the Embedded Ethernet
+	Module. Contains functions, variables, and types that control and
+	communication with the system hardware, including the non-volatile memory,
+	the EEM's MPCIE parallel bus interface, the PIC32MZ  internal registers, and
+	the UART interfaces. Does not include control of the Ethernet physical
+	layer.
 */
 
 #ifndef PIC_H
@@ -243,9 +246,9 @@ int pic_config_read(char* config, uint32_t config_size);
 	the channel they use is always the same channel.
 */
 int uart2_readcount(void *context);
-int uart2_getbytes(void *context, uint8_t* buff, uint32_t len);
+int uart2_read(void *context, uint8_t* buff, uint32_t len);
 int uart2_getchar(void *context);
-int uart2_putbytes(void *context, const uint8_t* buff, uint32_t len);
+int uart2_write(void *context, const uint8_t* buff, uint32_t len);
 int uart2_putchar(void *context, char c);
 int uart2_flush(void *context);
 

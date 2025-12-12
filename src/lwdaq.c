@@ -1,7 +1,5 @@
 /*
-	lwdaq.c defines functions used by our LWDAQ Relay to provide a LWDAQ Server.
-	It does not include the routines used by LWDAQ Relay to communicate with the
-	LWDAQ Controller. Those routines are in our pic.c file.
+	lwdaq.c -- Implementation of the Long-Wire Data Acquisition Relay library.
 
 	(C) 2025, Kevan Hashemi, Open Source Instruments Inc.
 
@@ -88,7 +86,7 @@ int lwdaq_header(TCP_SOCKET s, uint32_t id, uint32_t len) {
 	*lp = flip_bytes_u32(id);
 	lp = (uint32_t*) &buff[CLEN_OFFSET];
 	*lp = flip_bytes_u32(len);
-	tcp_write_all(s, buff, CONTENT_OFFSET);
+	tcp_writeall(&s, buff, CONTENT_OFFSET);
 	
 	return 0;
 }
@@ -100,7 +98,7 @@ int lwdaq_footer(TCP_SOCKET s) {
 	uint8_t buff[FRAME_BUFF_SIZE];
 	
 	buff[0] = END_CODE;
-	tcp_write_all(s, buff, 1);
+	tcp_writeall(&s, buff, 1);
 	
 	return 0;
 }
@@ -114,7 +112,7 @@ int lwdaq_byte_return(TCP_SOCKET s, uint8_t data) {
 	
 	lwdaq_header(s, DATA_RETURN, sizeof(data));
 	buff[0] = data;
-	tcp_write_all(s, buff, sizeof(data));
+	tcp_writeall(&s, buff, sizeof(data));
 	lwdaq_footer(s);
 	
 	return 0;
@@ -131,7 +129,7 @@ int lwdaq_integer_return(TCP_SOCKET s, uint32_t data) {
 	lwdaq_header(s, DATA_RETURN, sizeof(data));
 	lp = (uint32_t*) &buff[0];
 	*lp = flip_bytes_u32(data);
-	tcp_write_all(s, buff, sizeof(data));
+	tcp_writeall(&s, buff, sizeof(data));
 	lwdaq_footer(s);
 	
 	return 0;
@@ -142,7 +140,7 @@ int lwdaq_integer_return(TCP_SOCKET s, uint32_t data) {
 */
 int lwdaq_data_return(TCP_SOCKET s, uint8_t* block, uint32_t len) {
 	lwdaq_header(s, DATA_RETURN, len);
-	tcp_write_all(s, block, len);
+	tcp_writeall(&s, block, len);
 	lwdaq_footer(s);
 	
 	return 0;
@@ -190,7 +188,7 @@ int lwdaq_handle_message (TCP_SOCKET s, uint32_t id, uint32_t len, uint8_t* cont
 			if (debug) console_print("BYTE_POLL of %d for %d in %s.\r\n",
 				register_addr, value, __func__);
 			while (lwdaq_byte_read(register_addr) != value) {
-				if (socket_tick(s)<0) return -1;
+				if (tcp_socket_tick(&s)<0) return -1;
 			}
 		}
 		break;
@@ -212,13 +210,13 @@ int lwdaq_handle_message (TCP_SOCKET s, uint32_t id, uint32_t len, uint8_t* cont
 				for (int j = 0; j < tx_len; j++) {
 					lwdaq_byte_write(62, 0);
 					while (lwdaq_byte_read(62) == 0) {
-						if (socket_tick(s)<0) return -1;
+						if (tcp_socket_tick(&s)<0) return -1;
 					}
 					tx_buffer[i] = lwdaq_byte_read(register_addr);
 					i++;
 					if ((i == sizeof(tx_buffer)) || (j == tx_len - 1)) {
-						tcp_write_all(s, &tx_buffer[0], i);
-						if (socket_tick(s) < 0) {
+						tcp_writeall(&s, &tx_buffer[0], i);
+						if (tcp_socket_tick(&s) < 0) {
 							if (debug) console_print(
 								"Failed to write %d bytes in %s.\r\n", i, __func__);
 							return -1;
@@ -351,7 +349,7 @@ int lwdaq_handle_message (TCP_SOCKET s, uint32_t id, uint32_t len, uint8_t* cont
 	only the socket handle but also the server state, which allows the tasks
 	manager to determine when to reset its buffer.
 */
-int lwdaq_tasks(tcpip_server_type* s) {
+int lwdaq_tasks(tcpip_server_type* server) {
 	static uint8_t rx_buffer[TCP_RX_BUFF_SIZE];
 	static uint32_t rx_available = 0;
 	uint32_t id, len, rx_ready;
@@ -365,10 +363,10 @@ int lwdaq_tasks(tcpip_server_type* s) {
 		like to introduce an idle timer her as well, so we can close the sockeet
 		when it is idle for too long. Here we would start the timer.
 	*/
-	if ((*s).state == S_LISTENING) {
+	if (server->state == S_LISTENING) {
 		rx_available = 0;
 		if (debug) console_print("Initialized %s connection in %s.\r\n",
-			(*s).protocol, __func__);
+			server->protocol, __func__);
 		return 0;
 	};
 
@@ -378,9 +376,9 @@ int lwdaq_tasks(tcpip_server_type* s) {
 		bytes we have in our buffer. We start by finding out how many bytes are
 		available for us to read from the socket and add to our buffer.
 	*/
-	rx_ready = tcp_available((*s).socket);
+	rx_ready = tcp_readcount(&server->socket);
 	if (rx_ready>0) {
-		tcp_read((*s).socket, &rx_buffer[rx_available], rx_ready);	
+		tcp_read(&server->socket, &rx_buffer[rx_available], rx_ready);	
 		rx_available = rx_available+rx_ready;
 	}
 	if (rx_available == 0) return 0;
@@ -430,7 +428,7 @@ int lwdaq_tasks(tcpip_server_type* s) {
 		message content. If the message handler returns an error, we exit with
 		the same error code.
 	*/
-	status = lwdaq_handle_message((*s).socket, id, len, &rx_buffer[9]);
+	status = lwdaq_handle_message(server->socket, id, len, &rx_buffer[9]);
 	if (status<0) return status;
 	
 	/*

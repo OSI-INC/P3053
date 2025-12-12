@@ -1,7 +1,9 @@
 /*
-	lwdaq.h declares the variables, types, and functions used by our LWDAQ Relay to
-	provide a LWDAQ Server. It does not include the routines used by LWDAQ Relay to 
-	communicate with the LWDAQ Controller. Those routines are in our pic.c file.
+	lwdaq.c -- Interface of the Long-Wire Data Acquisition Relay library.
+	Provides a LWDAQ server for a TCP socket, thus creating a LWDAQ Relay. Does
+	not contain the routines that provide communication over the MCPIE parallel
+	buss that connects the LWDAQ Relay to the Controller. Those routines are
+	declared in pic.h.
 
 	(C) 2025, Kevan Hashemi, Open Source Instruments Inc.
 

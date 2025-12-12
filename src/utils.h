@@ -1,5 +1,7 @@
 /*
-	utils.h declares variables, types, and functions used by our generic utility routines.
+	utils.h -- Interface of the General-Purpose Utility library. These routines
+	do not use any Harmony or EEM-specific routines, only the standard run-time
+	library.
 */
 
 #ifndef UTILS_H

@@ -1,6 +1,5 @@
 /*
-	server.h declares the variables, types, and functions used in our TCP/IP
-	communication and server routines.
+	server.c -- Interface of the TCP/IP Server and Communication library.
 */
 
 #ifndef SERVER_H
@@ -14,23 +13,32 @@
 
 /*
 	Two procedures that maintain the TCP/IP stack, including the Ethernet
-	physical interface driver. The first, tcpip_tick, takes no arguments and
+	physical interface driver. The first, tcp_tick, takes no arguments and
 	returns no value. This procedure can be called anywhere without specifying a
 	socket. The second takes a TCP/IP socket as its argument and returns a
 	negative value if and only if the socket is closed or disconnected.
 */
-void tcpip_tick(void);
-int socket_tick(TCP_SOCKET s);
+void tcp_tick(void);
+int tcp_socket_tick(void* context);
 
 /*
-	Routines to read and write from sockets. These are wrappers for Harmony routines.
+	Routines that read and write from sockets. These are wrappers for Harmony
+	routines. They are compatible with our command-line interface (CLI) through
+	their use of a generic pointer rather than a TCP socket index. Instead of a
+	TCP_SOCKET type, we pass to these routines a pointer to a TCP_SOCKET. The
+	routines de-reference the pointer and so fetch the socket index, which they
+	then pass to the lower-level Harmony library routines. It is this use of a
+	generic pointer that makes the routines compatible with the CLI and other
+	channel-agnostic communication processes we might devise.
 */
-uint32_t tcp_available(TCP_SOCKET s);
-uint32_t tcp_read(TCP_SOCKET s, uint8_t* buffer, uint32_t len);
-uint32_t tcp_write_space(TCP_SOCKET s);
-uint32_t tcp_write(TCP_SOCKET s, const uint8_t* data, uint32_t len);
-void tcp_flush(TCP_SOCKET s);
-int tcp_write_all(TCP_SOCKET s, const uint8_t *buf, uint16_t len);
+int tcp_readcount(void* context);
+int tcp_read(void* context, uint8_t* buffer, uint32_t len);
+int tcp_getchar(void* context);
+int tcp_writecount(void* context);
+int tcp_write(void* context, const uint8_t* data, uint32_t len);
+int tcp_putchar(void* context, char c);
+int tcp_flush(void* context);
+int tcp_writeall(void* context, const uint8_t *buf, uint16_t len);
 
 /*
  	The tcpip_server_state structure defines the states of our generic TCP/IP server process.
@@ -73,8 +81,8 @@ void server_info(char* out, uint32_t max_len);
 /*
  	A tcpip_tasks_type is the type of procedure that will be called by our
  	generic TCP/IP server. It must take as argument a tcpip_server_info
- 	structure. If it blocks the server, it must call socket_tick while it is
- 	blocking. If socket_tick returns a negative value, the task must abort and
+ 	structure. If it blocks the server, it must call tcp_socket_tick while it is
+ 	blocking. If tcp_socket_tick returns a negative value, the task must abort and
  	return a negative value itself.
 */
 typedef int (*tcpip_tasks_type)(tcpip_server_type* s);

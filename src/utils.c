@@ -1,5 +1,5 @@
 /*
-	utils.c is a library of generic, platform-independent utility routines.
+	utils.c -- Implementation of the General-Purpose Utility library.
 */
 
 #include <stdio.h>

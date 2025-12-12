@@ -1,9 +1,5 @@
 /*
-	console.c is a library of routines that implement a console and
-	command interface using our UART2 interface. It defines a family
-	of console_* procedures for writing to and reading from the UART2.
-	It provides implementation for the family of SYS_CONSOLE routines
-	that Harmony system modules call for reporting and debugging.
+	console.c -- Implementation of the Process Reporting Console library.
 */
 
 #include <stdio.h>

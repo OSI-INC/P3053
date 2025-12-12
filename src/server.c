@@ -1,6 +1,5 @@
 /*
-	server.c is a library of communication routines, including network and
-	console interfaces.
+	server.c -- Implementation of the TCP/IP Server and Communication library.
 */
 
 #include <stdio.h>
@@ -20,19 +19,18 @@
 #include "console.h"
 #include "utils.h"
 
-
 /*
-	tcpip_tick maintains the TCP/IP stack without checking the status of any
+	tcp_tick maintains the TCP/IP stack without checking the status of any
 	particular socket. It returns no value. It refers to the global sysObj
 	structure declared in definitions.h of our Harmony library. 
 */
-void tcpip_tick(void) {
+void tcp_tick(void) {
 	DRV_MIIM_OBJECT_BASE_Default.DRV_MIIM_Tasks(sysObj.drvMiim_0);
 	TCPIP_STACK_Task(sysObj.tcpip);
 }
 
 /*
-	socket_tick maintains the TCP/IP stack and checks to see if a particular
+	tcp_socket_tick maintains the TCP/IP stack and checks to see if a particular
 	socket is still open. This routine must be called by any protocol task
 	whenever it enters a loop waiting for some other process to complete. We say
 	the protocol task is "blocking". When this routine returns a negative value,
@@ -43,9 +41,10 @@ void tcpip_tick(void) {
 	handle and returns a negative value when the socket has been closed or has
 	been determined by the stack to be disconnected.
 */
-int socket_tick(TCP_SOCKET s) {
-	tcpip_tick();
-	if (!TCPIP_TCP_IsConnected(s) || TCPIP_TCP_WasDisconnected(s)) {
+int tcp_socket_tick(void* context) {
+    TCP_SOCKET sock = *(TCP_SOCKET *) context;
+	tcp_tick();
+	if (!TCPIP_TCP_IsConnected(sock) || TCPIP_TCP_WasDisconnected(sock)) {
 		return -1;
 	} else {
 		return 0;
@@ -53,13 +52,14 @@ int socket_tick(TCP_SOCKET s) {
 }
 
 /*
-	tcp_available returns the number of bytes that are ready to be read out of
+	tcp_readcount returns the number of bytes that are ready to be read out of
 	a TCP socket. It is a wrapper for a Harmony routine. It converts sixteen-bit
 	integers to thirty-two bit integers for our thirty-two bit processor. Its
 	name is in our opinion more suitable.	
 */ 
-uint32_t tcp_available(TCP_SOCKET s) {
-	return TCPIP_TCP_GetIsReady(s);
+int tcp_readcount(void* context) {
+    TCP_SOCKET sock = *(TCP_SOCKET *) context;
+	return (int) TCPIP_TCP_GetIsReady(sock);
 }
 
 /*
@@ -69,59 +69,93 @@ uint32_t tcp_available(TCP_SOCKET s) {
 	is available. It takes as arguments a socket handle, a byte buffer pointer,
 	and an unsigned integer length.
 */
-uint32_t tcp_read(TCP_SOCKET s, uint8_t* buffer, uint32_t len) {
-	return TCPIP_TCP_ArrayGet(s, buffer, len);
+int tcp_read(void* context, uint8_t* buffer, uint32_t len) {
+    TCP_SOCKET sock= *(TCP_SOCKET *) context;
+	return (int) TCPIP_TCP_ArrayGet(sock, buffer, len);
 }
 
 /*
-	tcp_write_space returns how much space we have available for writing to the
+	tcp_getchar attempts to read a single byte from a TCP socket. It returns a -2
+	if the socket is disconnected. It returns -1 if the socket is still connected
+	but there is no character to be read. Otherwise it returns a character.
+*/
+int tcp_getchar(void* context) {
+    TCP_SOCKET sock= *(TCP_SOCKET *) context;
+    uint8_t c;
+	if (sock == INVALID_SOCKET) return -2;
+    if (TCPIP_TCP_GetIsReady(sock) < 1) return -1;
+    if (TCPIP_TCP_ArrayGet(sock, &c, 1) == 1) return (int) c;
+    return -1;
+}
+
+/*
+	tcp_writecount returns how much space we have available for writing to the
 	outgoing TCP buffer of a socket. It takes a socket handle.
 */
-uint32_t tcp_write_space(TCP_SOCKET s) {
-	return TCPIP_TCP_PutIsReady(s);
+int tcp_writecount(void* context) {
+    TCP_SOCKET sock= *(TCP_SOCKET *) context;
+	return (int) TCPIP_TCP_PutIsReady(sock);
 }
 
 /*
-	tcp_write writes as many bytes as it can to TCP socket without overflowing
+	tcp_write writes as many bytes as it can to a TCP socket without overflowing
 	the outgoing buffer, stopping only when it has written the specified number
 	of bytes. It returns the number of bytes it actually wrote. It takes as
 	argument a socket handle, a pointer to the byte buffer containing the data
 	that should be written, and an unsigned integer length. The routine does not
 	flush the socket. It does not block.
 */
-uint32_t tcp_write(TCP_SOCKET s, const uint8_t* data, uint32_t len) {
-	return TCPIP_TCP_ArrayPut(s, data, len);
+int tcp_write(void* context, const uint8_t* data, uint32_t len) {
+    TCP_SOCKET sock= *(TCP_SOCKET *) context;
+	return (int) TCPIP_TCP_ArrayPut(sock, data, len);
+}
+
+/*
+	tcp_putchar attempts to write a single character to a TCP socket. If the
+	socket is disconnected, it returns -1. If the buffer was full, it returns a
+	0. Otherwise it returns a 1 to show success.
+*/
+int tcp_putchar(void* context, char c) {
+	TCP_SOCKET sock= *(TCP_SOCKET *) context;
+	if (sock == INVALID_SOCKET) return -1;
+	while (TCPIP_TCP_PutIsReady(sock) == 0) {
+		if (tcp_socket_tick(context) < 0) return -1;
+	}
+	if (TCPIP_TCP_ArrayPut(sock, (uint8_t *)&c, 1) == 1) return 1;
+	return 0;
 }
 
 /*
 	tcp_flush forces the TCP/IP stack to transmit all bytes in the outgoing
 	buffer as soon as it can.
 */
-void tcp_flush(TCP_SOCKET s) {
-	TCPIP_TCP_Flush(s);
+int tcp_flush(void* context) {
+    TCP_SOCKET sock= *(TCP_SOCKET *) context;
+	TCPIP_TCP_Flush(sock);
+	return 0;
 }
 
 /*
-	tcp_write_all attempts to write all the specified bytes by repeatedly
+	tcp_writeall attempts to write all the specified bytes by repeatedly
 	writing as many bytes as possible to the outgoing buffer, flushing the
 	socket, and writing more bytes to the buffer until all bytes are sent. While
-	it is waiting for bytes to be transmitted, it calls socket_tick, and if this
+	it is waiting for bytes to be transmitted, it calls tcp_socket_tick, and if this
 	routine returns an error, the write routine must abort and itself return an
 	error. If it does not return an error, it returns the number of bytes
 	written, which must be the number specified.
 */
-int tcp_write_all(TCP_SOCKET s, const uint8_t *buf, uint16_t len) {
-    uint32_t total = 0;
-    uint32_t written = 0;
-    while (total < len) {
-        written = tcp_write(s, buf+total, len-total);
-        total = total + written;
-        if (total < len) {
-        	if (socket_tick(s) < 0) {return -1;}
-        }
-    }
-    tcp_flush(s);
-    return (int)total;
+int tcp_writeall(void* context, const uint8_t *buf, uint16_t len) {
+	int total = 0;
+	int written = 0;
+	while (total < len) {
+		written = tcp_write(context, buf+total, len-total);
+		total = total + written;
+		if (total < len) {
+			if (tcp_socket_tick(context) < 0) {return -1;}
+		}
+	}
+	tcp_flush(context);
+	return (int)total;
 }
 
 /*
@@ -280,14 +314,6 @@ void server_info(char* out, uint32_t max_len) {
 }
 
 /*
-	tcpip_write takes a socket handle, a pointer to a byte array, and a number
-	of bytes we want to write from the array. The routine attempts to write all
-	the data by repeatedly writing however many bytes the transmit buffer will
-	accept, and flushing the transmit buffer. Each time we flush the socket,
-	we also call the 
-*/
-
-/*
 	tcpip_server provides management of connection, service, and closure of a
 	TCP/IP protocol.  The core actions of waiting for the TCP/IP stack to start
 	up, waiting for an IP address to be assigned, listening on the port assigned
@@ -298,7 +324,7 @@ void server_info(char* out, uint32_t max_len) {
 
 	The tcpip_server is a state machine that does not block its calling
 	procedure, excepting when the protocol task provided to it causes a block.
-	The task procedure is permitted to block, but it must call socket_tick while
+	The task procedure is permitted to block, but it must call tcp_socket_tick while
 	it is blocking, so as to maintain the TCP/IP stack, and to detect closure of
 	the socket by the client. If the client closes the socket, the protocol task
 	must abort and return a negative value. The tcpip_server will close the
@@ -351,7 +377,7 @@ void server_info(char* out, uint32_t max_len) {
 	In the default state, the server remains stuck, and issues a debug heartbeat
 	report of its sitting in an unknown state.
 */
-void tcpip_server(tcpip_server_type* s, tcpip_tasks_type tasks) {
+void tcpip_server(tcpip_server_type* server, tcpip_tasks_type tasks) {
 	#define HEARTBEAT_PERIOD 50000000
 
 	SYS_STATUS tcpip_status;
@@ -364,7 +390,7 @@ void tcpip_server(tcpip_server_type* s, tcpip_tasks_type tasks) {
 	static uint32_t wait_stack_done = 0;
 	static uint32_t wait_ip_done = 0;
 
-	switch ((*s).state) {
+	switch (server->state) {
 		case S_WAIT_STACK: {
 			tcpip_status = TCPIP_STACK_Status(sysObj.tcpip);
 			if (tcpip_status < 0) {   
@@ -373,7 +399,7 @@ void tcpip_server(tcpip_server_type* s, tcpip_tasks_type tasks) {
 						"TCP/IP stack initialization failed in %s.\r\n",
 						__func__);
 				}
-				(*s).state = S_ERROR;
+				server->state = S_ERROR;
 			} else if (tcpip_status == SYS_STATUS_READY) {
 				net_hdl = TCPIP_STACK_IndexToNet(0);
 				interface_name = TCPIP_STACK_NetNameGet(net_hdl);
@@ -385,7 +411,7 @@ void tcpip_server(tcpip_server_type* s, tcpip_tasks_type tasks) {
 						string_trim(host_name),
 						__func__);
 				}
-				(*s).state = S_WAIT_IP;
+				server->state = S_WAIT_IP;
 			}
 			wait_stack_done = 1;
 		}
@@ -404,74 +430,74 @@ void tcpip_server(tcpip_server_type* s, tcpip_tasks_type tasks) {
 						__func__);
 					ping_gateway();
 				}
-				(*s).state = S_OPEN_SERVER;
+				server->state = S_OPEN_SERVER;
 				wait_ip_done = 1;
 			}
 		}
 		break;
 
 		case S_OPEN_SERVER: {
-			(*s).socket = TCPIP_TCP_ServerOpen(IP_ADDRESS_TYPE_IPV4, (*s).port, 0);
-			if ((*s).socket == INVALID_SOCKET) {
+			server->socket = TCPIP_TCP_ServerOpen(IP_ADDRESS_TYPE_IPV4, server->port, 0);
+			if (server->socket == INVALID_SOCKET) {
 				if (debug) console_print(
 					"Failed to open %s server on port %d in %s.\r\n",
-					(*s).protocol, (*s).port, __func__);
-				(*s).state = S_ERROR;
+					server->protocol, server->port, __func__);
+				server->state = S_ERROR;
 			} else {
 				if (debug) console_print(
 					"Listening for %s connection on port %d in %s.\r\n",
-					(*s).protocol, (*s).port, __func__);
-				(*s).state = S_LISTENING;
+					server->protocol, server->port, __func__);
+				server->state = S_LISTENING;
 			}
 		}
 		break;
 
 		case S_LISTENING: {
-			if (TCPIP_TCP_IsConnected((*s).socket)) {
-				if (TCPIP_TCP_SocketInfoGet((*s).socket, &sock_info)) {
+			if (TCPIP_TCP_IsConnected(server->socket)) {
+				if (TCPIP_TCP_SocketInfoGet(server->socket, &sock_info)) {
 					IPV4_ADDR ip = sock_info.remoteIPaddress.v4Add;
 					if (debug) console_print(
 						"%s connection from %u.%u.%u.%u in %s.\r\n",
-						(*s).protocol, ip.v[0], ip.v[1], ip.v[2], ip.v[3], __func__);
+						server->protocol, ip.v[0], ip.v[1], ip.v[2], ip.v[3], __func__);
 				} else {
 					if (debug) console_print(
 						"%s connection from unknown peer in %s.\r\n",
-						(*s).protocol, __func__);
+						server->protocol, __func__);
 				}
-				status = tasks(s);
+				status = tasks(server);
 				if (status >= 0) {
-					(*s).state = S_SERVING;
+					server->state = S_SERVING;
 				} else {
 					if (debug) console_print(
 						"%s socket closed pre-emptively by server in %s.\r\n",
-						(*s).protocol, __func__);			
-					(*s).state = S_CLOSE;
+						server->protocol, __func__);			
+					server->state = S_CLOSE;
 				}
 			}
 		}
 		break;
 
 		case S_SERVING: {
-			if (!TCPIP_TCP_IsConnected((*s).socket) ||
-					TCPIP_TCP_WasDisconnected((*s).socket)) {
+			if (!TCPIP_TCP_IsConnected(server->socket) ||
+					TCPIP_TCP_WasDisconnected(server->socket)) {
 				if (debug) console_print("%s socket closed by client in %s.\r\n",
-					(*s).protocol, __func__);
-				(*s).state = S_CLOSE;
+					server->protocol, __func__);
+				server->state = S_CLOSE;
 			} else {
-				status = tasks(s);
+				status = tasks(server);
 				if (status < 0) {
 					if (debug) console_print("%s socket closed by server in %s.\r\n",
-						(*s).protocol, __func__);			
-					(*s).state = S_CLOSE;
+						server->protocol, __func__);			
+					server->state = S_CLOSE;
 				}
 			}
 		}
 		break;
 		
 		case S_CLOSE: {
-			TCPIP_TCP_Close((*s).socket);
-			(*s).socket = INVALID_SOCKET;
-			(*s).state = S_OPEN_SERVER;
+			TCPIP_TCP_Close(server->socket);
+			server->socket = INVALID_SOCKET;
+			server->state = S_OPEN_SERVER;
 		}
 		break;
 		
@@ -482,7 +508,7 @@ void tcpip_server(tcpip_server_type* s, tcpip_tasks_type tasks) {
 		default: {
 			if (rand() % HEARTBEAT_PERIOD == 0) {
 				if (debug) console_print("Unknown state %u for % server in %s.\r\n",
-					(*s).protocol, (*s).state, __func__);
+					server->protocol, server->state, __func__);
 			}		
 		}
 		break;

@@ -64,24 +64,24 @@ static const bool telnet_enable = false;
 /*
 	telnet_tasks services a Telnet connection.
 */
-int telnet_tasks(tcpip_server_type* s) {
+int telnet_tasks(tcpip_server_type* server) {
 	static uint8_t rx_buffer[TCP_RX_BUFF_SIZE];
     static char msg_buffer[TCP_TX_BUFF_SIZE];
     int len = 0;
 	 
-	if ((*s).state == S_LISTENING) {
+	if (server->state == S_LISTENING) {
 		if (debug) console_print("Initialized %s connection in %s.\r\n",
-			(*s).protocol, __func__);
+			server->protocol, __func__);
 		server_info(&msg_buffer[0], sizeof(msg_buffer));
-		tcp_write_all((*s).socket, (const uint8_t*) &msg_buffer[0], 
+		tcp_writeall(&server->socket, (const uint8_t*) &msg_buffer[0], 
 			strlen(msg_buffer));
 		return 0;
 	};
 
-	len = TCPIP_TCP_GetIsReady((*s).socket);
+	len = tcp_readcount(&server->socket);
 	if (len>0) {
-		TCPIP_TCP_ArrayGet((*s).socket, &rx_buffer[0], len);	
-		tcp_write_all((*s).socket, &rx_buffer[0], len);
+		tcp_read(&server->socket, &rx_buffer[0], len);	
+		tcp_writeall(&server->socket, &rx_buffer[0], len);
 		if (debug) console_print("Echoed %u bytes in %s.\r\n", len, __func__);
 		return len;
 	}
@@ -126,7 +126,7 @@ int main (void) {
    	*/
 	int i = 0;
 	while (true) {
-		tcpip_tick();
+		tcp_tick();
 		console_server();
 		tcpip_server(&lwdaq_server, lwdaq_tasks);
 		if (telnet_enable) {

@@ -1,6 +1,5 @@
 /*
-	cli.h provides declarations for our general-purpose Command-Line Interpreter
-	(CLI).
+	cli.h -- Implementation of the Command-Line Interpreter (CLI) library.
 */
 
 #ifndef CLI_H

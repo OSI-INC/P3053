@@ -1,7 +1,7 @@
 /*
-	cli.c implements a general-purpose Command-Line Interpreter (CLI) that we
-	can attach to any channel we like and into which we can register our own
-	commands.
+	cli.c -- Implementation of the Command-Line Interpreter (CLI) library.
+	Provides routines that create and maintain a generic CLI that we can attach
+	to any channel and expand with our own commands.
 */
 
 #include <stdio.h>

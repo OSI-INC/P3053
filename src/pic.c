@@ -1,7 +1,6 @@
 /*
-	pic.c is a library of utility routines that communicate with the PIC32MZ
-	registers, read and write throught he MPCIE parallel port, and read and
-	write to the non-volatile memory (NVM).
+	pic.c -- Implementation of the PIC32MZ Utility library for the Embedded
+	Ethernet Module.
 */
 
 #include <stdio.h>
@@ -319,13 +318,13 @@ int uart2_readcount(void *context)
 }
 
 /*
-	uart2_getchar attempts to read the specified number of bytes from the UART2
+	uart2_read attempts to read the specified number of bytes from the UART2
 	interface into a buffer. The routine will block until it receives all bytes
 	it wants. We assume that the number of bytes requested has been set by the
 	readcount routine, so the bytes are all waiting to be read. The context
 	pointer is for use by channel descriptors.
 */
-int uart2_getbytes(void *context, uint8_t* buff, uint32_t len) {
+int uart2_read(void *context, uint8_t* buff, uint32_t len) {
     (void) context;
     int num_got = (int) UART2_Read(buff, len);
     return num_got;
@@ -339,12 +338,12 @@ int uart2_getbytes(void *context, uint8_t* buff, uint32_t len) {
 int uart2_getchar(void *context) {
     (void) context;
     uint8_t c;
-    if (UART2_Read(&c, 1) == 1) return c; 
+    if (UART2_Read(&c, 1) == 1) return (int) c; 
     return -1;
 }
 
 /*
-	uart2_putbytes attempts to write a specified number of bytes to the UART2
+	uart2_write attempts to write a specified number of bytes to the UART2
 	interface. It waits until all bytes have been written. It never returns an
 	error. We trust it will not block or hang. The context pointer is for use by
 	channel descriptors. One detail in the code: Harmony's UART2 write routine
@@ -352,7 +351,7 @@ int uart2_getchar(void *context) {
 	to the buffer. So we must type-cast the buffer into a modifiable buffer to
 	avoid a compiler warning.
 */
-int uart2_putbytes(void *context, const uint8_t* buff, uint32_t len) {
+int uart2_write(void *context, const uint8_t* buff, uint32_t len) {
     (void)context;
     for (uint32_t i = 0; i < len; i++) {
         while (UART2_Write((uint8_t*) &buff[i], 1) == 0);
