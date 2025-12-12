@@ -1,5 +1,43 @@
 /*
-	server.c -- Interface of the TCP/IP Server and Communication library.
+	server.h -- Interface of the TCP/IP Server and Communication library.
+
+	Provides a TCP/IP server state machine that does not block, maintains a
+	listening socket and a single connection to that socket, and can be called
+	maintained by calling a single routine in the application's main loop. The
+	server code is re-entrant, so that we can launch as many of them as we like,
+	provided each one has its own dedicated listening socket. Each server calls
+	a task routine that maintains whatever function the server is supposed to
+	provide on the socket. Thus the particular tasks of a particular server
+	function are separated from the shared tasks of listening, accepting, and
+	closing a socket. These shared tasks are implemented by our tcpip_server
+	routine.	
+	
+	Provides routines to maintain, read, and write from TCP sockets that we find
+	more convenient than the Harmony3 routines, and which in addition take a
+	pointer to a TCP_SOCKET type rather than a TCP_SOCKET type itself. Because
+	the routines accept a pointer rather than a TCP-specific type, they can be
+	used with the generic communication channel descriptor structure we define
+	in our Command-Line Interface (CLI) library, so that we can provide a CLI on
+	a TCP/IP socket, as well as on a UART interface, or any other channel that
+	writes and reads bytes, without changing the CLI code to accommodate the
+	peculiarities of the physical channel. The CLI is just one example of a
+	piece of code that is channel-agnostic. Any other channel-agnostic project
+	would require TCP routines that conformed to a generic format. 
+	
+	(C) 2025, Kevan Hashemi, Open Source Instruments Inc.
+
+	This program is free software: you can redistribute it and/or modify it
+	under the terms of the GNU General Public License as published by the Free
+	Software Foundation, either version 3 of the License, or (at your option)
+	any later version.
+
+	This program is distributed in the hope that it will be useful, but WITHOUT
+	ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+	FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+	more details.
+
+	You should have received a copy of the GNU General Public License along with
+	this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
 #ifndef SERVER_H
