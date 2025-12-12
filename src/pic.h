@@ -236,14 +236,17 @@ int pic_config_write(const char* config);
 int pic_config_read(char* config, uint32_t config_size);
 
 /*
-	Routines that allow a command-line interpreter (CLI) use the UART2 interface. All
-	CLI communication routines take a context pointer argument, which is required by
-	some communication routines, but not our UART2 routines. So our UART2 routines 
-	accept the pointer, but make no use of it.
+	Generic UART2 communication routines. Each of these takes a context pointer
+	argument that allows it to be used with channel descriptors, such as our
+	command-line interpreter (CLI) uses to manage communication with a generic
+	channel. These context pointers are not used by our UART2 routines, because
+	the channel they use is always the same channel.
 */
 int uart2_readcount(void *context);
 int uart2_getbytes(void *context, uint8_t* buff, uint32_t len);
+int uart2_getchar(void *context);
 int uart2_putbytes(void *context, const uint8_t* buff, uint32_t len);
+int uart2_putchar(void *context, char c);
 int uart2_flush(void *context);
 
 #endif

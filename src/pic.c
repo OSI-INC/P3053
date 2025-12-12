@@ -307,24 +307,23 @@ int pic_config_read(char* config, uint32_t config_size) {
 }
 
 /*
-	uart2_readcount returns the number of bytes ready to be read in the UART2
-	interface. It is the first of four routines that communicate with the UART2
-	interface, which we enable and assign to pins during our initialization.
-	These routines are designed for deployment in our general-purpose
-	command-line interpreter (CLI), so they accept a context pointer. But they
-	do not use this pointer, so we declare them as "void" in each routine to
-	avoid a compiler warning.
+	uart2_readcount returns the number of bytes that are available in the UART2 
+	input buffer. It takes as an argument a generic pointer, which allows the
+	routine to be used in generic channel-descriptor records, such as those used
+	by our command-line interpreter (CLI).
 */
-int uart2_readcount(void *context) {
-    (void) context;
-	return UART2_ReadCountGet();
+int uart2_readcount(void *context)
+{
+    (void)context;
+    return UART2_ReadCountGet();
 }
 
 /*
-	uart2_getbytes attempts to read the specified number of bytes from the UART2
+	uart2_getchar attempts to read the specified number of bytes from the UART2
 	interface into a buffer. The routine will block until it receives all bytes
 	it wants. We assume that the number of bytes requested has been set by the
-	readcount routine, so the bytes are all waiting to be read.
+	readcount routine, so the bytes are all waiting to be read. The context
+	pointer is for use by channel descriptors.
 */
 int uart2_getbytes(void *context, uint8_t* buff, uint32_t len) {
     (void) context;
@@ -333,24 +332,50 @@ int uart2_getbytes(void *context, uint8_t* buff, uint32_t len) {
 }
 
 /*
+	uart2_getchar attempts to read a single character from the UART2 interface.
+	If it succeeds, it returns the byte value in an integer. If it fails, it
+	returns a -1. The context pointer is for use by channel descriptors.
+*/
+int uart2_getchar(void *context) {
+    (void) context;
+    uint8_t c;
+    if (UART2_Read(&c, 1) == 1) return c; 
+    return -1;
+}
+
+/*
 	uart2_putbytes attempts to write a specified number of bytes to the UART2
 	interface. It waits until all bytes have been written. It never returns an
-	error. We trust it will not block or hang. One detail in the code: Harmony's
-	UART2 write routine expects a buffer that is declared modifiable, even
-	though it does not write to the buffer. So we must type-cast the buffer into
-	a modifiable buffer to avoid a compiler warning.
+	error. We trust it will not block or hang. The context pointer is for use by
+	channel descriptors. One detail in the code: Harmony's UART2 write routine
+	expects a buffer that is declared modifiable, even though it does not write
+	to the buffer. So we must type-cast the buffer into a modifiable buffer to
+	avoid a compiler warning.
 */
 int uart2_putbytes(void *context, const uint8_t* buff, uint32_t len) {
     (void)context;
     for (uint32_t i = 0; i < len; i++) {
-        while (UART2_Write((uint8_t*) &buff[i], 1) == 0) { ; }
+        while (UART2_Write((uint8_t*) &buff[i], 1) == 0);
     }
     return (int) len;
 }
 
 /*
-	uart2_flush waits until all bytes waiting to be transmitted by the UART2
-	have been transmitted, and then returns. It never returns an error.
+	uart2_putchar writes a character to the UART2 interface. It blocks until the
+	character is written. It returns a 1 to indicate that one byte was written. 
+	The context pointer is for use by channel descriptors.
+*/
+int uart2_putchar(void *context, char c) {
+    (void) context;
+	while (UART2_Write((uint8_t*)&c, 1) == 0);
+	return 1;
+}
+
+/*
+	uart2_flush is a CLI-ready communication routine. It waits until all bytes
+	waiting to be transmitted by the UART2 have been transmitted, and then
+	returns. It blocks until transmission is complete. It always returns a zero
+	to indicate success. The context pointer is for use by channel descriptors.
 */
 int uart2_flush(void *context) {
     (void) context;

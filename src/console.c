@@ -38,7 +38,7 @@ static inline bool is_printable(char c) {
 	for all characters to be transmitted, we use our flush procedure.
 */
 void console_putchar(char c) {
-	uart2_putbytes(NULL, (uint8_t*)&c, 1); 
+	uart2_putchar(NULL, c);
 }
 
 /*
@@ -164,9 +164,7 @@ int console_readcount(void) {
 	that when it returns characters, we keep reading until we get a minus one.
 */
 int console_getchar(void) {
-    uint8_t c;
-    if (uart2_getbytes(NULL, &c, 1) == 1) return c;
-    return -1;
+    return uart2_getchar(NULL);
 }
 
 /*
@@ -232,16 +230,16 @@ void SYS_CONSOLE_Message(int index, const char* msg) {
 	be formatted by conversion specifications within the string. Because of the
 	variable number of arguments, we cannot simply call console_print and pass
 	it the string and arguments. We must repeat our console_print instructions,
-	using the stdarg.h machinery.
+	using the same stdarg.h machinery.
 */
 void SYS_CONSOLE_Print(int index, const char* fmt, ...) {
 	(void) index;
-	char buff[2048];
-	va_list ap;
-	va_start(ap, fmt);
-	vsnprintf(buff, sizeof(buff), fmt, ap);
-	va_end(ap);
-	console_message(buff);
+    char buff[2048];
+    va_list args;
+    va_start(args, fmt);
+    vsnprintf(buff, sizeof(buff), fmt, args);
+    va_end(args);
+    console_message(buff);
 }
 
 /*
@@ -463,293 +461,3 @@ void console_server(void) {
 		console_message("EEM$ ");
 	}
 }
-
-/*
-	cli_putchar writes a single character to a CLI channel. Any CLI command procedure
-	can call this routine to write to its output. The routine does not distinguishe
-	between binary and text characters. It does not perform CRLF checking.
-*/
-void cli_putchar(cli_chan_type *ch, char c) {
-    ch->putbytes(ch->context, (const uint8_t *) &c, 1);
-}
-
-/*
-	cli_message writes a null-terminated string to a CLI channel. It checks
-	every character in the string to make sure that all CR and LF become a
-	contiguous CRLF. The routine takes as arguments a channel pointer and
-	a pointer to the string. It writes the string one character at a time
-	to the output, using the cli_putchar routine.
-*/
-void cli_message(cli_chan_type *ch, const char *s) {
-    bool expect_lf = false;
-    while (*s) {
-        char c = *s;
-        if (c == '\r') {
-            cli_putchar(ch, '\r');
-            cli_putchar(ch, '\n');
-            expect_lf = true;
-        }
-        else if (c == '\n') {
-            if (!expect_lf) {
-                cli_putchar(ch, '\r');
-                cli_putchar(ch, '\n');
-            }
-            expect_lf = false;
-        }
-        else {
-            cli_putchar(ch, c);
-            expect_lf = false;
-        }
-        s++;
-    }
-    ch->flush(ch->context);
-}
-
-/*
-	cli_print composes a string of characters based upon a string containing
-	text and formatting characters, followed by zero or more arguments, and
-	prints the string it composes to the output of a CLI channel. For each
-	literal argument there must be a conversion specification in the string. The
-	conversion specifier begins with a percent symbol. Simple examples are
-	percent symbol followed by: "d" for signed integer, "u" for unsigned
-	integer, "x" for hexadecimal, "s" for a null-terminated string, "c" for a
-	character, "f" for a floating point number or or a double-length floating
-	point number. In the case of the "f" format specifier, we can have
-	percent-symbol followed by "10.3f" for width ten characters, padded with
-	spaces on the left, and three digits after the decimal point. The routine
-	uses the machinery provided by stdarg.h to go through the format
-	specficiations and literal arguments. This machinery is: va_start, va_list,
-	vsnprintf, and va_end.
-*/
-void cli_print(cli_chan_type* ch, const char* fmt, ...) {
-    char buff[511];
-    va_list args;
-    va_start(args, fmt);
-    vsnprintf(buff, sizeof(buff), fmt, args);
-    va_end(args);
-    cli_message(ch, buff);
-}
-
-/*
-	Command line interpreter (CLI) command list. See the accompanying header file
-	for the declaration of the command procedure type. We keep track of the number
-	of commands registered so we will know where to register the next command in
-	our list, and so we will be able to avoid overflowing the list.
-*/
-static cli_command_entry cli_commands[CLI_MAX_COMMANDS];
-static int cli_num_commands = 0;
-
-/*
-	cli_cmd_register adds a command to our command-line interface (CLI). We pass
-	name of the command and a pointer to the procedure that implements the
-	command. The command must all be of type cli_cmd_proc, and it must obey the
-	CLI command procedure rules. The registration routine returns 0 for success,
-	-1 for a null argument, and -2 if the command list is full.
-*/
-int cli_cmd_register(const char *name, cli_cmd_proc proc) {
-    if (name == NULL || proc == NULL) {
-        return -1;
-    }
-    if (cli_num_commands >= CLI_MAX_COMMANDS) {
-        return -2; 
-    }
-    cli_commands[cli_num_commands].name = name;
-    cli_commands[cli_num_commands].proc = proc;
-    cli_num_commands++;
-    return 0;
-}
-
-/*
-	cli_cmd_dummy is an example CLI procedure in the correct format, showing
-	how we must define the response to the four operation codes.
-*/
-int cli_cmd_dummy (cli_chan_type *ch, const char *args) {
-    if(strcmp(args, "--info") == 0) {
-        cli_print(ch, "A dummy procedure for the CLI.\r\n");
-        return 0;
-    }
-    if(strcmp(args, "--help") == 0) {
-        cli_print(ch,
-            "Usage: dummy <value> [options]\r\n"
-            "Options:\r\n"
-            "  --info        One-line summary\r\n"
-            "  --help        Detailed help\r\n");
-        return 0;
-    }
-    cli_print(ch, "Unknown option .\r\n");
-    return -1;
-}
-
-
-/*
-	cli_cmd_find takes a command name and returns a pointer to the procedure that 
-	implements the functionality of the named command.
-*/
-static cli_cmd_proc cli_cmd_find(const char *name) {
-    for (int i = 0; i < cli_num_commands; i++) {
-        if (strcmp(cli_commands[i].name, name) == 0) {
-            return cli_commands[i].proc;
-        }
-    }
-    return NULL;
-}
-
-/*
-	cli_initialize initializes a command-line interpreter. We pass to it a completed
-	channel structure.
-*/
-void cli_initialize(cli_chan_type* ch) {
-	ch->rx_len = 0;
-	cli_cmd_register("dummy",cli_cmd_dummy);
-	cli_message(ch, "\r\n");
-	cli_message(ch, "------------------------\r\n");
-	cli_message(ch, "Command-Line Interpreter\r\n");
-	cli_message(ch, "------------------------\r\n");
-}
-
-/*
-	cli_server maintains a command-line interpreter on the specified channel.
-*/
-void cli_server(cli_chan_type *ch)
-{
-    /*---------------------------------------------------------------
-      1. Read available bytes from channel into rx_buff
-    ----------------------------------------------------------------*/
-    int available = ch->readcount(ch->context);
-    if (available > 0) {
-
-        /* Read as many bytes as will fit in the buffer */
-        int space = (CLI_RX_SIZE - 1) - (int)ch->rx_len;
-        if (space < 0) space = 0;
-
-        int to_read = available;
-        if (to_read > space) {
-            to_read = space;
-        }
-
-        if (to_read > 0) {
-            int got = ch->getbytes(ch->context,
-                                   &ch->rx_buff[ch->rx_len],
-                                   (uint32_t)to_read);
-            if (got > 0) {
-                ch->rx_len += (uint32_t)got;
-            }
-        }
-
-        /* Always maintain a terminator for convenience */
-        ch->rx_buff[ch->rx_len] = '\0';
-    }
-
-    /*---------------------------------------------------------------
-      2. Look for a newline in the receive buffer
-         Accept either '\n', '\r', or CRLF
-    ----------------------------------------------------------------*/
-    uint8_t *buff = ch->rx_buff;
-    uint32_t len = ch->rx_len;
-    uint32_t i;
-
-    for (i = 0; i < len; i++) {
-        if (buff[i] == '\n' || buff[i] == '\r') {
-            break;
-        }
-    }
-
-    if (i == len) {
-        /* No newline yet — command not complete */
-        return;
-    }
-
-    /*---------------------------------------------------------------
-      3. We found a newline at buff[i].
-         Extract the full command line.
-    ----------------------------------------------------------------*/
-
-    /* Identify end of line region (skip CRLF or LFCR) */
-    uint32_t eol = i;
-    uint32_t consume = 1;
-
-    if (buff[i] == '\r' && i + 1 < len && buff[i+1] == '\n') {
-        consume = 2;
-    }
-    else if (buff[i] == '\n' && i + 1 < len && buff[i+1] == '\r') {
-        consume = 2;
-    }
-
-    /* Copy token (command) and args into local buffers */
-    char token[32];
-    char linebuff[256];
-
-    {
-        /* skip leading whitespace in the received command */
-        uint32_t p = 0;
-        while (p < eol && (buff[p] == ' ' || buff[p] == '\t'))
-            p++;
-
-        /* extract token */
-        uint32_t t = 0;
-        while (p < eol &&
-               buff[p] != ' ' &&
-               buff[p] != '\t' &&
-               t < sizeof(token) - 1)
-        {
-            token[t++] = (char)buff[p++];
-        }
-        token[t] = '\0';
-
-        /* skip whitespace after token */
-        while (p < eol && (buff[p] == ' ' || buff[p] == '\t'))
-            p++;
-
-        /* copy the rest into linebuff */
-        uint32_t l = 0;
-        while (p < eol && l < sizeof(linebuff) - 1) {
-            linebuff[l++] = (char)buff[p++];
-        }
-        linebuff[l] = '\0';
-    }
-
-    /*---------------------------------------------------------------
-      4. Shift remaining characters down in rx_buff
-         Remove the processed line including CR/LF
-    ----------------------------------------------------------------*/
-    {
-        uint32_t shift = eol + consume;
-        uint32_t remain = ch->rx_len - shift;
-
-        if (remain > 0) {
-            memmove(buff, &buff[shift], remain);
-        }
-
-        ch->rx_len = remain;
-        buff[ch->rx_len] = '\0';
-    }
-
-    /*---------------------------------------------------------------
-      5. Look up the command in the registry
-    ----------------------------------------------------------------*/
-    cli_cmd_proc proc = NULL;
-	proc = cli_cmd_find(token);
-
-    /*---------------------------------------------------------------
-      6. Execute or report error
-    ----------------------------------------------------------------*/
-    if (proc == NULL) {
-        cli_message(ch, "ERR: unknown command\r\n");
-    }
-    else {
-        int rc = proc(ch, linebuff);
-
-        if (rc == 0) {
-            cli_message(ch, "OK\r\n");
-        }
-        else {
-            cli_message(ch, "ERR\r\n");
-        }
-    }
-
-    /*---------------------------------------------------------------
-      7. Print new prompt
-    ----------------------------------------------------------------*/
-    cli_message(ch, "$ ");
-}
-
