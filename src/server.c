@@ -90,9 +90,10 @@ int tcp_read(void* context, uint8_t* buffer, uint32_t len) {
 }
 
 /*
-	tcp_getchar attempts to read a single byte from a TCP socket. It returns a -2
-	if the socket is disconnected. It returns -1 if the socket is still connected
-	but there is no character to be read. Otherwise it returns a character.
+	tcp_getchar attempts to read a single byte from a TCP socket. It returns a
+	-2 if the socket is disconnected. It returns -1 if the socket is still
+	connected but there is no character to be read. Otherwise it returns a
+	character. This routine can be deployed in a CLI channel descriptor.
 */
 int tcp_getchar(void* context) {
     TCP_SOCKET sock= *(TCP_SOCKET *) context;
@@ -127,14 +128,16 @@ int tcp_write(void* context, const uint8_t* data, uint32_t len) {
 
 /*
 	tcp_putchar attempts to write a single character to a TCP socket. If the
-	socket is disconnected, it returns -1. If the buffer was full, it returns a
-	0. Otherwise it returns a 1 to show success.
+	socket is disconnected, it returns -2. If the buffer was full, it keeps
+	waiting. It never returns the buffer full error code "-1". When it writes
+	the character, it returns a 1. This routine can be deployed in a CLI channel
+	descriptor.
 */
 int tcp_putchar(void* context, char c) {
 	TCP_SOCKET sock= *(TCP_SOCKET *) context;
-	if (sock == INVALID_SOCKET) return -1;
+	if (sock == INVALID_SOCKET) return -2;
 	while (TCPIP_TCP_PutIsReady(sock) == 0) {
-		if (tcp_socket_tick(context) < 0) return -1;
+		if (tcp_socket_tick(context) < 0) return -2;
 	}
 	if (TCPIP_TCP_ArrayPut(sock, (uint8_t *)&c, 1) == 1) return 1;
 	return 0;
@@ -142,7 +145,8 @@ int tcp_putchar(void* context, char c) {
 
 /*
 	tcp_flush forces the TCP/IP stack to transmit all bytes in the outgoing
-	buffer as soon as it can.
+	buffer as soon as it can. This routine can be deployed in a CLI channel
+	descriptor.
 */
 int tcp_flush(void* context) {
     TCP_SOCKET sock= *(TCP_SOCKET *) context;
@@ -151,10 +155,10 @@ int tcp_flush(void* context) {
 }
 
 /*
-	tcp_writeall attempts to write all the specified bytes by repeatedly
-	writing as many bytes as possible to the outgoing buffer, flushing the
-	socket, and writing more bytes to the buffer until all bytes are sent. While
-	it is waiting for bytes to be transmitted, it calls tcp_socket_tick, and if this
+	tcp_writeall attempts to write all requested bytes by repeatedly writing as
+	many bytes as possible to the outgoing buffer, flushing the socket, and
+	writing more bytes to the buffer until all bytes are sent. While it is
+	waiting for bytes to be transmitted, it calls tcp_socket_tick, and if this
 	routine returns an error, the write routine must abort and itself return an
 	error. If it does not return an error, it returns the number of bytes
 	written, which must be the number specified.
@@ -179,7 +183,7 @@ int tcp_writeall(void* context, const uint8_t *buf, uint16_t len) {
 	gatewayt, becauyse if there is no such entry in the local network's ARP
 	table, the Harmony TCP/IP stack will refuse to generate the ping. We use the
 	ping to announce the presence of the EEM on the local network when it boots
-	up.
+	up. We provide no routine currently to determine if the ping succeeded.
 */
 void ping_gateway(void) {
     TCPIP_NET_HANDLE netH;

@@ -18,11 +18,12 @@
 	the routines accept a pointer rather than a TCP-specific type, they can be
 	used with the generic communication channel descriptor structure we define
 	in our Command-Line Interface (CLI) library, so that we can provide a CLI on
-	a TCP/IP socket, as well as on a UART interface, or any other channel that
-	writes and reads bytes, without changing the CLI code to accommodate the
-	peculiarities of the physical channel. The CLI is just one example of a
-	piece of code that is channel-agnostic. Any other channel-agnostic project
-	would require TCP routines that conformed to a generic format. 
+	a TCP/IP socket, as well as on a UART interface, or an artificial channel
+	communicating with memory, or any other channel that writes and reads bytes,
+	without changing the CLI code to accommodate the peculiarities of the
+	physical channel. The CLI is just one example of a piece of code that is
+	channel-agnostic. Any other channel-agnostic project would also require TCP
+	routines that conformed to a generic format. 
 	
 	(C) 2025, Kevan Hashemi, Open Source Instruments Inc.
 

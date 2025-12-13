@@ -21,6 +21,19 @@
 #define CLI_H
 
 /*
+	cli_accept_char returns true iff the character is one that the CLI knows what
+	to do with. If the CLI does not know what to do with a character, it will
+	discard the character. This routine is for use by channel getchar routines
+	to normalize the input stream for the CLI.
+*/
+static inline bool cli_accept_char(unsigned char c) {
+    if (c >= 32 && c <= 126) return true; // Printable characters.
+    if (c == '\r' || c == '\n') return true; // Carriage return and line feed.
+    if (c == '\b' || c == 127) return true; // Backspace and delete.
+    return false; // Discard everything else.
+}
+
+/*
 	Channel communication function prototypes for the Command-Line Interpreter
 	(CLI). Each CLI instance uses a set of routines matching these prototypes to
 	manage its communication through the channel to which it is attached. It
@@ -29,11 +42,18 @@
 	it must do so with a text encoding, such as using two hexadecimal digits per
 	byte. The CLI reads and writes only one character at a time. It needs only
 	three routines to support its use of a channel: getchar, putchar, and flush.
-	The getchar returns a non-negative byte value in an integer if it was
-	successful in obtaining a character, a -1 if there are no characters
-	present, and a -2 if the channel has closed. The putchar returns a 1 if it
-	was successful, a 0 if the output buffer was full, and a -1 if the channel
-	has closed. The flush returns a 0 if successful, and a -1 if the channel has
+	All three return an integer. A positive value, including a zero, indicate no
+	error was encountered. A negative value is an error code. The getchar
+	routine must return a byte value 0-255 if it succeeds, -1 if there was no
+	byte available, and -2 if the channel has closed. The getchar routine must
+	not return characters for which cli_accept_char returns false. If getchar is
+	reading from a channel that contains control characters, such as a Telnet
+	interface, it must be adapted to this interface so that it removeds these
+	control characters and leaves only the command-line contents that the CLI
+	knows how to interpret. The putchar routine must return a 1 if it was
+	successful, a -1 if the output buffer was full, and a -2 if the channel has
+	closed. The flush routine must return a 0 if successful, a -1 if it times
+	out while waiting for the flush to complete, and a -2 if the channel is
 	closed. The CLI does not need a routine to tell it how many characters are
 	available to be read, because it can call getchar until the routine returns
 	-1. Each of the functions takes a generic pointer that it can use to look up
@@ -65,7 +85,8 @@ typedef struct {
     cli_flush_func flush;
     void *context;
     char rx_buff[CLI_RX_SIZE];
-    uint32_t rx_len;   
+    uint32_t rx_len;
+    char* name;
 } cli_chan_type;
 
 /*
@@ -94,7 +115,7 @@ typedef void (*cli_cmd_proc) (cli_chan_type *ch, const char *args);
 */
 typedef struct {const char *name; cli_cmd_proc proc;} cli_command_entry;
 #define CLI_MAX_COMMANDS 64
-#define CLI_NAME_SIZE 32
+#define CLI_CMD_SIZE 32
 #define CLI_ARGS_SIZE 256
 
 /*

@@ -321,14 +321,16 @@ int pic_config_read(char* config, uint32_t config_size) {
 }
 
 /*
-	uart2_readcount returns the number of bytes that are available in the UART2 
+	uart2_readcount returns the number of bytes that are available in the UART2
 	input buffer. It takes as an argument a generic pointer, which allows the
 	routine to be used in generic channel-descriptor records, such as those used
-	by our command-line interpreter (CLI).
+	by our command-line interpreter (CLI). Our UART2 routines make no use of
+	this pointer, so they mark it as "void" to stop a compiler warning about an
+	unused variable.
 */
 int uart2_readcount(void *context)
 {
-    (void)context;
+    (void) context;
     return UART2_ReadCountGet();
 }
 
@@ -348,7 +350,9 @@ int uart2_read(void *context, uint8_t* buff, uint32_t len) {
 /*
 	uart2_getchar attempts to read a single character from the UART2 interface.
 	If it succeeds, it returns the byte value in an integer. If it fails, it
-	returns a -1. The context pointer is for use by channel descriptors.
+	returns a -1. The context pointer is for use by channel descriptors. The
+	routine never returns a -2, which is the code our CLI expects for a channel
+	closure, because the UART will never close.
 */
 int uart2_getchar(void *context) {
     (void) context;
@@ -376,8 +380,9 @@ int uart2_write(void *context, const uint8_t* buff, uint32_t len) {
 
 /*
 	uart2_putchar writes a character to the UART2 interface. It blocks until the
-	character is written. It returns a 1 to indicate that one byte was written. 
-	The context pointer is for use by channel descriptors.
+	character is written. It returns a 1 to indicate that one byte was written.
+	It blocks until the write is complete. It never returns an error. The
+	context pointer is for use by channel descriptors.
 */
 int uart2_putchar(void *context, char c) {
     (void) context;
@@ -386,10 +391,10 @@ int uart2_putchar(void *context, char c) {
 }
 
 /*
-	uart2_flush is a CLI-ready communication routine. It waits until all bytes
-	waiting to be transmitted by the UART2 have been transmitted, and then
-	returns. It blocks until transmission is complete. It always returns a zero
-	to indicate success. The context pointer is for use by channel descriptors.
+	uart2_flush waits until all bytes waiting to be transmitted by the UART2
+	have been transmitted, and then returns. It blocks until transmission is
+	complete. It always returns a zero to indicate success. The context pointer
+	is for use by channel descriptors.
 */
 int uart2_flush(void *context) {
     (void) context;

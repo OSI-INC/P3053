@@ -33,13 +33,7 @@
 #include "pic.h"
 #include "server.h"
 #include "cli.h"
-
-/*
-	An in-line routine to test a character to see if it is printable.
-*/
-static inline bool is_printable(char c) {
-    return (c >= 32 && c <= 126);
-}
+#include "console.h"
 
 /*
 	cli_message writes a null-terminated string to a CLI channel. It checks
@@ -249,6 +243,7 @@ void cli_start(cli_chan_type* ch) {
 	cli_print(ch, "=========    Embedded Ethernet Module (A3053)     =========\r\n");
 	cli_print(ch, "===========================================================\r\n");
 	cli_print(ch, "Command-line interpreter running, try 'help' for help.\r\n");
+	cli_print(ch, "$ ");
 }
 
 /*
@@ -264,11 +259,11 @@ void cli_start(cli_chan_type* ch) {
 void cli_server(cli_chan_type *ch) {
 
 	// Static buffers are persistent, but we do not use them to carry
-	// information from one execution of this routine to the next. We
-	// merely avoiding re-allocating stack space for these buffers every
-	// time we call the server routine. Note that these lengths include
-	// the null character we put at the end of the name or argument list.
-    static char cmd_name[CLI_NAME_SIZE];
+	// information from one execution of this routine to the next. We merely
+	// avoiding re-allocating stack space for these buffers every time we call
+	// the server routine. Note that these lengths include the null character we
+	// put at the end of the command name or argument list.
+    static char cmd[CLI_CMD_SIZE];
     static char args[CLI_ARGS_SIZE];
 	
 
@@ -287,12 +282,11 @@ void cli_server(cli_chan_type *ch) {
 	// If the buffer has overflowed, reset it and report an error.
 	if (ch->rx_len >= CLI_RX_SIZE) {
 		cli_print(ch,"ERROR: Receive buffer overflow, "
-			"discarding all characters in %s.\r\n", __func__);
+			"discarding all characters in %s.\r\n", ch->name);
 		ch->rx_len = 0;
 		ch->rx_buff[0] = '\0';
 		return;
 	}
-	
 	
 	// Look for a newline in the characters we have available. If we find one, mark
 	// its location. If we don't find one, return.
@@ -326,31 +320,30 @@ void cli_server(cli_chan_type *ch) {
     // entire receive buffer and return.
 	uint32_t t = 0;
 	while (p < eol && ch->rx_buff[p] != ' ' && ch->rx_buff[p] != '\t') {
-		if (t >= sizeof(cmd_name) - 1) {
+		if (t >= sizeof(cmd) - 1) {
 			cli_print(ch,"ERROR: Command name buffer overflow, "
-				"discarding all characters in %s.\r\n", __func__);
+				"discarding all characters in %s.\r\n", ch->name);
 			ch->rx_len = 0;
 			ch->rx_buff[0] = '\0';
 			return;
 		}
-		cmd_name[t] = ch->rx_buff[p];
+		cmd[t] = ch->rx_buff[p];
 		t++;
 		p++;
 	}
-	cmd_name[t] = '\0';
+	cmd[t] = '\0';
 
 	// Skip over any leading spaces or tabs after the command name.
 	while (p < eol && (ch->rx_buff[p] == ' ' || ch->rx_buff[p] == '\t')) p++;
 
 	// Copy the rest of the input line into our argument list buffer. Terminate
-	// with a null
-    // character. If the argument list buffer overflows, discard the entire
-    // receive buffer and return an error. 
+	// with a null character. If the argument list buffer overflows, discard the
+	// entire receive buffer and return an error. 
 	uint32_t l = 0;
 	while (p < eol) {
 		if (l >= sizeof(args) - 1) {
 			cli_print(ch,"ERROR: Argument list buffer overflow, "
-				"discarding all characters in %s.\r\n", __func__);
+				"discarding all characters in %s.\r\n", ch->name);
 			ch->rx_len = 0;
 			ch->rx_buff[0] = '\0';
 			return;
@@ -360,6 +353,9 @@ void cli_server(cli_chan_type *ch) {
 		p++;
 	}
 	args[l] = '\0';
+	
+	// In debug mode, we report the command, arguments, and channel name.
+    if (debug) console_print("[%s] %s %s\r\n", ch->name, cmd, args);
 
 	// Shift any remaining characters all the way to the start of the receive
 	// buffer. We will deal with them the next time we call this routine.
@@ -372,9 +368,9 @@ void cli_server(cli_chan_type *ch) {
     // See if we can find a command procedure with a name that matches our
     // command name. If not, print an error and return.
     cli_cmd_proc proc = NULL;
-	proc = cli_cmd_find(cmd_name);
+	proc = cli_cmd_find(cmd);
     if (proc == NULL) {
-        cli_print(ch, "ERROR: Unknown command \"%s\" in %s.\r\n", cmd_name, __func__);
+        cli_print(ch, "ERROR: Unknown command '%s' in %s.\r\n", cmd, __func__);
         return;
     }
 

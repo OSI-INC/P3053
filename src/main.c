@@ -73,6 +73,7 @@
 #include "definitions.h"
 #include "utils.h"
 #include "pic.h"
+#include "cli.h"
 #include "console.h"
 #include "server.h"
 #include "lwdaq.h"
@@ -88,7 +89,7 @@ tcpip_server_type telnet_server = {
 	INVALID_SOCKET,
 	S_WAIT_STACK,
 	TELNET_PORT,
-	"TELNET"
+	"Telnet"
 };
 #ifdef VERBOSE_CONSOLE
 static const bool telnet_enable = true;
@@ -97,30 +98,62 @@ static const bool telnet_enable = false;
 #endif
 
 /*
+	telnet_getchar removes Telnet commands from the input stream so as to make
+	the stream compatible with our Command-Line Interpreter (CLI). Most of the
+	characters in these commands are non-printable characters, but some are not,
+	and they can reappear in the input stream at any time. This routine is not
+	re-entrant. It may be used by only one Telnet client at a time. Furthermore,
+	the routine assumes that Telnet control verbs 0xFB, 0xFC, 0xFD, and 0xFE
+	will never be present in the input stream unless followed by an option
+	character that we must ignore. We do not expect our CLI user to be entering
+	these values, and if they do, the behavior of our CLI is indeterminate. Like
+	all CLI-compatible getchar routines, this getchar returns -2 if the socket
+	is closed, -1 if no characters are available, and the character if it finds
+	one.	
+*/
+int telnet_getchar(void *context) {
+    static bool waiting_for_option = false;
+    int c;
+    
+    while (true) {
+		c = tcp_getchar(context);
+		if (c < 0) return c;
+		if (waiting_for_option) {
+			waiting_for_option = false;
+			continue;
+		}
+		if (c == 0xFF) continue;
+		if (c == 0xFB || c == 0xFC || c == 0xFD || c == 0xFE) {
+			waiting_for_option = true;
+			continue;
+		}
+		if (cli_accept_char((char) c)) {
+			return c;
+		}
+		continue;
+    }
+	return -1;
+}
+
+/*
 	telnet_tasks services a Telnet connection.
 */
 int telnet_tasks(tcpip_server_type* server) {
-	static uint8_t rx_buffer[TCP_RX_BUFF_SIZE];
-    static char msg_buffer[TCP_TX_BUFF_SIZE];
-    int len = 0;
-	 
+	static cli_chan_type cli_chan;
+		 
 	if (server->state == S_LISTENING) {
+   		cli_chan.getchar = telnet_getchar;
+		cli_chan.putchar = tcp_putchar;
+		cli_chan.flush = tcp_flush;
+		cli_chan.context  = (void *) &server->socket;
+		cli_chan.name = "CLI-Telnet";
+		cli_start(&cli_chan);
 		if (debug) console_print("Initialized %s connection in %s.\r\n",
 			server->protocol, __func__);
-		server_info(&msg_buffer[0], sizeof(msg_buffer));
-		tcp_writeall(&server->socket, (const uint8_t*) &msg_buffer[0], 
-			strlen(msg_buffer));
 		return 0;
 	};
 
-	len = tcp_readcount(&server->socket);
-	if (len>0) {
-		tcp_read(&server->socket, &rx_buffer[0], len);	
-		tcp_writeall(&server->socket, &rx_buffer[0], len);
-		if (debug) console_print("Echoed %u bytes in %s.\r\n", len, __func__);
-		return len;
-	}
-
+	cli_server(&cli_chan);
 	return 0;
 }
 
@@ -140,6 +173,12 @@ int main (void) {
 		the eight-bit parallel bus.
 	*/
 	pic_initialize();
+	
+	/*
+		Initialize the command-line interpreter. This involves nothing more than
+		registering commands.
+	*/
+	cli_initialize();
 	
 	/*
 		Set up the embedded ethernet module for this particular appliction. Here

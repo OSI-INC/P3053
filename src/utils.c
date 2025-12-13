@@ -28,9 +28,12 @@
 #include "utils.h"
 
 /*
-	string_trim takes a pointer to a null-terminated string and returns a pointer
-	to another null-terminated string that is the same as the original but with all
-	whitespace removed from the beginning and the end.
+	string_trim takes a pointer to a null-terminated string and returns a
+	pointer to another null-terminated string that is the same as the original
+	but with all whitespace removed from the beginning and the end. The routine
+	is not re-entrant: the trimmed string must be copied or have served its
+	purpose before the next call to string_trim, because it is a static string
+	allocated for the routine in memory. 
 */
 const char* string_trim(const char *s) {
     static char buf[256];

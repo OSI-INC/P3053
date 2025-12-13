@@ -65,30 +65,31 @@ void console_flush(void) {
 }
 
 /*
-	console_puthex takes a thirty-two bit integer, which is eight nibbles, and
-	prints it a hexadecimal value, most significant nibble first, to the
-	console.
+	console_put_int_hex takes a thirty-two bit integer, which is eight nibbles,
+	and prints it as eight hexadecimal digits, most significant nibble first, to
+	the console.
 */
-void console_puthex(uint32_t value) {
+void console_put_int_hex(uint32_t value) {
     const char hex[] = "0123456789ABCDEF";
     for (int shift = 28; shift >= 0; shift -= 4)
         console_putchar(hex[(value >> shift) & 0xF]);
 }
 
 /*
-	console_putint is not an ASCII-reporting routine. It is designed to allow us
-	to view thirty-two bit integers on an oscilloscope attached to our console
-	TX signel. It takes an integer value and transmits it, least significant
-	byte first, over the UART. Because the UART sends the least significant bit
-	first, we will see the bits on our oscilloscope trace of UART2 TX line as
-	bit 0 to 32, with a stop bit (1) and a start bit (0) between each of the
-	bytes. We can use it to broadcast raw register values, as in
-	console_putint(RPF3R). We used this routine to look at LATF, PIRTF, ODCF,
-	and RPF3R when we were investigating our start-up GPIP problems. By looking
-	at the bits on an oscilloscope, we do not need a functioning UART-to-USB
-	bridge, and we can view register bits toggling more easily.		
+	console_put_int_trace is not an ASCII-reporting routine. It is designed to
+	allow us to view thirty-two bit integers on an oscilloscope attached to our
+	console TX signel. It takes an integer value and transmits it, least
+	significant byte first, over the UART. Because the UART sends the least
+	significant bit first, we will see the bits on our oscilloscope trace of
+	UART2 TX line as bit 0 to 32, with a stop bit (1) and a start bit (0)
+	between each of the bytes. We can use it to broadcast raw register values,
+	as in console_putint(RPF3R). We used this routine to look at LATF, PIRTF,
+	ODCF, and RPF3R when we were investigating our start-up GPIP problems. By
+	looking at the bits on an oscilloscope, we do not need a functioning
+	UART-to-USB bridge, and we can view register bits toggling more
+	easily.		
 */
-void console_putint(uint32_t value) {
+void console_put_int_trace(uint32_t value) {
 	int i;
 	for (i = 0; i <= 3; i++) console_putchar(((uint8_t*)&value)[i]);
 }
@@ -158,6 +159,37 @@ void console_print(const char* fmt, ...) {
     vsnprintf(buff, sizeof(buff), fmt, args);
     va_end(args);
     console_message(buff);
+}
+
+/*
+	console_dump_hex prints the charactesr of a null-terminated string as pairs
+	of hexadecimal digits so we can see what the values of the non-printable
+	characters.
+*/
+void console_dump_hex(const char* s) {
+    const unsigned char* p = (const unsigned char*) s;
+    while (*p != '\0') {
+        console_print("%02X ", *p);
+        p++;
+    }
+    console_message("\r\n");
+}
+
+/*
+	console_dump_ascii prints the charactesr of a null-terminated string one
+	after the other, but transforms non-printable characters into periods.
+*/
+void console_dump_ascii(const char* s) {
+    const unsigned char* p = (const unsigned char*) s;
+    while (*p != '\0') {
+        if (is_printable(*p)) {
+            console_putchar((char) *p);
+        } else {
+            console_putchar('.');
+        }
+        p++;
+    }
+    console_message("\r\n");
 }
 
 /*
@@ -438,9 +470,14 @@ void console_server(void) {
 					break;
 					
 				case 'm':
-					sprintf(msg_buff,"System Timer Frequency (MHz): %.1f.",
-						(SYS_TMR_TickCounterFrequencyGet()*0.000001));
-					console_print("%s\r\n", msg_buff);
+					sprintf(msg_buff, 
+						"Tick Counter Frequency (kHz): %.3f\r\n"
+						"System Counter Frequency (MHz): %.3f\r\n"
+						"Sytem Clock Frequency (MHz): %.3f\r\n",
+						(double) SYS_TMR_TickCounterFrequencyGet() * 1e-3,
+						(double) SYS_TMR_SystemCountFrequencyGet() * 1e-6,
+						(double) SYS_TMR_SystemCountFrequencyGet() * 2e-6);
+					console_print("%s", msg_buff);
 					break;
 				
 				case 'n':
