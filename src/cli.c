@@ -243,9 +243,13 @@ void cli_cmd_ipconfig(cli_chan_type *ch, char *args) {
 			"  ipconfig [--info] [--help]\r\n"
 			"\r\n"
 			"Summary:\r\n"
-			"  List network interface configuration.\r\n"
+			"  Change network configuration as specified by options, then print\r\n" 
+			"  network configuration. With no options, no changes will be made.\r\n"
 			"\r\n"
 			"Options:\r\n"
+			"  --ip          Set IP address to new string 'x.x.x.x'.\r\n"
+			"  --gateway     Set gateway address to new string 'x.x.x.x'.\r\n"
+			"  --mask        Set network mask to new string 'x.x.x.x'.\r\n"
 			"  --info        Print a one-line summary of this command.\r\n"
 			"  --help        Print this help text.\r\n"
 		);
@@ -365,6 +369,7 @@ static cli_cmd_proc cli_cmd_find(const char *name) {
 	channel.
 */
 void cli_server(cli_chan_type *ch) {
+	const char* prompt = "EEM$ ";
 
 	// Static buffers are persistent, but we do not use them to carry
 	// information from one execution of this routine to the next. We merely
@@ -396,8 +401,8 @@ void cli_server(cli_chan_type *ch) {
 		return;
 	}
 	
-	// Look for a newline in the characters we have available. If we find one, mark
-	// its location. If we don't find one, return.
+	// Look for a newline in the characters we have available. If we find one,
+	// record its location. If we don't find one, return.
     uint32_t i;
     for (i = 0; i < ch->rx_len; i++) {
         if (ch->rx_buff[i] == '\n' || ch->rx_buff[i] == '\r') break;
@@ -409,25 +414,50 @@ void cli_server(cli_chan_type *ch) {
 	// sequence.
     uint32_t eol = i;
     uint32_t consume = 1;
-    if (ch->rx_buff[i] == '\r' 
-    		&& i < ch->rx_len - 1 
-    		&& ch->rx_buff[i+1] == '\n') {
+    if (ch->rx_buff[eol] == '\r' 
+    		&& eol < ch->rx_len - 1 
+    		&& ch->rx_buff[eol+1] == '\n') {
         consume = 2;
-    } else if (ch->rx_buff[i] == '\n' 
-    		&& i < ch->rx_len - 1 
-    		&& ch->rx_buff[i+1] == '\r') {
+    } else if (ch->rx_buff[eol] == '\n' 
+    		&& eol < ch->rx_len - 1 
+    		&& ch->rx_buff[eol+1] == '\r') {
         consume = 2;
     }
+    
+    // Overwrite the first newline character with a null to make a null-terminated
+    // line string.
+    ch->rx_buff[eol] = '\0';
+
+	// Now we normalize the line by executing backspace and delete characters. We
+	// make sure we treat characters we read from the receive buffer as unsigned
+	// values so that we can compare them to ASCII decimal values. Each time we read
+	// a printable character, we add it to the normalized string. Each time we see
+	// backspace or delete, we remove the previous character. We add a new null
+	// terminator at the end.
+    char *src = ch->rx_buff;
+    char *dst = ch->rx_buff;
+    while (*src != '\0') {
+		unsigned char c = (unsigned char)* src++;
+		if (c == '\b' || c == 0x7F) {
+			if (dst > ch->rx_buff) dst--;
+			continue;
+		}
+		if (c < 32 || c == 127) continue;
+		*dst++ = (char) c;
+    }
+    *dst = '\0';
 
     // Skip over any leading spaces or tabs in the input line.
 	uint32_t p = 0;
-	while (p < eol && (ch->rx_buff[p] == ' ' || ch->rx_buff[p] == '\t')) p++;
+	while (ch->rx_buff[p] == ' ' || ch->rx_buff[p] == '\t') p++;
 
     // Copy the first word in the input line into our command name buffer. If we
     // overflow the name buffer, because the name is too long, discard the
     // entire receive buffer and return.
 	uint32_t t = 0;
-	while (p < eol && ch->rx_buff[p] != ' ' && ch->rx_buff[p] != '\t') {
+	while (ch->rx_buff[p] != '\0' 
+			&& ch->rx_buff[p] != ' ' 
+			&& ch->rx_buff[p] != '\t') {
 		if (t >= sizeof(cmd) - 1) {
 			cli_print(ch,"ERROR: Command name buffer overflow, "
 				"discarding all characters in %s.\r\n", ch->name);
@@ -442,13 +472,13 @@ void cli_server(cli_chan_type *ch) {
 	cmd[t] = '\0';
 
 	// Skip over any leading spaces or tabs after the command name.
-	while (p < eol && (ch->rx_buff[p] == ' ' || ch->rx_buff[p] == '\t')) p++;
+	while (ch->rx_buff[p] == ' ' || ch->rx_buff[p] == '\t') p++;
 
 	// Copy the rest of the input line into our argument list buffer. Terminate
 	// with a null character. If the argument list buffer overflows, discard the
 	// entire receive buffer and return an error. 
 	uint32_t l = 0;
-	while (p < eol) {
+	while (ch->rx_buff[p] != '\0') {
 		if (l >= sizeof(args) - 1) {
 			cli_print(ch,"ERROR: Argument list buffer overflow, "
 				"discarding all characters in %s.\r\n", ch->name);
@@ -472,6 +502,12 @@ void cli_server(cli_chan_type *ch) {
 	if (remain > 0) memmove(ch->rx_buff, &ch->rx_buff[shift], remain);
 	ch->rx_len = remain;
 	ch->rx_buff[ch->rx_len] = '\0';
+	
+	// If the command name is an empty string, print the prompt.
+	if (strlen(cmd) == 0) {
+	    cli_message(ch, prompt);
+		return;
+	}
 
     // See if we can find a command procedure with a name that matches our
     // command name. If not, print an error and return.
@@ -479,6 +515,7 @@ void cli_server(cli_chan_type *ch) {
 	proc = cli_cmd_find(cmd);
     if (proc == NULL) {
         cli_print(ch, "ERROR: Unknown command '%s' in %s.\r\n", cmd, __func__);
+	    cli_message(ch, prompt);
         return;
     }
 
@@ -488,6 +525,6 @@ void cli_server(cli_chan_type *ch) {
 	proc(ch, args);
 
     // Print the prompt.
-    cli_message(ch, "$ ");
+    cli_message(ch, prompt);
 }
 

@@ -189,7 +189,7 @@ int lwdaq_handle_message (TCP_SOCKET s, uint32_t id, uint32_t len, uint8_t* cont
 			if (debug) console_print("BYTE_POLL of %d for %d in %s.\r\n",
 				register_addr, value, __func__);
 			while (lwdaq_byte_read(register_addr) != value) {
-				if (tcp_socket_tick(&s)<0) return -1;
+				if (tcpip_socket_tick(&s)<0) return -1;
 			}
 		}
 		break;
@@ -211,13 +211,13 @@ int lwdaq_handle_message (TCP_SOCKET s, uint32_t id, uint32_t len, uint8_t* cont
 				for (int j = 0; j < tx_len; j++) {
 					lwdaq_byte_write(62, 0);
 					while (lwdaq_byte_read(62) == 0) {
-						if (tcp_socket_tick(&s)<0) return -1;
+						if (tcpip_socket_tick(&s)<0) return -1;
 					}
 					tx_buffer[i] = lwdaq_byte_read(register_addr);
 					i++;
 					if ((i == sizeof(tx_buffer)) || (j == tx_len - 1)) {
 						tcp_writeall(&s, &tx_buffer[0], i);
-						if (tcp_socket_tick(&s) < 0) {
+						if (tcpip_socket_tick(&s) < 0) {
 							if (debug) console_print(
 								"Failed to write %d bytes in %s.\r\n", i, __func__);
 							return -1;

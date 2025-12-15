@@ -201,7 +201,7 @@ int main (void) {
    	*/
 	int i = 0;
 	while (true) {
-		tcp_tick();
+		tcpip_tick();
 		console_server();
 		tcpip_server(&lwdaq_server, lwdaq_tasks);
 		if (telnet_enable) {

@@ -35,17 +35,17 @@
 #include "utils.h"
 
 /*
-	tcp_tick maintains the TCP/IP stack without checking the status of any
+	tcpip_tick maintains the TCP/IP stack without checking the status of any
 	particular socket. It returns no value. It refers to the global sysObj
 	structure declared in definitions.h of our Harmony library. 
 */
-void tcp_tick(void) {
+void tcpip_tick(void) {
 	DRV_MIIM_OBJECT_BASE_Default.DRV_MIIM_Tasks(sysObj.drvMiim_0);
 	TCPIP_STACK_Task(sysObj.tcpip);
 }
 
 /*
-	tcp_socket_tick maintains the TCP/IP stack and checks to see if a particular
+	tcpip_socket_tick maintains the TCP/IP stack and checks to see if a particular
 	socket is still open. This routine must be called by any protocol task
 	whenever it enters a loop waiting for some other process to complete. We say
 	the protocol task is "blocking". When this routine returns a negative value,
@@ -56,9 +56,9 @@ void tcp_tick(void) {
 	handle and returns a negative value when the socket has been closed or has
 	been determined by the stack to be disconnected.
 */
-int tcp_socket_tick(void* context) {
+int tcpip_socket_tick(void* context) {
 	TCP_SOCKET sock = *(TCP_SOCKET *) context;
-	tcp_tick();
+	tcpip_tick();
 	if (!TCPIP_TCP_IsConnected(sock) || TCPIP_TCP_WasDisconnected(sock)) {
 		return -1;
 	} else {
@@ -137,7 +137,7 @@ int tcp_putchar(void* context, char c) {
 	TCP_SOCKET sock= *(TCP_SOCKET *) context;
 	if (sock == INVALID_SOCKET) return -2;
 	while (TCPIP_TCP_PutIsReady(sock) == 0) {
-		if (tcp_socket_tick(context) < 0) return -2;
+		if (tcpip_socket_tick(context) < 0) return -2;
 	}
 	if (TCPIP_TCP_ArrayPut(sock, (uint8_t *)&c, 1) == 1) return 1;
 	return 0;
@@ -158,7 +158,7 @@ int tcp_flush(void* context) {
 	tcp_writeall attempts to write all requested bytes by repeatedly writing as
 	many bytes as possible to the outgoing buffer, flushing the socket, and
 	writing more bytes to the buffer until all bytes are sent. While it is
-	waiting for bytes to be transmitted, it calls tcp_socket_tick, and if this
+	waiting for bytes to be transmitted, it calls tcpip_socket_tick, and if this
 	routine returns an error, the write routine must abort and itself return an
 	error. If it does not return an error, it returns the number of bytes
 	written, which must be the number specified.
@@ -170,7 +170,7 @@ int tcp_writeall(void* context, const uint8_t *buf, uint16_t len) {
 		written = tcp_write(context, buf+total, len-total);
 		total = total + written;
 		if (total < len) {
-			if (tcp_socket_tick(context) < 0) {return -1;}
+			if (tcpip_socket_tick(context) < 0) {return -1;}
 		}
 	}
 	tcp_flush(context);
@@ -183,7 +183,8 @@ int tcp_writeall(void* context, const uint8_t *buf, uint16_t len) {
 	gatewayt, becauyse if there is no such entry in the local network's ARP
 	table, the Harmony TCP/IP stack will refuse to generate the ping. We use the
 	ping to announce the presence of the EEM on the local network when it boots
-	up. We provide no routine currently to determine if the ping succeeded.
+	up. We provide no routine currently to determine if the ping succeeded. The
+	ping identifier we pass is arbitrary.
 */
 void ping_gateway(void) {
 	TCPIP_NET_HANDLE netH;
@@ -196,22 +197,22 @@ void ping_gateway(void) {
 	gwAddr.Val = TCPIP_STACK_NetAddressGateway(netH);
 	TCPIP_MAC_ADDR fakeMac = { .v = { 0x02, 0x00, 0x00, 0x00, 0x00, 0x01 } };
 	TCPIP_ARP_EntrySet(netH, &gwAddr, &fakeMac, true);
-	console_print("Pinging %d.%d.%d.%d in %s...\r\n",
+	console_print("Pinging %d.%d.%d.%d...",
 		gwAddr.v[0], gwAddr.v[1], gwAddr.v[2], gwAddr.v[3], __func__);
 	memset(&echoReq, 0, sizeof(echoReq));
-	echoReq.netH			= netH;
-	echoReq.targetAddr	  = gwAddr;
-	echoReq.sequenceNumber  = 1;
-	echoReq.identifier	  = 0xBEEF;	// arbitrary
-	echoReq.pData		   = NULL;	  // no payload
-	echoReq.dataSize		= 0;
-	echoReq.callback		= NULL;	  // polling mode
-	echoReq.param		   = NULL;
+	echoReq.netH = netH;
+	echoReq.targetAddr = gwAddr;
+	echoReq.sequenceNumber = 1;
+	echoReq.identifier = 0xBEEF;
+	echoReq.pData = NULL;
+	echoReq.dataSize = 0;
+	echoReq.callback = NULL;
+	echoReq.param = NULL;
 	res = TCPIP_ICMP_EchoRequest(&echoReq, &reqHandle);
 	if (res == ICMP_ECHO_OK) {
-		console_print("Ping succeeded in %s.\r\n", __func__);
+		console_print("succeeded in %s.\r\n", __func__);
 	} else {
-		console_print("Ping failed with code %u in %s.\r\n", res, __func__);
+		console_print("failed with code %u in %s.\r\n", res, __func__);
 	}
 }
 
@@ -227,42 +228,34 @@ int server_set_ip(const char* ip_str, const char* gw_str, const char* nm_str) {
 	IPV4_ADDR gw_addr;
 	TCPIP_NET_HANDLE net_hdl;
 
+	console_print("Setting IP address, gateway, and network mask in %s.\r\n", __func__);
 	if (!TCPIP_Helper_StringToIPAddress(ip_str, &ip_addr)) {
-		console_print("Invalid IP address: %s\r\n", ip_str);
+		console_print("ERROR: Invalid IP address '%s'.\r\n", ip_str);
 		return -1;
 	}
-
 	if (!TCPIP_Helper_StringToIPAddress(gw_str, &gw_addr)) {
-		console_print("Invalid Gateway address: %s\r\n", gw_str);
+		console_print("ERROR: Invalid gateway '%s'.\r\n", gw_str);
 		return -1;
 	}
-
 	if (!TCPIP_Helper_StringToIPAddress(nm_str, &mask_addr)) {
-		console_print("Invalid netmask: %s\r\n", nm_str);
-		return false;
+		console_print("ERROR: Invalid mask '%s'.\r\n", nm_str);
+		return -1;
 	}
-	
 	net_hdl = TCPIP_STACK_IndexToNet(0);
 	if (net_hdl == 0) {
-		console_print("Could not get network interface handle.\r\n");
+		console_print("ERROR: Failed to obtain interface handle.\r\n");
 		return -1;
 	}
-
-	console_print("Disabling DHCP...\r\n");
 	TCPIP_DHCP_Disable(net_hdl);
-	
-	console_print("Setting IP and Mask: %s and %s\r\n", ip_str, nm_str);
 	if (!TCPIP_STACK_NetAddressSet(net_hdl, &ip_addr, &mask_addr, true)) {
-		console_print("NetAddressSet failed.\r\n");
+		console_print("ERROR: Failed to set IP address.\r\n");
 		return -1;
 	}
-	
-	console_print("Setting Gatweay: %s\r\n", gw_str);
 	if (!TCPIP_STACK_NetAddressGatewaySet(net_hdl, &gw_addr)) {
-		console_print("NetAddressGatewaySet failed.\r\n");
+		console_print("ERROR: Failed to set gateway.\r\n");
 		return -1;
 	}
-	
+	console_print("Succeeded with ip=%s, gw=%s, nm=%s.\r\n", ip_str, gw_str, nm_str);
 	return 0;
 }
 
@@ -404,15 +397,48 @@ int server_info(char* out) {
 	len += server_nm_str(out+len);
 	len += sprintf(out+len, "\r\nGateway   : ");
 	len += server_gw_str(out+len);
-	len += sprintf(out+len, "\r\nMAC	   : ");
+	len += sprintf(out+len, "\r\nMAC       : ");
 	len += server_mac_str(out+len);
-	len += sprintf(out+len, "\r\nLink	   : ");
+	len += sprintf(out+len, "\r\nLink      : ");
 	if (server_linked()) {
 		len += sprintf(out+len, "UP");
 	} else {
 		len += sprintf(out+len, "DOWN");
 	}
 	return len;
+}
+
+
+/*
+	tcpip_server_check_ip_change checks to see if the network interface's IP address
+	has been changed since a server started listening for connections, or started
+	serving a connection. It compares the ip address saved in the server record
+	with the current IP address. If they differ, it closes the existing listening
+	or connected socket, marks the socket as invalid, calls the TCP/IP maintenance
+	routine a few times to make sure the new IP address propagates through the
+	stack, and returns true. Otherwise it returns false.
+*/
+bool tcpip_server_check_ip_change(tcpip_server_type* server) {
+	TCPIP_NET_HANDLE net_hdl;
+	IPV4_ADDR current_ip;
+
+	net_hdl = TCPIP_STACK_IndexToNet(0);
+	current_ip.Val = TCPIP_STACK_NetAddress(net_hdl);
+
+	if (current_ip.Val != server->ip_addr.Val) {
+		console_print("IP address change detected, restarting %s server.\r\n",
+			server->protocol);
+		if (server->socket != INVALID_SOCKET) {
+			TCPIP_TCP_Close(server->socket);
+			server->socket = INVALID_SOCKET;
+		}
+		tcpip_tick();
+		tcpip_tick();
+		tcpip_tick();
+		return true;
+	} else {
+		return false;
+	}
 }
 
 /*
@@ -426,14 +452,14 @@ int server_info(char* out) {
 
 	The tcpip_server is a state machine that does not block its calling
 	procedure, excepting when the protocol task provided to it causes a block.
-	The task procedure is permitted to block, but it must call tcp_socket_tick while
-	it is blocking, so as to maintain the TCP/IP stack, and to detect closure of
-	the socket by the client. If the client closes the socket, the protocol task
-	must abort and return a negative value. The tcpip_server will close the
-	listening socket and open a new one. By this arrangement, the protocol task
-	can block the servicing of other protocols by other tcpip_server processes
-	indefinitely, but it can block its own server only so long as its client
-	does not close its socket.
+	The task procedure is permitted to block, but it must call tcpip_socket_tick
+	while it is blocking, so as to maintain the TCP/IP stack, and to detect
+	closure of the socket by the client. If the client closes the socket, the
+	protocol task must abort and return a negative value. The tcpip_server will
+	close the listening socket and open a new one. By this arrangement, the
+	protocol task can block the servicing of other protocols by other
+	tcpip_server processes indefinitely, but it can block its own server only so
+	long as its client does not close its socket.
 
 	In order to support a particular protocol, we pass into the routine a
 	call-back function. This call-back function takes as a parameter the
@@ -488,14 +514,14 @@ void tcpip_server(tcpip_server_type* server, tcpip_tasks_type tasks) {
 
 	const char* interface_name, *host_name;
 	int status;
-	static uint32_t wait_stack_msg_printed = 0;
-	static uint32_t wait_ip_msg_printed = 0;
+	static bool print_init_wait = true;
+	static bool ping_sent = false;
 
 	switch (server->state) {
 		case S_WAIT_STACK: {
 			tcpip_status = TCPIP_STACK_Status(sysObj.tcpip);
 			if (tcpip_status < 0) {   
-				if (!wait_stack_msg_printed) {
+				if (print_init_wait) {
 					console_print(
 						"TCP/IP stack initialization failed in %s.\r\n",
 						__func__);
@@ -505,16 +531,17 @@ void tcpip_server(tcpip_server_type* server, tcpip_tasks_type tasks) {
 				net_hdl = TCPIP_STACK_IndexToNet(0);
 				interface_name = TCPIP_STACK_NetNameGet(net_hdl);
 				host_name = TCPIP_STACK_NetBIOSName(net_hdl);
-				if (!wait_stack_msg_printed) {
-					console_print(
-						"Interface %s on host %s awaiting initialization in %s.\r\n",
-						interface_name,
-						string_trim(host_name),
-						__func__);
-				}
+				console_print(
+					"%s server, interface %s, host %s initialized in %s.\r\n",
+					server->protocol,
+					interface_name,
+					string_trim(host_name),
+					__func__);
 				server->state = S_WAIT_IP;
+			} else if (print_init_wait) {
+				console_print("Waiting for TCP/IP stack in %s.\r\n", __func__);
+				print_init_wait = false;
 			}
-			wait_stack_msg_printed = 1;
 		}
 		break;
 
@@ -522,20 +549,19 @@ void tcpip_server(tcpip_server_type* server, tcpip_tasks_type tasks) {
 			net_hdl = TCPIP_STACK_IndexToNet(0);
 			if (TCPIP_STACK_NetIsReady(net_hdl)) {
 				server->ip_addr.Val = TCPIP_STACK_NetAddress(net_hdl);
-				interface_name = TCPIP_STACK_NetNameGet(net_hdl);
-				if (!wait_ip_msg_printed) {
-					console_print(
-						"Interface %s assigned IP address %d.%d.%d.%d in %s.\r\n", 
-						interface_name,
-						server->ip_addr.v[0], 
-						server->ip_addr.v[1], 
-						server->ip_addr.v[2], 
-						server->ip_addr.v[3],
-						__func__);
+				console_print(
+					"%s server assigned IP address %d.%d.%d.%d in %s.\r\n", 
+					server->protocol,
+					server->ip_addr.v[0], 
+					server->ip_addr.v[1], 
+					server->ip_addr.v[2], 
+					server->ip_addr.v[3],
+					__func__);
+				if (!ping_sent) {
 					ping_gateway();
+					ping_sent = true;
 				}
 				server->state = S_OPEN_SERVER;
-				wait_ip_msg_printed = 1;
 			}
 		}
 		break;
@@ -544,27 +570,33 @@ void tcpip_server(tcpip_server_type* server, tcpip_tasks_type tasks) {
 			server->socket = TCPIP_TCP_ServerOpen(IP_ADDRESS_TYPE_IPV4, server->port, 0);
 			if (server->socket == INVALID_SOCKET) {
 				if (debug) console_print(
-					"Failed to open %s server on port %d in %s.\r\n",
-					server->protocol, server->port, __func__);
+					"Failed to open %s server on %d.%d.%d.%d:%d in %s.\r\n",
+					server->protocol, 
+					server->ip_addr.v[0], 
+					server->ip_addr.v[1], 
+					server->ip_addr.v[2], 
+					server->ip_addr.v[3],
+					server->port, 
+					__func__);
 				server->state = S_ERROR;
 			} else {
 				if (debug) console_print(
-					"Listening for %s connection on port %d in %s.\r\n",
-					server->protocol, server->port, __func__);
+					"Listening for %s connection on %d.%d.%d.%d:%d in %s.\r\n",
+					server->protocol, 
+					server->ip_addr.v[0], 
+					server->ip_addr.v[1], 
+					server->ip_addr.v[2], 
+					server->ip_addr.v[3],
+					server->port, 
+					__func__);
 				server->state = S_LISTENING;
 			}
 		}
 		break;
 
 		case S_LISTENING: {
-			net_hdl = TCPIP_STACK_IndexToNet(0);
-			IPV4_ADDR current_ip;
-			current_ip.Val = TCPIP_STACK_NetAddress(net_hdl);
-			if (current_ip.Val != server->ip_addr.Val) {
-					TCPIP_TCP_Close(server->socket);
-					server->socket = INVALID_SOCKET;
-					for (int i = 0; i < 3; i++) tcp_tick();
-					server->state = S_WAIT_IP;
+			if (tcpip_server_check_ip_change(server)) {
+				server->state = S_WAIT_IP;
 			} else if (TCPIP_TCP_IsConnected(server->socket)) {
 				if (TCPIP_TCP_SocketInfoGet(server->socket, &sock_info)) {
 					IPV4_ADDR ip = sock_info.remoteIPaddress.v4Add;
@@ -581,7 +613,7 @@ void tcpip_server(tcpip_server_type* server, tcpip_tasks_type tasks) {
 					server->state = S_SERVING;
 				} else {
 					if (debug) console_print(
-						"%s socket closed pre-emptively by server in %s.\r\n",
+						"%s socket closed by server in %s.\r\n",
 						server->protocol, __func__);			
 					server->state = S_CLOSE;
 				}
@@ -590,7 +622,9 @@ void tcpip_server(tcpip_server_type* server, tcpip_tasks_type tasks) {
 		break;
 
 		case S_SERVING: {
-			if (!TCPIP_TCP_IsConnected(server->socket) ||
+			if (tcpip_server_check_ip_change(server)) {
+				server->state = S_WAIT_IP;
+			} else if (!TCPIP_TCP_IsConnected(server->socket) ||
 					TCPIP_TCP_WasDisconnected(server->socket)) {
 				if (debug) console_print("%s socket closed by client in %s.\r\n",
 					server->protocol, __func__);

@@ -52,13 +52,13 @@
 
 /*
 	Two procedures that maintain the TCP/IP stack, including the Ethernet
-	physical interface driver. The first, tcp_tick, takes no arguments and
+	physical interface driver. The first, tcpip_tick, takes no arguments and
 	returns no value. This procedure can be called anywhere without specifying a
 	socket. The second takes a TCP/IP socket as its argument and returns a
 	negative value if and only if the socket is closed or disconnected.
 */
-void tcp_tick(void);
-int tcp_socket_tick(void* context);
+void tcpip_tick(void);
+int tcpip_socket_tick(void* context);
 
 /*
 	Routines that read and write from sockets. These are wrappers for Harmony
@@ -131,9 +131,9 @@ int server_info(char* out);
 /*
  	A tcpip_tasks_type is the type of procedure that will be called by our
  	generic TCP/IP server. It must take as argument a tcpip_server_info
- 	structure. If it blocks the server, it must call tcp_socket_tick while it is
- 	blocking. If tcp_socket_tick returns a negative value, the task must abort and
- 	return a negative value itself.
+ 	structure. If it blocks the server, it must call tcpip_socket_tick while it
+ 	is blocking. If tcpip_socket_tick returns a negative value, the task must
+ 	abort and return a negative value itself.
 */
 typedef int (*tcpip_tasks_type)(tcpip_server_type* s);
 
