@@ -33,6 +33,7 @@
 #include "server.h"
 #include "console.h"
 #include "utils.h"
+#include "pic.h"
 
 /*
 	tcpip_tick maintains the TCP/IP stack without checking the status of any
@@ -406,6 +407,49 @@ int server_info(char* out) {
 		len += sprintf(out+len, "DOWN");
 	}
 	return len;
+}
+
+/*
+	server_config_write writes a null-terminated string to the configuration
+	location in non-volatile memory.
+*/
+int server_config_write(const char* config) {
+	return pic_nvm_writestr(config, FLASH_CONFIG_ADDR);
+}
+
+/*
+	server_config_read reads a null-terminated string from the configuration
+	location in non-volatile memory (NVM). If the read from NVM fails, the
+	routine generates a default string.
+*/
+int server_config_read(char* config, uint32_t config_size) {
+	int status;
+	char scratch[255];
+	status = pic_nvm_readstr(FLASH_CONFIG_ADDR, config, config_size);
+	if (status < 0) {
+		sprintf(config,"lwdaq_relay_configuration:\n");
+		sprintf(scratch,"operator: unassigned\r\n");
+		strcat(config,scratch);
+		sprintf(scratch,"configuration_time: 00000000000000\r\n");
+		strcat(config,scratch);
+		sprintf(scratch,"password: LWDAQ\r\n");
+		strcat(config,scratch);
+		sprintf(scratch,"driver_id: unassigned\r\n");
+		strcat(config,scratch);
+		sprintf(scratch,"ip_addr: 10.0.0.37\r\n");
+		strcat(config,scratch);
+		sprintf(scratch,"ip_port: 90\r\n");
+		strcat(config,scratch);
+		sprintf(scratch,"tcp_timeout: 0\r\n");
+		strcat(config,scratch);
+		sprintf(scratch,"security_level: 0\r\n");
+		strcat(config,scratch);
+		sprintf(scratch,"gateway_addr: 10.0.0.1\r\n");
+		strcat(config,scratch);
+		sprintf(scratch,"subnet_mask: 255.255.255.0\r\n");
+		strcat(config,scratch);		
+	}
+	return status;
 }
 
 

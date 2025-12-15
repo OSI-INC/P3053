@@ -269,10 +269,11 @@ void cli_cmd_ipconfig(cli_chan_type *ch, char *args) {
 }
 
 /*
-	cli_cmd_minfo with no arguments prints to the specified channel a list of
-	machine characteristics.
+	cli_cmd_picinfo with no arguments prints PIC32MZ characteristics. It does
+	not offer any way to change those characteristics, and takes only the two
+	required options --info and --help.
 */
-void cli_cmd_minfo(cli_chan_type *ch, char *args) {
+void cli_cmd_picinfo(cli_chan_type *ch, char *args) {
 	bool print_info = false;
 	bool print_help = false;
 	char* tok = strtok(args, " \t");
@@ -291,17 +292,18 @@ void cli_cmd_minfo(cli_chan_type *ch, char *args) {
     }
     
 	if (print_info) {
-		cli_message(ch, "List microcontroller information.\r\n");
+		cli_message(ch, "List PIC32MZ internal information.\r\n");
 		return;
 	}
 
 	if (print_help) {
 		cli_message(ch,
 			"Usage:\r\n"
-			"  minfo [--info] [--help]\r\n"
+			"  picinfo [--info] [--help]\r\n"
 			"\r\n"
 			"Summary:\r\n"
-			"  List microcontroller information.\r\n"
+			"  List internal PIC32MZ microcontroller configuration values. Provides\r\n"
+			"  no means to change any of these values.\r\n"
 			"\r\n"
 			"Options:\r\n"
 			"  --info        Print a one-line summary of this command.\r\n"
@@ -318,13 +320,13 @@ void cli_cmd_minfo(cli_chan_type *ch, char *args) {
 
 /*
 	cli_initialize initializes the command-line interpreter by registering some
-	basic commands. We can add more commands at any time with the
+	commands we find useful. We can add more commands at any time with the
 	cli_cmd_register routine.
 */
 void cli_initialize(void) {
 	cli_cmd_register("help",cli_cmd_help);
 	cli_cmd_register("ipconfig",cli_cmd_ipconfig);
-	cli_cmd_register("minfo",cli_cmd_minfo);
+	cli_cmd_register("picinfo",cli_cmd_picinfo);
 }
 
 /*

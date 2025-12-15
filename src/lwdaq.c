@@ -253,7 +253,7 @@ int lwdaq_handle_message (TCP_SOCKET s, uint32_t id, uint32_t len, uint8_t* cont
 		case CONFIG_READ:{
 			if (debug) console_print("CONFIG_READ in %s.\r\n", __func__);
 			if ((logged_in==1) || (security_level==0)) {
-				pic_config_read(configuration, sizeof(configuration));
+				server_config_read(configuration, sizeof(configuration));
 			  	lwdaq_data_return(s, (uint8_t*) configuration, strlen(configuration));
 				if (debug) console_print(
 					"Transmitted configuration of %d characters.\r\n",
@@ -272,7 +272,7 @@ int lwdaq_handle_message (TCP_SOCKET s, uint32_t id, uint32_t len, uint8_t* cont
 					if (debug) console_print("Accepted: config %d characters.\r\n",len);
 					content[len]=0x00;
 					console_print("%s",(char*) content);
-					pic_config_write((char*) content);
+					server_config_write((char*) content);
 				} else {
 					if (debug) console_print("Rejected: %d characters too long.\r\n",len);
 					return -1;

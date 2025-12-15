@@ -439,7 +439,7 @@ void console_server(void) {
 				case 'c':
 					console_message("String: ");
 					console_readln(msg_buff, sizeof(msg_buff));
-					status = pic_config_write(msg_buff);
+					status = server_config_write(msg_buff);
 					if (status >= 0) {
 						console_print("Wrote: %s\r\n", msg_buff);
 					} else {
@@ -450,7 +450,7 @@ void console_server(void) {
 					
 				case 'd':
 					console_message("Reading string...\r\n");
-					status = pic_config_read(msg_buff, sizeof(msg_buff));
+					status = server_config_read(msg_buff, sizeof(msg_buff));
 					if (status >= 0) {
 						console_print("String: %s\r\n", msg_buff);
 					} else {

@@ -129,6 +129,33 @@ bool server_linked(void);
 int server_info(char* out);
 
 /*
+	Routines that write and read the server configuration to and from
+	non-volatile memory (NVM). The configuration takes the form of a string in
+	which we have parameter names and values paired together so that they are
+	human-readable a and computer-extractable.
+
+	The PIC32MZ2048EFH's 2 MByte of NVM appears twice in the CPU's virtual
+	address space. Once in the range 0x9D000000 to 0x9D0FFFFF, in which range
+	the NVM is accessed by the CPU indirectly through a cache memory, and again
+	in the range 0xBD000000 to 0xBD0FFFFF, in which range the CPU accesses the
+	NVM directly, without a cache. We want to put our string in the un-cached
+	copy so that we can write with the direct memory access (DMA) hardware and
+	read back immediately from the physical NVM rather than getting a stale copy
+	of the NVM from cache. So we place our string in the 0xBD range. In that
+	range, we must make sure we are above the program itself. In our case, our
+	program is less than 256 KByte, so anywhere above 0xBD040000 will be fine.
+	The NVM pages are 16 Kbyte in the PIC32MZ, and NVM rows are 2 KByte. So we
+	must pick a location that is on a 16-KByte boundary. Reading repeatedly from
+	un-cached NVM is far slower than reading repeatedly from a cached copy of an
+	NVM page, but we do not plan to read repeatedly from our configuration
+	string, so we will suffer no loss of performance from reading direction from
+	NVM.
+*/
+#define FLASH_CONFIG_ADDR	0xBD100000
+int server_config_write(const char* config);
+int server_config_read(char* config, uint32_t config_size);
+
+/*
  	A tcpip_tasks_type is the type of procedure that will be called by our
  	generic TCP/IP server. It must take as argument a tcpip_server_info
  	structure. If it blocks the server, it must call tcpip_socket_tick while it
