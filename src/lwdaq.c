@@ -68,10 +68,11 @@
 
 // The LWDAQ server record.
 tcpip_server_type lwdaq_server = {
-	INVALID_SOCKET,
-	S_WAIT_STACK,
-	LWDAQ_PORT,
-	"LWDAQ"
+    .socket   = INVALID_SOCKET,
+    .state    = S_WAIT_STACK,
+    .port     = LWDAQ_PORT,
+    .protocol = "LWDAQ",
+    .ip_addr = { .Val = 0 }
 };
 	
 /*

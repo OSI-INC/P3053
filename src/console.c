@@ -414,7 +414,7 @@ void console_server(void) {
 			} else {
 				cmd_len = 0;
 				console_print("\r\nERROR: Have cmd_len>%d in %s.\r\n",
-					max_cmd_len,__func__);
+					max_cmd_len, __func__);
 			}
 		}
 		
@@ -429,7 +429,7 @@ void console_server(void) {
 					console_message("  c - save string to flash\r\n");
 					console_message("  d - read string from flash\r\n");
 					console_message("  i - new ip addr\r\n");
-					console_message("  m - machine configurationr\n");
+					console_message("  m - machine configuration\r\n");
 					console_message("  n - net info\r\n");
 					console_message("  p - ping gateway\r\n");
 					console_message("  r - software reset\r\n");
@@ -470,18 +470,12 @@ void console_server(void) {
 					break;
 					
 				case 'm':
-					sprintf(msg_buff, 
-						"Tick Counter Frequency (kHz): %.3f\r\n"
-						"System Counter Frequency (MHz): %.3f\r\n"
-						"Sytem Clock Frequency (MHz): %.3f\r\n",
-						(double) SYS_TMR_TickCounterFrequencyGet() * 1e-3,
-						(double) SYS_TMR_SystemCountFrequencyGet() * 1e-6,
-						(double) SYS_TMR_SystemCountFrequencyGet() * 2e-6);
-					console_print("%s", msg_buff);
+					pic_info(msg_buff);
+					console_print("%s\r\n", msg_buff);
 					break;
 				
 				case 'n':
-					server_info(msg_buff, sizeof(msg_buff));
+					server_info(msg_buff);
 					console_print("%s\r\n", msg_buff);
 					break;
 				

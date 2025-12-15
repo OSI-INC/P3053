@@ -321,6 +321,24 @@ int pic_config_read(char* config, uint32_t config_size) {
 }
 
 /*
+	pic_info prints a list of microcontroller information, such as timer and
+	clock frequencies, and anything else we think is interesting or possibly
+	helpful. The routine simply writes to a buffer. The calling process must
+	ensure that the buffer is big enough. We do not bother implementing any
+	check in this routine of the buffer size.
+*/
+void pic_info(char* out) {
+	sprintf(out, 
+		"Tick Counter Frequency (kHz):   %.3f\r\n"
+		"System Counter Frequency (MHz): %.3f\r\n"
+		"Sytem Clock Frequency (MHz):    %.3f",
+		(double) SYS_TMR_TickCounterFrequencyGet() * 1e-3,
+		(double) SYS_TMR_SystemCountFrequencyGet() * 1e-6,
+		(double) SYS_TMR_SystemCountFrequencyGet() * 2e-6);
+	return;
+}
+
+/*
 	uart2_readcount returns the number of bytes that are available in the UART2
 	input buffer. It takes as an argument a generic pointer, which allows the
 	routine to be used in generic channel-descriptor records, such as those used

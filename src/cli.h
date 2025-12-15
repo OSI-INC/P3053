@@ -66,26 +66,33 @@ typedef int (*cli_putchar_func)(void *context, char c);
 typedef int (*cli_flush_func)(void *context);
 
 /*
-	The cli_chan_type holds all the information one of our comman-line
-	interpreter (CLI) needs to manage comminication over a particular channel.
-	When we set up a CLI, we compose the channel structure and pass a pointer to
-	the record into the CLI initialization routine. When we call the CLI to
-	service the channel, we pass the same the same pointer into the CLI server
-	routine. In addition to four channel-specific read and write routines, we
-	have a receive buffer and receive length counter. The receive buffer stores
-	bytes as they arrive. It allows the CLI to accumulate commands until they
-	are complete, and to carry multiple commands through multiple calls to the
-	CLI server. We do not include a transmit buffer because this can be created
-	by the CLI for each command response. 
+	The cli_chan_type holds all the information our comman-line interpreter
+	(CLI) needs to manage comminication over a particular channel. We call it a
+	"channel descriptor". Before we start a CLI, we prepare a channel descriptor
+	record. We assign getchar, putchar, and flush functions for the CLI to use
+	for receiving and transmitting characters. If our receive and transmit
+	routines need context, such as a TCP_SOCKET handle, we put a pointer to this
+	context in the channel descriptor's context field. The channel descriptor
+	contains a receive buffer and a receive length that tells the CLI the
+	location of the null character in the receive buffer that marks the end of
+	the current accumulating command line arriving through the channel. The
+	receive buffer allows the CLI to accumulate commands until they are
+	complete, and to carry multiple commands through multiple calls to the CLI
+	server. A transmit buffer is not strictly necessary for the operation of the
+	CLI, but we include one because it acts as a shared workspace for CLI
+	commands, where they can build output strings.
 */
 #define CLI_RX_SIZE 2048
+#define CLI_TX_SIZE 2048
 typedef struct {
     cli_getchar_func getchar;
     cli_putchar_func putchar;
     cli_flush_func flush;
+    bool echo;
     void *context;
     char rx_buff[CLI_RX_SIZE];
     uint32_t rx_len;
+    char tx_buff[CLI_TX_SIZE];
     char* name;
 } cli_chan_type;
 
@@ -95,16 +102,18 @@ typedef struct {
 	arguments a pointer to a channel descriptor and a pointer to a
 	null-terminated string. The null-terminated string will contain all
 	arguments passed to the CLI following the command name, stripped of any
-	leading white space. The procedure is not allowed to modify the argument
-	string. All CLI commands must implement two options. The "--info" option
-	should print to the console a single-line description of the command, no
-	more than 63 characters long. The "--help" option should either print the
-	same description, or a multi-line help text. In their operation, CLI
-	commands must be non-blocking, bounded-time operations. They may trigger
-	long-running background actions, but must not wait for these actions to
-	complete.
+	leading white space. The procedure is permitted to modify the argument
+	string, as it might as it divides the string into distinct tokens with its
+	own marker characters.
+
+	All CLI commands must implement two options. The "--info" option should
+	print to the console a single-line description of the command, no more than
+	63 characters long. The "--help" option should either print the same
+	description, or a multi-line help text. In their operation, CLI commands
+	must be non-blocking, bounded-time operations. They may trigger long-running
+	background actions, but must not wait for these actions to complete.
 */
-typedef void (*cli_cmd_proc) (cli_chan_type *ch, const char *args);
+typedef void (*cli_cmd_proc) (cli_chan_type *ch, char *args);
 
 /*
 	Each command we add to the CLI's command list is a record consisting of the

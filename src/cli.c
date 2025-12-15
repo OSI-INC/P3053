@@ -121,49 +121,32 @@ int cli_cmd_register(const char *name, cli_cmd_proc proc) {
     return 0;
 }
 
+
 /*
 	cli_cmd_help with no arguments prints to the specified channel a list of all
 	registered commands and their information strings. If we pass it "--info" it
-	prints its info string only. If we pass it "--help" it prints its own help
-	string and nothing else. We register this routine with the CLI in order to
-	implement the help command within the interpreter. Look to the code below
-	for an example format for the help text.
+	prints its info string only. Otherwise, if we pass it "--help", it prints
+	its own help string.
 */
-void cli_cmd_help(cli_chan_type *ch, const char *args) {
+void cli_cmd_help(cli_chan_type *ch, char *args) {
 
-	// We copy the argument list into our own local buffer. Now we can apply the
-	// string-parsing function "strtok" to the buffer. This function allows us
-	// to extract one word, or "token", after another from the argument list. If
-	// we encounter an invalid argument, or an invalid combination of arguments,
-	// we print an error to the channel and exit.
-	static char args_copy[CLI_ARGS_SIZE];
-	strncpy(args_copy, args, sizeof(args_copy) - 1);
-	char *tok = strtok(args_copy, " \t");
-	char *opt = NULL;
+	// Option flags.
+	bool print_info = false;
+	bool print_help = false;
+
+	// We apply the string-parsing function "strtok" to the argument string.
+	// This function allows us to extract one word, or "token", after another
+	// from the argument list. If we encounter an invalid argument, or an
+	// invalid combination of arguments, we print an error to the channel and
+	// exit.
+	char* tok = strtok(args, " \t");
 	
-	// If tok is not null, we have found an argument. If valid, look for another
-	// argument, and so on, until we either encounter an argument list error or
-	// reach the end of the arguments. By the end, if we have one or more valid
-	// arguments, opt will contain a string that controls the command after the
-	// end of the token-sorting loop.
+	// If tok is not null, we have found an argument. If the argument is valid,
+	// set a flag. If invalid, print an error message and return.
 	while (tok != NULL) {
- 		if (strcmp(tok, "--info") == 0) {
-            if (opt != NULL) {
-                cli_print(ch, "ERROR: Multiple options not allowed in %s.\r\n",
-                	__func__);
-                return;
-            }
-            opt = "--info";
-        } else if (strcmp(tok, "--help") == 0) {
-            if (opt != NULL) {
-                cli_print(ch, "ERROR: Multiple options not allowed in %s.\r\n",
-                	__func__);
-                return;
-            }
-            opt = "--help";
-        } else {
-            cli_print(ch, "ERROR: Unrecognized option '%s' in %s.\r\n",
-            	tok, __func__);
+ 		if (strcmp(tok, "--info") == 0) {print_info = true;} 
+ 		else if (strcmp(tok, "--help") == 0) {print_help = true;} else {
+            cli_print(ch, "ERROR: Unrecognized option '%s' in %s.\r\n", tok, __func__);
             return;
         }
         tok = strtok(NULL, " \t");
@@ -172,7 +155,7 @@ void cli_cmd_help(cli_chan_type *ch, const char *args) {
 	// The --info option must be implemented by every CLI command. In
 	// response, the command must print an information string to the CLI
 	// channel.
-	if ((opt != NULL) && strcmp(opt, "--info") == 0) {
+	if (print_info) {
 		cli_message(ch, "List all commands with descriptions.\r\n");
 		return;
 	}
@@ -180,7 +163,7 @@ void cli_cmd_help(cli_chan_type *ch, const char *args) {
 	// The --help option must be supported by all CLI commands. It prints a
 	// longer help message that acts as a manual page for the command, listing
 	// all options and their functions.
-	if ((opt != NULL) && strcmp(opt, "--help") == 0) {
+	if (print_help) {
 		cli_message(ch,
 			"Usage:\r\n"
 			"  help [--info] [--help]\r\n"
@@ -195,7 +178,8 @@ void cli_cmd_help(cli_chan_type *ch, const char *args) {
 		return;
 	}
 
-	// If we arrive here, then w
+	// No options were given, so perform the default function: print the full
+	// CLI command help list.
     cli_message(ch, "Available commands:\r\n");
     for (int i = 0; i < cli_num_commands; i++) {
         const char *name = cli_commands[i].name;
@@ -205,6 +189,156 @@ void cli_cmd_help(cli_chan_type *ch, const char *args) {
     }
 
     return;
+}
+
+/*
+	cli_cmd_ipconfig with no arguments prints to the specified channel a list of
+	network information. 
+*/
+void cli_cmd_ipconfig(cli_chan_type *ch, char *args) {
+	bool print_info = false;
+	bool print_help = false;
+	bool update = false;
+	char ip_str[31];
+	char gw_str[31];
+	char nm_str[31];
+	
+	server_ip_str(ip_str);
+	server_gw_str(gw_str);
+	server_nm_str(nm_str);
+	
+	char* tok = strtok(args, " \t");
+	while (tok != NULL) {
+		if (strcmp(tok, "--ip") == 0) {
+			strcpy( ip_str, strtok(NULL, " \t"));
+			update = true;
+		}
+		else if (strcmp(tok, "--gateway") == 0) {
+			strcpy(gw_str, strtok(NULL, " \t"));
+			update = true;
+		}
+		else if (strcmp(tok, "--mask") == 0) {
+			strcpy( nm_str, strtok(NULL, " \t"));
+			update = true;
+		}
+		else if (strcmp(tok, "--info") == 0) {
+			print_info = true;}
+		else if (strcmp(tok, "--help") == 0) {
+			print_help = true;
+		} else {
+    		cli_print(ch, "ERROR: Unrecognized option '%s' in %s.\r\n",tok, __func__);
+        	return;
+        }
+        tok = strtok(NULL, " \t");
+    }
+    
+	if (print_info) {
+		cli_message(ch, "List network configuration.\r\n");
+		return;
+	}
+
+	if (print_help) {
+		cli_message(ch,
+			"Usage:\r\n"
+			"  ipconfig [--info] [--help]\r\n"
+			"\r\n"
+			"Summary:\r\n"
+			"  List network interface configuration.\r\n"
+			"\r\n"
+			"Options:\r\n"
+			"  --info        Print a one-line summary of this command.\r\n"
+			"  --help        Print this help text.\r\n"
+		);
+		return;
+	}
+	
+	if (update) {
+		if (server_set_ip(ip_str, gw_str, nm_str) < 0) {
+			cli_message(ch,"ERROR: Failed to update IP interface.\r\n");
+		}
+	}
+
+	server_info(ch->tx_buff);
+	cli_print(ch, "%s\r\n", ch->tx_buff);
+
+    return;
+}
+
+/*
+	cli_cmd_minfo with no arguments prints to the specified channel a list of
+	machine characteristics.
+*/
+void cli_cmd_minfo(cli_chan_type *ch, char *args) {
+	bool print_info = false;
+	bool print_help = false;
+	char* tok = strtok(args, " \t");
+
+	while (tok != NULL) {
+ 		if (strcmp(tok, "--info") == 0) {
+ 			print_info = true;
+        } else if (strcmp(tok, "--help") == 0) {
+        	print_help = true;
+        } else {
+            cli_print(ch, "ERROR: Unrecognized option '%s' in %s.\r\n",
+            	tok, __func__);
+            return;
+        }
+        tok = strtok(NULL, " \t");
+    }
+    
+	if (print_info) {
+		cli_message(ch, "List microcontroller information.\r\n");
+		return;
+	}
+
+	if (print_help) {
+		cli_message(ch,
+			"Usage:\r\n"
+			"  minfo [--info] [--help]\r\n"
+			"\r\n"
+			"Summary:\r\n"
+			"  List microcontroller information.\r\n"
+			"\r\n"
+			"Options:\r\n"
+			"  --info        Print a one-line summary of this command.\r\n"
+			"  --help        Print this help text.\r\n"
+		);
+		return;
+	}
+
+ 	pic_info(ch->tx_buff);
+	cli_print(ch, "%s\r\n", ch->tx_buff);
+
+    return;
+}
+
+/*
+	cli_initialize initializes the command-line interpreter by registering some
+	basic commands. We can add more commands at any time with the
+	cli_cmd_register routine.
+*/
+void cli_initialize(void) {
+	cli_cmd_register("help",cli_cmd_help);
+	cli_cmd_register("ipconfig",cli_cmd_ipconfig);
+	cli_cmd_register("minfo",cli_cmd_minfo);
+}
+
+/*
+	cli_start starts up a new command-line interpreter. We pass it a completed
+	channel structure. It clears the receive buffer in this structure and it
+	prints an introductory message. With any luck we have already called the CLI
+	initialization routine by the time we start this CLI, so the help command
+	will be installed in all CLI server.
+*/
+void cli_start(cli_chan_type* ch) {
+	ch->rx_len = 0;
+	ch->rx_buff[0] = '\0';
+	ch->echo = false;
+	cli_print(ch, "===========================================================\r\n");
+	cli_print(ch, "=========    Embedded Ethernet Module (A3053)     =========\r\n");
+	cli_print(ch, "===========================================================\r\n");
+	cli_print(ch, "Command-line interpreter running, try 'help' for help.\r\n");
+	cli_print(ch, "$ ");
 }
 
 /*
@@ -218,32 +352,6 @@ static cli_cmd_proc cli_cmd_find(const char *name) {
         }
     }
     return NULL;
-}
-
-/*
-	cli_initialize initializes the command-line interpreter. It registers a minimal
-	set of commands that we believe all interpreters need.
-*/
-void cli_initialize(void) {
-	cli_cmd_register("help",cli_cmd_help);
-}
-
-/*
-	cli_start starts up a new command-line interpreter. We pass it a completed
-	channel structure. It clears the receive buffer in this structure and it
-	prints an introductory message. With any luck we have already called the CLI
-	initialization routine by the time we start this CLI, so the help command
-	will be installed in all CLI server.
-*/
-void cli_start(cli_chan_type* ch) {
-	ch->rx_len = 0;
-	ch->rx_buff[0] = '\0';
-	cli_print(ch, "\r\n\r\n");
-	cli_print(ch, "===========================================================\r\n");
-	cli_print(ch, "=========    Embedded Ethernet Module (A3053)     =========\r\n");
-	cli_print(ch, "===========================================================\r\n");
-	cli_print(ch, "Command-line interpreter running, try 'help' for help.\r\n");
-	cli_print(ch, "$ ");
 }
 
 /*

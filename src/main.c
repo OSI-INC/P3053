@@ -86,10 +86,11 @@
 */
 #define TELNET_PORT 23
 tcpip_server_type telnet_server = {
-	INVALID_SOCKET,
-	S_WAIT_STACK,
-	TELNET_PORT,
-	"Telnet"
+    .socket   = INVALID_SOCKET,
+    .state    = S_WAIT_STACK,
+    .port     = TELNET_PORT,
+    .protocol = "Telnet",
+    .ip_addr = { .Val = 0 }
 };
 #ifdef VERBOSE_CONSOLE
 static const bool telnet_enable = true;

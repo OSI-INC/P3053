@@ -19,7 +19,7 @@
 
 #include <stdio.h>
 #include <stdint.h>
-#include <stddef.h>                  
+#include <stddef.h>				  
 #include <stdbool.h>
 #include <stdlib.h>
 #include <stdarg.h>
@@ -57,7 +57,7 @@ void tcp_tick(void) {
 	been determined by the stack to be disconnected.
 */
 int tcp_socket_tick(void* context) {
-    TCP_SOCKET sock = *(TCP_SOCKET *) context;
+	TCP_SOCKET sock = *(TCP_SOCKET *) context;
 	tcp_tick();
 	if (!TCPIP_TCP_IsConnected(sock) || TCPIP_TCP_WasDisconnected(sock)) {
 		return -1;
@@ -73,7 +73,7 @@ int tcp_socket_tick(void* context) {
 	name is in our opinion more suitable.	
 */ 
 int tcp_readcount(void* context) {
-    TCP_SOCKET sock = *(TCP_SOCKET *) context;
+	TCP_SOCKET sock = *(TCP_SOCKET *) context;
 	return (int) TCPIP_TCP_GetIsReady(sock);
 }
 
@@ -85,7 +85,7 @@ int tcp_readcount(void* context) {
 	and an unsigned integer length.
 */
 int tcp_read(void* context, uint8_t* buffer, uint32_t len) {
-    TCP_SOCKET sock= *(TCP_SOCKET *) context;
+	TCP_SOCKET sock= *(TCP_SOCKET *) context;
 	return (int) TCPIP_TCP_ArrayGet(sock, buffer, len);
 }
 
@@ -96,12 +96,12 @@ int tcp_read(void* context, uint8_t* buffer, uint32_t len) {
 	character. This routine can be deployed in a CLI channel descriptor.
 */
 int tcp_getchar(void* context) {
-    TCP_SOCKET sock= *(TCP_SOCKET *) context;
-    uint8_t c;
+	TCP_SOCKET sock= *(TCP_SOCKET *) context;
+	uint8_t c;
 	if (sock == INVALID_SOCKET) return -2;
-    if (TCPIP_TCP_GetIsReady(sock) < 1) return -1;
-    if (TCPIP_TCP_ArrayGet(sock, &c, 1) == 1) return (int) c;
-    return -1;
+	if (TCPIP_TCP_GetIsReady(sock) < 1) return -1;
+	if (TCPIP_TCP_ArrayGet(sock, &c, 1) == 1) return (int) c;
+	return -1;
 }
 
 /*
@@ -109,7 +109,7 @@ int tcp_getchar(void* context) {
 	outgoing TCP buffer of a socket. It takes a socket handle.
 */
 int tcp_writecount(void* context) {
-    TCP_SOCKET sock= *(TCP_SOCKET *) context;
+	TCP_SOCKET sock= *(TCP_SOCKET *) context;
 	return (int) TCPIP_TCP_PutIsReady(sock);
 }
 
@@ -122,7 +122,7 @@ int tcp_writecount(void* context) {
 	flush the socket. It does not block.
 */
 int tcp_write(void* context, const uint8_t* data, uint32_t len) {
-    TCP_SOCKET sock= *(TCP_SOCKET *) context;
+	TCP_SOCKET sock= *(TCP_SOCKET *) context;
 	return (int) TCPIP_TCP_ArrayPut(sock, data, len);
 }
 
@@ -149,7 +149,7 @@ int tcp_putchar(void* context, char c) {
 	descriptor.
 */
 int tcp_flush(void* context) {
-    TCP_SOCKET sock= *(TCP_SOCKET *) context;
+	TCP_SOCKET sock= *(TCP_SOCKET *) context;
 	TCPIP_TCP_Flush(sock);
 	return 0;
 }
@@ -186,33 +186,33 @@ int tcp_writeall(void* context, const uint8_t *buf, uint16_t len) {
 	up. We provide no routine currently to determine if the ping succeeded.
 */
 void ping_gateway(void) {
-    TCPIP_NET_HANDLE netH;
-    IPV4_ADDR gwAddr;
-    TCPIP_ICMP_ECHO_REQUEST echoReq;
-    TCPIP_ICMP_REQUEST_HANDLE reqHandle;
-    ICMP_ECHO_RESULT res;
+	TCPIP_NET_HANDLE netH;
+	IPV4_ADDR gwAddr;
+	TCPIP_ICMP_ECHO_REQUEST echoReq;
+	TCPIP_ICMP_REQUEST_HANDLE reqHandle;
+	ICMP_ECHO_RESULT res;
 
-    netH = TCPIP_STACK_IndexToNet(0);
-    gwAddr.Val = TCPIP_STACK_NetAddressGateway(netH);
-    TCPIP_MAC_ADDR fakeMac = { .v = { 0x02, 0x00, 0x00, 0x00, 0x00, 0x01 } };
+	netH = TCPIP_STACK_IndexToNet(0);
+	gwAddr.Val = TCPIP_STACK_NetAddressGateway(netH);
+	TCPIP_MAC_ADDR fakeMac = { .v = { 0x02, 0x00, 0x00, 0x00, 0x00, 0x01 } };
 	TCPIP_ARP_EntrySet(netH, &gwAddr, &fakeMac, true);
-    console_print("Pinging %d.%d.%d.%d in %s...\r\n",
-        gwAddr.v[0], gwAddr.v[1], gwAddr.v[2], gwAddr.v[3], __func__);
-    memset(&echoReq, 0, sizeof(echoReq));
-    echoReq.netH            = netH;
-    echoReq.targetAddr      = gwAddr;
-    echoReq.sequenceNumber  = 1;
-    echoReq.identifier      = 0xBEEF;    // arbitrary
-    echoReq.pData           = NULL;      // no payload
-    echoReq.dataSize        = 0;
-    echoReq.callback        = NULL;      // polling mode
-    echoReq.param           = NULL;
-    res = TCPIP_ICMP_EchoRequest(&echoReq, &reqHandle);
-    if (res == ICMP_ECHO_OK) {
-    	console_print("Ping succeeded in %s.\r\n", __func__);
+	console_print("Pinging %d.%d.%d.%d in %s...\r\n",
+		gwAddr.v[0], gwAddr.v[1], gwAddr.v[2], gwAddr.v[3], __func__);
+	memset(&echoReq, 0, sizeof(echoReq));
+	echoReq.netH			= netH;
+	echoReq.targetAddr	  = gwAddr;
+	echoReq.sequenceNumber  = 1;
+	echoReq.identifier	  = 0xBEEF;	// arbitrary
+	echoReq.pData		   = NULL;	  // no payload
+	echoReq.dataSize		= 0;
+	echoReq.callback		= NULL;	  // polling mode
+	echoReq.param		   = NULL;
+	res = TCPIP_ICMP_EchoRequest(&echoReq, &reqHandle);
+	if (res == ICMP_ECHO_OK) {
+		console_print("Ping succeeded in %s.\r\n", __func__);
 	} else {
-    	console_print("Ping failed with code %u in %s.\r\n", res, __func__);
-    }
+		console_print("Ping failed with code %u in %s.\r\n", res, __func__);
+	}
 }
 
 /*
@@ -221,37 +221,37 @@ void ping_gateway(void) {
 	these three IP addresses, and the routine translates these into IPV4_ADDR types
 	and applies them. It also makes sure that DHCP is turned off.
 */
-int server_set_ip(const char* ip_str, const char* gw_str, const char* mask_str) {
-    IPV4_ADDR ip_addr;
-    IPV4_ADDR mask_addr;
-    IPV4_ADDR gw_addr;
-    TCPIP_NET_HANDLE net_hdl;
+int server_set_ip(const char* ip_str, const char* gw_str, const char* nm_str) {
+	IPV4_ADDR ip_addr;
+	IPV4_ADDR mask_addr;
+	IPV4_ADDR gw_addr;
+	TCPIP_NET_HANDLE net_hdl;
 
-    if (!TCPIP_Helper_StringToIPAddress(ip_str, &ip_addr)) {
-        console_print("Invalid IP address: %s\r\n", ip_str);
-        return -1;
-    }
+	if (!TCPIP_Helper_StringToIPAddress(ip_str, &ip_addr)) {
+		console_print("Invalid IP address: %s\r\n", ip_str);
+		return -1;
+	}
 
-    if (!TCPIP_Helper_StringToIPAddress(gw_str, &gw_addr)) {
-        console_print("Invalid Gateway address: %s\r\n", gw_str);
-        return -1;
-    }
+	if (!TCPIP_Helper_StringToIPAddress(gw_str, &gw_addr)) {
+		console_print("Invalid Gateway address: %s\r\n", gw_str);
+		return -1;
+	}
 
-	if (!TCPIP_Helper_StringToIPAddress(mask_str, &mask_addr)) {
-        console_print("Invalid netmask: %s\r\n", mask_str);
-        return false;
-    }
-    
-    net_hdl = TCPIP_STACK_IndexToNet(0);
-    if (net_hdl == 0) {
-        console_print("Could not get network interface handle.\r\n");
-        return -1;
-    }
+	if (!TCPIP_Helper_StringToIPAddress(nm_str, &mask_addr)) {
+		console_print("Invalid netmask: %s\r\n", nm_str);
+		return false;
+	}
+	
+	net_hdl = TCPIP_STACK_IndexToNet(0);
+	if (net_hdl == 0) {
+		console_print("Could not get network interface handle.\r\n");
+		return -1;
+	}
 
 	console_print("Disabling DHCP...\r\n");
 	TCPIP_DHCP_Disable(net_hdl);
 	
-	console_print("Setting IP and Mask: %s and %s\r\n", ip_str, mask_str);
+	console_print("Setting IP and Mask: %s and %s\r\n", ip_str, nm_str);
 	if (!TCPIP_STACK_NetAddressSet(net_hdl, &ip_addr, &mask_addr, true)) {
 		console_print("NetAddressSet failed.\r\n");
 		return -1;
@@ -259,77 +259,160 @@ int server_set_ip(const char* ip_str, const char* gw_str, const char* mask_str) 
 	
 	console_print("Setting Gatweay: %s\r\n", gw_str);
 	if (!TCPIP_STACK_NetAddressGatewaySet(net_hdl, &gw_addr)) {
-        console_print("NetAddressGatewaySet failed.\r\n");
-        return -1;
-    }
-    
-    return 0;
+		console_print("NetAddressGatewaySet failed.\r\n");
+		return -1;
+	}
+	
+	return 0;
 }
 
 /*
-	server_mac returns the network interface's media access control (MAC) address as
-	a six-byte block.
+	server_mac returns the network interface's media access control (MAC)
+	address as a six-byte block. The routine does not check the size of the
+	destination byte buffer, but it does return the number of bytes it wrote.
 */
-void server_mac(uint8_t* out) {
-    TCPIP_NET_HANDLE net_hdl;
-    TCPIP_NET_IF* pNetIf;
-    uint8_t* mac;
+int server_mac(uint8_t* out) {
+	TCPIP_NET_HANDLE net_hdl;
+	TCPIP_NET_IF* pNetIf;
+	uint8_t* mac;
 
-    net_hdl = TCPIP_STACK_IndexToNet(0);
-    pNetIf = _TCPIPStackHandleToNet(net_hdl);
-    mac = pNetIf->netMACAddr.v;
+	net_hdl = TCPIP_STACK_IndexToNet(0);
+	pNetIf = _TCPIPStackHandleToNet(net_hdl);
+	mac = pNetIf->netMACAddr.v;
 	out[0] = mac[0];
 	out[1] = mac[1];
 	out[2] = mac[2];
 	out[3] = mac[3];
 	out[4] = mac[4];
 	out[5] = mac[5];
+	
+	return 6;
 }
 
 /*
-	server_info composes a string that presents the status and configuration of the
-	network interface. It writes the string to a buffer specified by the calling
-	process. The calling process also provides a maximum size for the stirng.
-	The function returns the number of characters it wrote, and it also terminates
-	the string with null character.
+	server_mac_str writes the network interface's media access control (MAC)
+	address to a string as six, two-digit hexadecimal characters separeted by
+	colons, making 18 charcters in all. The routine does not check the size of
+	the destination string buffer, but it does return the number of characters
+	it wrote.
 */
-void server_info(char* out, uint32_t max_len) {
-    TCPIP_NET_HANDLE net_hdl;
-    TCPIP_NET_IF* pNetIf;
-    IPV4_ADDR ip, mask, gw;
-    uint8_t* mac;
-    uint32_t i = 0;
-    uint32_t n = 0;
-    const char* name;
+int server_mac_str(char* out) {
+	uint8_t m[6];
+	server_mac(m);
+	return sprintf(out, 
+		"%02X:%02X:%02X:%02X:%02X:%02X", 
+		m[0], m[1], m[2], m[3], m[4], m[5]);
+}
 
-    net_hdl = TCPIP_STACK_IndexToNet(0);
-    pNetIf = _TCPIPStackHandleToNet(net_hdl);
+/*
+	server_ip_str writes the server IP address to a buffer as four printable
+	decimal values separated by periods.  The routine does not check the size of
+	the destination string buffer, but it does return the number of characters
+	it wrote.
+*/
+int server_ip_str(char* out) {
+	TCPIP_NET_HANDLE net_hdl;
+	TCPIP_NET_IF* pNetIf;
+	IPV4_ADDR ip;
 
-    ip.Val  = pNetIf->netIPAddr.Val;
-    mask.Val = pNetIf->netMask.Val;
-    gw.Val   = pNetIf->netGateway.Val;
-    mac = pNetIf->netMACAddr.v;
-    name = TCPIP_STACK_NetNameGet(net_hdl);
-	
-	n = snprintf(&out[i], max_len, "\r\nNetwork Info:\r\n");
-	i = i + n;
-	n = snprintf(&out[i], max_len-i, "Interface : %s\r\n", name);
-	i = i + n;
-	n = snprintf(&out[i], max_len-i, "IP        : %u.%u.%u.%u\r\n",
-        ip.v[0], ip.v[1], ip.v[2], ip.v[3]);
-	i = i + n;
-	n = snprintf(&out[i], max_len-i, "Mask      : %u.%u.%u.%u\r\n",
-        mask.v[0], mask.v[1], mask.v[2], mask.v[3]);
-	i = i + n;
-    n = snprintf(&out[i], max_len-i, "Gateway   : %u.%u.%u.%u\r\n",
-        gw.v[0], gw.v[1], gw.v[2], gw.v[3]);
-	i = i + n;
-    n = snprintf(&out[i], max_len-i, "MAC       : %02X:%02X:%02X:%02X:%02X:%02X\r\n",
-        mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
-	i = i + n;
-    n = snprintf(&out[i], max_len-i, "Link      : %s\r\n",
-        (TCPIP_STACK_NetIsLinked(net_hdl) ? "UP" : "DOWN"));
-	i = i + n;
+	net_hdl = TCPIP_STACK_IndexToNet(0);
+	pNetIf = _TCPIPStackHandleToNet(net_hdl);
+	ip.Val  = pNetIf->netIPAddr.Val;
+	return sprintf(out, 
+		"%u.%u.%u.%u",
+		ip.v[0], ip.v[1], ip.v[2], ip.v[3]);
+}
+
+/*
+	server_nm_str writes the server network mask to a buffer as four printable
+	decimal values separated by periods. The routine does not check the size of
+	the destination string buffer, but it does return the number of characters
+	it wrote.
+*/
+int server_nm_str(char* out) {
+	TCPIP_NET_HANDLE net_hdl;
+	TCPIP_NET_IF* pNetIf;
+	IPV4_ADDR nm;
+
+	net_hdl = TCPIP_STACK_IndexToNet(0);
+	pNetIf = _TCPIPStackHandleToNet(net_hdl);
+	nm.Val = pNetIf->netMask.Val;
+	return sprintf(out, 
+		"%u.%u.%u.%u",
+		nm.v[0], nm.v[1], nm.v[2], nm.v[3]);
+}
+
+/*
+	server_gw_str writes the server gateway address to a buffer as four printable
+	decimal values separated by periods. The routine does not check the size of
+	the destination string buffer, but it does return the number of characters
+	it wrote.
+*/
+int server_gw_str(char* out) {
+	TCPIP_NET_HANDLE net_hdl;
+	TCPIP_NET_IF* pNetIf;
+	IPV4_ADDR gw;
+
+	net_hdl = TCPIP_STACK_IndexToNet(0);
+	pNetIf = _TCPIPStackHandleToNet(net_hdl);
+	gw.Val   = pNetIf->netGateway.Val;
+	return sprintf(out, 
+		"%u.%u.%u.%u",
+		gw.v[0], gw.v[1], gw.v[2], gw.v[3]);
+}
+
+/*
+	server_name_str writes the server interface name to a buffer as a printable
+	string. The routine does not check the size of the destination string
+	buffer, but it does return the number of characters it wrote.
+*/
+int server_name_str(char* out) {
+	TCPIP_NET_HANDLE net_hdl;
+	const char* name;
+
+	net_hdl = TCPIP_STACK_IndexToNet(0);
+	name = TCPIP_STACK_NetNameGet(net_hdl);
+	return sprintf(out, "%s", name);
+}
+
+/*
+	server_linked returns true iff the Ethernet interface has an active link
+	to a peer, hub, or switch.
+*/
+bool server_linked(void) {
+	TCPIP_NET_HANDLE net_hdl;
+	net_hdl = TCPIP_STACK_IndexToNet(0);
+	return TCPIP_STACK_NetIsLinked(net_hdl);
+}
+
+/*
+	server_info composes a string that presents the status and configuration of
+	the network interface. It writes the string to a buffer specified by the
+	calling process. The calling process must provide a buffer that is large
+	enough for the entire string. The routine does not check the size of the
+	destination string buffer, but it does return the number of characters it
+	wrote.
+*/
+int server_info(char* out) {
+	int len = 0;
+
+	len += sprintf(out+len,     "Interface : ");
+	len += server_name_str(out+len);
+	len += sprintf(out+len, "\r\nIP        : ");
+	len += server_ip_str(out+len);
+	len += sprintf(out+len, "\r\nMask      : ");
+	len += server_nm_str(out+len);
+	len += sprintf(out+len, "\r\nGateway   : ");
+	len += server_gw_str(out+len);
+	len += sprintf(out+len, "\r\nMAC	   : ");
+	len += server_mac_str(out+len);
+	len += sprintf(out+len, "\r\nLink	   : ");
+	if (server_linked()) {
+		len += sprintf(out+len, "UP");
+	} else {
+		len += sprintf(out+len, "DOWN");
+	}
+	return len;
 }
 
 /*
@@ -400,20 +483,19 @@ void tcpip_server(tcpip_server_type* server, tcpip_tasks_type tasks) {
 	#define HEARTBEAT_PERIOD 50000000
 
 	SYS_STATUS tcpip_status;
-	IPV4_ADDR ip_addr;
 	TCP_SOCKET_INFO sock_info;
 	TCPIP_NET_HANDLE net_hdl;
 
 	const char* interface_name, *host_name;
 	int status;
-	static uint32_t wait_stack_done = 0;
-	static uint32_t wait_ip_done = 0;
+	static uint32_t wait_stack_msg_printed = 0;
+	static uint32_t wait_ip_msg_printed = 0;
 
 	switch (server->state) {
 		case S_WAIT_STACK: {
 			tcpip_status = TCPIP_STACK_Status(sysObj.tcpip);
 			if (tcpip_status < 0) {   
-				if (!wait_stack_done) {
+				if (!wait_stack_msg_printed) {
 					console_print(
 						"TCP/IP stack initialization failed in %s.\r\n",
 						__func__);
@@ -423,7 +505,7 @@ void tcpip_server(tcpip_server_type* server, tcpip_tasks_type tasks) {
 				net_hdl = TCPIP_STACK_IndexToNet(0);
 				interface_name = TCPIP_STACK_NetNameGet(net_hdl);
 				host_name = TCPIP_STACK_NetBIOSName(net_hdl);
-				if (!wait_stack_done) {
+				if (!wait_stack_msg_printed) {
 					console_print(
 						"Interface %s on host %s awaiting initialization in %s.\r\n",
 						interface_name,
@@ -432,25 +514,28 @@ void tcpip_server(tcpip_server_type* server, tcpip_tasks_type tasks) {
 				}
 				server->state = S_WAIT_IP;
 			}
-			wait_stack_done = 1;
+			wait_stack_msg_printed = 1;
 		}
 		break;
 
 		case S_WAIT_IP: {
 			net_hdl = TCPIP_STACK_IndexToNet(0);
 			if (TCPIP_STACK_NetIsReady(net_hdl)) {
-				ip_addr.Val = TCPIP_STACK_NetAddress(net_hdl);
+				server->ip_addr.Val = TCPIP_STACK_NetAddress(net_hdl);
 				interface_name = TCPIP_STACK_NetNameGet(net_hdl);
-				if (!wait_ip_done) {
+				if (!wait_ip_msg_printed) {
 					console_print(
 						"Interface %s assigned IP address %d.%d.%d.%d in %s.\r\n", 
 						interface_name,
-						ip_addr.v[0], ip_addr.v[1], ip_addr.v[2], ip_addr.v[3],
+						server->ip_addr.v[0], 
+						server->ip_addr.v[1], 
+						server->ip_addr.v[2], 
+						server->ip_addr.v[3],
 						__func__);
 					ping_gateway();
 				}
 				server->state = S_OPEN_SERVER;
-				wait_ip_done = 1;
+				wait_ip_msg_printed = 1;
 			}
 		}
 		break;
@@ -472,7 +557,15 @@ void tcpip_server(tcpip_server_type* server, tcpip_tasks_type tasks) {
 		break;
 
 		case S_LISTENING: {
-			if (TCPIP_TCP_IsConnected(server->socket)) {
+			net_hdl = TCPIP_STACK_IndexToNet(0);
+			IPV4_ADDR current_ip;
+			current_ip.Val = TCPIP_STACK_NetAddress(net_hdl);
+			if (current_ip.Val != server->ip_addr.Val) {
+					TCPIP_TCP_Close(server->socket);
+					server->socket = INVALID_SOCKET;
+					for (int i = 0; i < 3; i++) tcp_tick();
+					server->state = S_WAIT_IP;
+			} else if (TCPIP_TCP_IsConnected(server->socket)) {
 				if (TCPIP_TCP_SocketInfoGet(server->socket, &sock_info)) {
 					IPV4_ADDR ip = sock_info.remoteIPaddress.v4Add;
 					if (debug) console_print(

@@ -97,25 +97,36 @@ typedef enum {
 	The tcpip_server_type structure provides a complete description of one of
 	our TCP/IP servers. The structure includes the server state, a handle to the
 	socket, which is either invalid, listening or connected, the port number the
-	server should listen on, and the name of the protocol it serves. The only
-	feature of the server that is not encoded in this structure is the protocol
-	tast procedure, which we pass into the server routine as a separate
-	argument.
+	server should listen on, and the name of the protocol it serves. The IP
+	address to which the socket is bound we save in its own field, which we
+	check every time we call the server maintenance routine, tcpip_server, to
+	see if it is the same as the current IP address. When we chanage the IP
+	address, we must close the server sockets and re-open them again so they
+	will be bound to the new IP address. The only feature of the server that is
+	not encoded in this structure is the protocol tast procedure, which we pass
+	into the server routine as a separate argument.
 */
 typedef struct {
 	TCP_SOCKET socket;
  	tcpip_server_state_type state;
 	int port;
 	const char* protocol;
+	IPV4_ADDR ip_addr;
 } tcpip_server_type;
 
 /*
-	Here are some utility routines for TCP/IP management and reporting.
+	Routines for TCP/IP management and reporting.
 */
 void ping_gateway(void);
-int server_set_ip(const char* ip_str, const char* gw_str, const char* mk_str);
-void server_mac(uint8_t* out);
-void server_info(char* out, uint32_t max_len);
+int server_set_ip(const char* ip_str, const char* gw_str, const char* nm_str);
+int server_mac(uint8_t* out);
+int server_mac_str(char* out);
+int server_ip_str(char* out);
+int server_nm_str(char* out);
+int server_gw_str(char* out);
+int server_name_str(char* out);
+bool server_linked(void);
+int server_info(char* out);
 
 /*
  	A tcpip_tasks_type is the type of procedure that will be called by our

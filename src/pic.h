@@ -251,6 +251,7 @@ void pic_reset(void);
 void pic_initialize(void);
 int pic_config_write(const char* config);
 int pic_config_read(char* config, uint32_t config_size);
+void pic_info(char* out);
 
 /*
 	Generic UART2 communication routines. Each of these takes a context pointer
