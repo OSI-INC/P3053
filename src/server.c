@@ -36,6 +36,99 @@
 #include "pic.h"
 
 /*
+	The active server configuration, a global variable. Intended to reflect the 
+	current server configuration.
+*/
+server_config_type server_config_active;
+
+/*
+	The default server configuration is the one we use when we have not yet written
+	a configuration to non-volatile memory. 
+*/
+const server_config_type server_config_default = {
+	.magic_str = "The Pelagic Argosy Sites Land",
+	.ip_str = "10.0.0.37",
+	.gw_str = "10.0.0.1",
+	.nm_str = "255.255.255.0",
+	.operator_str = "unassigned",
+	.time_str = "00000000000000",
+	.password_str = "LWDAQ",
+	.lwdaq_port_str = "90",
+	.telnet_port_str = "23",
+	.security_level_str = "0",
+	.tcp_timeout_str = "10"
+};
+
+/*
+	server_config_write writes a server configuration record to the flash
+	configuration address in non-volatile memory.
+*/
+int server_config_write(const server_config_type* config_ptr) {
+	return pic_nvm_putbytes(
+		FLASH_CONFIG_ADDR, 
+		(const uint8_t *) config_ptr,
+		sizeof(server_config_type));
+}
+
+/*
+	server_config_read reads a server configuration record from the flash
+	configuration address in non-volatile memory. After reading the record, the
+	routine checks that its magic string matches that of a composed string, so
+	as to check for a random set of bytes read from uninitialized NVM. If the
+	magic string does not match, we create the default configuration record and
+	use that instead.
+*/
+int server_config_read(server_config_type* config_ptr) {
+	int len;
+	console_print("entering %s\r\n",__func__);
+	len = pic_nvm_getbytes(
+		(uint8_t*) config_ptr,
+		FLASH_CONFIG_ADDR, 
+		sizeof(server_config_type));
+	console_print("read %s\r\n",__func__);
+	config_ptr->magic_str[sizeof(config_ptr->magic_str)-1] = '\0';
+	if (strcmp(config_ptr->magic_str, "The Pelagic Argosy Sites Land") != 0) {
+		*config_ptr = server_config_default;
+		return 0;
+	} else {
+		return len;
+	}
+}
+
+/*
+	server_str_from_config takes a server configuration record and generates a
+	colon-delimited string of parameter names and values, each pair on a separate
+	line. The routine returns the length of the generated string. It does not 
+	check to make sure that the destination string is large enough.
+*/
+int server_str_from_config(char* str, const server_config_type* config_ptr) {
+	int len = 0;
+	len += sprintf(str+len, "magic: %s\r\n", config_ptr->magic_str);
+	len += sprintf(str+len, "ip_addr: %s\r\n", config_ptr->ip_str);
+	len += sprintf(str+len, "gateway_addr: %s\r\n", config_ptr->gw_str);
+	len += sprintf(str+len, "network_mask: %s\r\n", config_ptr->nm_str);
+	len += sprintf(str+len, "operator: %s\r\n", config_ptr->operator_str);
+	len += sprintf(str+len, "time: %s\r\n", config_ptr->time_str);
+	len += sprintf(str+len, "password: %s\r\n", config_ptr->password_str);
+	len += sprintf(str+len, "lwdaq_port: %s\r\n", config_ptr->lwdaq_port_str);
+	len += sprintf(str+len, "telnet_port: %s\r\n", config_ptr->telnet_port_str);
+	len += sprintf(str+len, "security_level: %s\r\n", config_ptr->security_level_str);
+	len += sprintf(str+len, "tcp_timeout: %s\r\n", config_ptr->tcp_timeout_str);
+	return len;
+}
+
+/*
+	server_config_from_str looks through a string for pairs of colon-delimited
+	pairs of parameter names and values. If it finds a parameter with a name
+	that matches one of our server parameters, it copies the value into the
+	server the configuration record passed as an argument. The routine returns
+	the number of parameters if found, or -1 for an error.
+*/
+int server_config_from_str(server_config_type* config_ptr, const char* str) {
+	return 0;
+}
+
+/*
 	tcpip_tick maintains the TCP/IP stack without checking the status of any
 	particular socket. It returns no value. It refers to the global sysObj
 	structure declared in definitions.h of our Harmony library. 
@@ -389,7 +482,6 @@ bool server_linked(void) {
 */
 int server_info(char* out) {
 	int len = 0;
-
 	len += sprintf(out+len,     "Interface : ");
 	len += server_name_str(out+len);
 	len += sprintf(out+len, "\r\nIP        : ");
@@ -409,62 +501,6 @@ int server_info(char* out) {
 	return len;
 }
 
-/*
-	The active server configuration, a global variable. Intended to reflect the 
-	current server configuration.
-*/
-server_config_type server_config_active;
-
-/*
-	The default server configuration is the one we use when we have not yet written
-	a configuration to non-volatile memory. 
-*/
-const server_config_type server_config_default = {
-	.magic_str = server_config_magic_str,
-	.ip_str = "10.0.0.37",
-	.gw_str = "10.0.0.1",
-	.nm_str = "255.255.255.0",
-	.operator_str = "unassigned",
-	.time_str = "00000000000000",
-	.password_str = "LWDAQ",
-	.lwdaq_port_str = "90",
-	.telnet_port_str = "23",
-	.security_level_str = "0",
-	.tcp_timeout_str = "10"
-};
-
-/*
-	server_config_write writes a server configuration record to the flash
-	configuration address in non-volatile memory.
-*/
-int server_config_write(const server_config_type* config_ptr) {
-	return pic_nvm_putbytes(
-		FLASH_CONFIG_ADDR, 
-		(const uint8_t *) config_ptr,
-		sizeof(server_config_type));
-}
-
-/*
-	server_config_read reads a server configuration record from the flash
-	configuration address in non-volatile memory. After reading the record, the
-	routine checks that its magic string matches that of a composed string, so
-	as to check for a random set of bytes read from uninitialized NVM. If the
-	magic string does not match, we create the default configuration record and
-	use that instead.
-*/
-int server_config_read(server_config_type* config_ptr) {
-	int len;
-	len = pic_nvm_getbytes(
-		(uint8_t*) config_ptr,
-		FLASH_CONFIG_ADDR, 
-		sizeof(server_config_type));
-	if (strcmp(config_ptr->magic_str, server_config_magic_str) != 0) {
-		*config_ptr = server_config_default;
-		return 0;
-	} else {
-		return len;
-	}
-}
 
 /*
 	tcpip_server_check_ip_change checks to see if the network interface's IP address

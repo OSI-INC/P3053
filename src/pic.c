@@ -99,7 +99,7 @@ static uint8_t pic_nvm_write_buff[NVM_FLASH_ROWSIZE]
 	have trouble with the erase procedure. The routine is wasteful of NVM space
 	in that it makes no use of the other 14 KB in the page, nor does it permit
 	any other process to use the other 14 KB. If the number of specified length
-	of the copy is greater than a row, we curtail it to one row. If the length
+	of the copy is greater than a row, we truncate it to one row. If the length
 	is less than one row, we fill the rest of the row with erase bytes 0xFF. The
 	routine returns the number of bytes it wrote, not counting erase bytes.
 */
@@ -116,20 +116,54 @@ int pic_nvm_putbytes(uint32_t flash_addr, const uint8_t* buff, uint32_t len) {
 }
 
 /*
+	pic_nvm_writestr copies a string to non-volatile memory (NVM). We pass it an
+	address in NVM and a pointer to a null-terminated string. The routine calls
+	pic_nvm_putbytes to perform the copy. It returns the number of characters
+	written, which will be the string length plus one, or an error code.
+*/
+int pic_nvm_writestr(uint32_t flash_addr, const char* str) {
+    uint32_t len = strlen(str) + 1;
+    return pic_nvm_putbytes(flash_addr, (const uint8_t*) str, len);
+}
+
+/*
 	pic_nvm_getbytes reads an array of bytes from non-volatile memory (NVM) into
 	a byte array in RAM. We pass as arguments the byte array address we want to
 	write to, the NVM address we want to read from, and the number of bytes to
 	copy. If the flash address we specify is in the cached range of program
 	flash, we will read from the cached copy of the NVM. If the address is in
 	the non-cached range, we will read directly from NVM. The routine returns
-	the number of bytes it read. If more than an NVM row were requested, the
-	read is curtailed to one row.
+	the number of bytes it read. Reading from NVM is not subject to the same
+	2-KB boundary constraint as writing to NVM. We can read from any address
+	and we can read any number of bytes, by simply using memcpy.
 */
 int pic_nvm_getbytes(uint8_t* buff, uint32_t flash_addr, uint32_t len)  {
 	const uint8_t* row = (const uint8_t*) flash_addr;
-    if (len >= NVM_FLASH_ROWSIZE) {len = NVM_FLASH_ROWSIZE;}
 	memcpy(buff, row, len);
 	return len;
+}
+
+/*
+	pic_nvm_readstr reads a null-terminated string from non-volatile memory
+	(NVM) and copies the string into a buffer we provide. We pass as arguments
+	the NVM address (flash memory address) we wish to read from, a pointer to
+	the buffer we want to copy into, and the maximum length of string we can
+	copy. The flash address does not need to be on a 2-KB boundary. The routine
+	scans forward from the flash address looking for a null, then copies all
+	characters up to and including the null to the destination string. It
+	returns the length of the string it copied. If it does not find a null, it
+	will make an empty string and return a negative value.
+*/
+int pic_nvm_readstr(char* str, uint32_t flash_addr, uint32_t str_size) {
+	const uint8_t* row = (const uint8_t*) flash_addr;
+	uint32_t i = 0;
+	while ((i < str_size) && (row[i] != '\0')) {i++;}
+	if (i + 1 > str_size) {
+		str[0] = '\0';
+		return -1;
+	}
+	memcpy(str, row, i + 1);
+	return i;
 }
 
 /*

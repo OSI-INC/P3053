@@ -372,6 +372,7 @@ void console_initialize(void)
 	the state of the debug flag.
 */
 void console_server(void) {
+	#define CONSOLE_STR_ADDR 0xBD104000
 	enum {max_cmd_len=255};
 	static char cmd_buff[max_cmd_len];
 	static uint32_t cmd_len = 0;
@@ -385,7 +386,8 @@ void console_server(void) {
     enum {max_msg_len=2048};    
     static char msg_buff[max_msg_len];
     
- 	bool ignore_lf = false;
+    int status;
+	bool ignore_lf = false;
 	bool process_command = false;    
     
 
@@ -425,6 +427,8 @@ void console_server(void) {
 			switch (cmd) {
 				case 'h':
 					console_message("Commands:\r\n");
+					console_message("  c - save string to flash\r\n");
+					console_message("  d - read string from flash\r\n");
 					console_message("  i - new ip addr\r\n");
 					console_message("  m - machine configuration\r\n");
 					console_message("  n - net info\r\n");
@@ -432,7 +436,33 @@ void console_server(void) {
 					console_message("  r - software reset\r\n");
 					console_message("  h - print help\r\n");
 					break;
-										
+					
+				case 'c':
+					console_message("String: ");
+					console_readln(msg_buff, sizeof(msg_buff));
+					status = pic_nvm_writestr(CONSOLE_STR_ADDR, msg_buff);
+					if (status >= 0) {
+						console_print("Wrote: %s\r\n", msg_buff);
+					} else {
+						console_print("ERROR: String write failed in %s.\r\n",
+							__func__);
+					}	
+					break;
+					
+				case 'd':
+					console_message("Reading string...\r\n");
+					status = pic_nvm_readstr(
+						msg_buff,
+						CONSOLE_STR_ADDR,
+						sizeof(msg_buff));
+					if (status >= 0) {
+						console_print("String: %s\r\n", msg_buff);
+					} else {
+						console_print("ERROR: String read failed in %s.\r\n",
+							__func__);
+					}
+					break;
+					
 				case 'i':
 					console_message("New IP Address: ");
 					console_readln(ip_str, sizeof(ip_str));

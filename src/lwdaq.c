@@ -144,9 +144,9 @@ int lwdaq_data_return(TCP_SOCKET s, uint8_t* block, uint32_t len) {
 	It returns the number of fields set by the string, or a negative number for
 	an error.
 */
-int lwdaq_extract_server_config(server_config_type* config, char* str) {
+int lwdaq_extract_server_config(server_config_type* config_ptr, char* str) {
 	(void) str;
-	(void) str;
+	(void) config_ptr;
 	return 0;
 }
 
@@ -155,8 +155,8 @@ int lwdaq_extract_server_config(server_config_type* config, char* str) {
 	configuration record. It returns the length of the created string, or a negative
 	number to indicate an error.
 */
-int lwdaq_create_config_str(char* str, const server_config_type* config) {
-	(void) config;
+int lwdaq_create_config_str(char* str, const server_config_type* config_ptr) {
+	(void) config_ptr;
 	str = "lwdaq_configuration:\r\n"
 		"ip_addr: 10.0.0.37";
 	return strlen(str);

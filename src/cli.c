@@ -123,12 +123,12 @@ int cli_cmd_register(const char *name, cli_cmd_proc proc) {
 
 
 /*
-	cli_cmd_help with no arguments prints to the specified channel a list of all
+	cli_help with no arguments prints to the specified channel a list of all
 	registered commands and their information strings. If we pass it "--info" it
 	prints its info string only. Otherwise, if we pass it "--help", it prints
 	its own help string.
 */
-void cli_cmd_help(cli_chan_type *ch, char *args) {
+void cli_help(cli_chan_type *ch, char *args) {
 
 	// Option flags.
 	bool print_info = false;
@@ -192,10 +192,12 @@ void cli_cmd_help(cli_chan_type *ch, char *args) {
 }
 
 /*
-	cli_cmd_ipconfig with no arguments prints to the specified channel a list of
-	network information. 
+	cli_ip_config with no arguments prints to the specified channel a list of
+	network information. With the --ip, --gateway, or --mask options, it changes
+	the current server values and copies the new values into the active 
+	server configuration. 
 */
-void cli_cmd_ipconfig(cli_chan_type *ch, char *args) {
+void cli_ip_config(cli_chan_type *ch, char *args) {
 	bool print_info = false;
 	bool print_help = false;
 	bool update = false;
@@ -240,7 +242,7 @@ void cli_cmd_ipconfig(cli_chan_type *ch, char *args) {
 	if (print_help) {
 		cli_message(ch,
 			"Usage:\r\n"
-			"  ipconfig [--info] [--help]\r\n"
+			"  ip-config [--info] [--help]\r\n"
 			"\r\n"
 			"Summary:\r\n"
 			"  Change network configuration as specified by options, then print\r\n" 
@@ -259,6 +261,10 @@ void cli_cmd_ipconfig(cli_chan_type *ch, char *args) {
 	if (update) {
 		if (server_set_ip(ip_str, gw_str, nm_str) < 0) {
 			cli_message(ch,"ERROR: Failed to update IP interface.\r\n");
+		} else {
+			strcpy(server_config_active.ip_str,ip_str);
+			strcpy(server_config_active.gw_str,gw_str);
+			strcpy(server_config_active.nm_str,nm_str);			
 		}
 	}
 
@@ -269,11 +275,10 @@ void cli_cmd_ipconfig(cli_chan_type *ch, char *args) {
 }
 
 /*
-	cli_cmd_picinfo with no arguments prints PIC32MZ characteristics. It does
-	not offer any way to change those characteristics, and takes only the two
-	required options --info and --help.
+	cli_pic_info with no arguments prints PIC32MZ characteristics. It does
+	not offer any way to change those characteristics.
 */
-void cli_cmd_picinfo(cli_chan_type *ch, char *args) {
+void cli_pic_info(cli_chan_type *ch, char *args) {
 	bool print_info = false;
 	bool print_help = false;
 	char* tok = strtok(args, " \t");
@@ -299,7 +304,7 @@ void cli_cmd_picinfo(cli_chan_type *ch, char *args) {
 	if (print_help) {
 		cli_message(ch,
 			"Usage:\r\n"
-			"  picinfo [--info] [--help]\r\n"
+			"  pic-info [--info] [--help]\r\n"
 			"\r\n"
 			"Summary:\r\n"
 			"  List internal PIC32MZ microcontroller configuration values. Provides\r\n"
@@ -319,14 +324,92 @@ void cli_cmd_picinfo(cli_chan_type *ch, char *args) {
 }
 
 /*
+	cli_server_config converts a server configuration record into a string
+	of parameter names and values, and prints it to the console. We select which
+	record to print with the options. With no option, the routine returns the
+	active configuration.
+*/
+void cli_server_config(cli_chan_type *ch, char *args) {
+	bool print_info = false;
+	bool print_help = false;
+	bool print_flash = false;
+	bool print_default = false;
+	server_config_type config;
+	char* tok = strtok(args, " \t");
+
+	while (tok != NULL) {
+ 		if (strcmp(tok, "--info") == 0) {
+ 			print_info = true;
+        } else if (strcmp(tok, "--help") == 0) {
+        	print_help = true;
+        } else if (strcmp(tok, "flash") == 0) {
+        	print_flash = true;
+        } else if (strcmp(tok, "active") == 0) {
+        	;
+        } else if (strcmp(tok, "default") == 0) {
+        	print_default = true;
+        } else {
+            cli_print(ch, "ERROR: Unrecognized option '%s' in %s.\r\n",
+            	tok, __func__);
+            return;
+        }
+        tok = strtok(NULL, " \t");
+    }
+    
+	if (print_info) {
+		cli_message(ch, "Print server configuration records.\r\n");
+		return;
+	}
+
+	if (print_help) {
+		cli_message(ch,
+			"Usage:\r\n"
+			"  server-config [--info] [--help]\r\n"
+			"\r\n"
+			"Summary:\r\n"
+			"  Print server configuration records, as directed by options. If no\r\n"
+			"  record given, print the active record.\r\n"
+			"\r\n"
+			"Options:\r\n"
+			"  flash         Print the server configuration stored in flash memory.\r\n"
+			"  active        Print the active server configuration.\r\n"
+			"  default       Print the default server configuration.\r\n"
+			"  --info        Print a one-line summary of this command.\r\n"
+			"  --help        Print this help text.\r\n"
+		);
+		return;
+	}
+	
+	if (print_flash) {
+		server_config_read(&config);
+		server_str_from_config(ch->tx_buff, &config);
+		cli_print(ch, "%s\r\n", ch->tx_buff);
+		return;
+	}
+	
+	if (print_default) {
+		server_str_from_config(ch->tx_buff, &server_config_default);
+		cli_print(ch, "%s\r\n", ch->tx_buff);
+		return;
+	}
+	
+	server_str_from_config(ch->tx_buff, &server_config_active);
+	cli_print(ch, "%s\r\n", ch->tx_buff);
+	return;
+	
+    return;
+}
+
+/*
 	cli_initialize initializes the command-line interpreter by registering some
 	commands we find useful. We can add more commands at any time with the
 	cli_cmd_register routine.
 */
 void cli_initialize(void) {
-	cli_cmd_register("help",cli_cmd_help);
-	cli_cmd_register("ipconfig",cli_cmd_ipconfig);
-	cli_cmd_register("picinfo",cli_cmd_picinfo);
+	cli_cmd_register("help",cli_help);
+	cli_cmd_register("ip-config",cli_ip_config);
+	cli_cmd_register("pic-info",cli_pic_info);
+	cli_cmd_register("server-config",cli_server_config);
 }
 
 /*

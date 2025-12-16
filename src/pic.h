@@ -239,15 +239,15 @@ static inline uint8_t lwdaq_byte_read_repeat(void) {
 }
 
 /*
-	Reading and writing from non-volatile memory. These routines operate upon
-	the flash memory page pointed to by their flash_addr argument. The write
-	routine erases the page and then writes a null-terminated string to the page
-	followed by 0xFF erase bytes. The read routine reads from the page up to and
-	including the null character at the end of the string and copies the
-	characters into an output buffer provided by the calling process. If there
-	is no null string, the routine returns an error code and does not attempt to
-	copy the string into the output buffer.
-	
+	Reading and writing from non-volatile memory (NVM). These routines operate
+	upon the flash memory page pointed to by their flash_addr argument. The
+	write routines erases a page and then write either a byte array or a
+	null-terminated string to the page, followed by 0xFF erase bytes. The read
+	routines read from any location in NVM, either a byte array or a string.
+	When copying a string, if there is no null character to be found within the
+	maximum copy length, the routine returns an error code. Otherwise the
+	routines return the number of bytes read, or the length of the string read.
+
 	The PIC32MZ2048EFH's 2 MByte of NVM appears twice in the CPU's virtual
 	address space. Once in the range 0x9D000000 to 0x9D0FFFFF, in which range
 	the NVM is accessed by the CPU indirectly through a cache memory, and again
@@ -266,7 +266,9 @@ static inline uint8_t lwdaq_byte_read_repeat(void) {
 	NVM.
 */
 int pic_nvm_putbytes(uint32_t flash_addr, const uint8_t* buff, uint32_t len);
+int pic_nvm_writestr(uint32_t flash_addr, const char* str);
 int pic_nvm_getbytes(uint8_t* buff, uint32_t flash_addr, uint32_t len);
+int pic_nvm_readstr(char* str, uint32_t flash_addr, uint32_t str_size);
 
 /*
 	Reset, initialization, and configuration routines.
