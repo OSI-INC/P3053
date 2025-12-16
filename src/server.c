@@ -410,13 +410,37 @@ int server_info(char* out) {
 }
 
 /*
+	The active server configuration, a global variable. Intended to reflect the 
+	current server configuration.
+*/
+server_config_type server_config_active;
+
+/*
+	The default server configuration is the one we use when we have not yet written
+	a configuration to non-volatile memory. 
+*/
+const server_config_type server_config_default = {
+	.magic_str = server_config_magic_str,
+	.ip_str = "10.0.0.37",
+	.gw_str = "10.0.0.1",
+	.nm_str = "255.255.255.0",
+	.operator_str = "unassigned",
+	.time_str = "00000000000000",
+	.password_str = "LWDAQ",
+	.lwdaq_port_str = "90",
+	.telnet_port_str = "23",
+	.security_level_str = "0",
+	.tcp_timeout_str = "10"
+};
+
+/*
 	server_config_write writes a server configuration record to the flash
 	configuration address in non-volatile memory.
 */
-int server_config_write(const server_config_type* config) {
+int server_config_write(const server_config_type* config_ptr) {
 	return pic_nvm_putbytes(
 		FLASH_CONFIG_ADDR, 
-		(uint8_t*) config,
+		(const uint8_t *) config_ptr,
 		sizeof(server_config_type));
 }
 
@@ -428,14 +452,14 @@ int server_config_write(const server_config_type* config) {
 	magic string does not match, we create the default configuration record and
 	use that instead.
 */
-int server_config_read(server_config_type* config) {
+int server_config_read(server_config_type* config_ptr) {
 	int len;
 	len = pic_nvm_getbytes(
-		(uint8_t*) config,
+		(uint8_t*) config_ptr,
 		FLASH_CONFIG_ADDR, 
 		sizeof(server_config_type));
-	if (strcmp(config->magic_str, server_config_magic_str) != 0) {
-		*config = server_config_default;
+	if (strcmp(config_ptr->magic_str, server_config_magic_str) != 0) {
+		*config_ptr = server_config_default;
 		return 0;
 	} else {
 		return len;

@@ -150,21 +150,10 @@ typedef struct {
 
 /*
 	The default server configuration is the one we use when we have not yet written
-	a configuration to non-volatile memory.
+	a configuration to non-volatile memory. Its contents are defined in the server
+	implementation file.
 */
-const server_config_type server_config_default = {
-	.magic_str = server_config_magic_str,
-	.ip_str = "10.0.0.37",
-	.gw_str = "10.0.0.1",
-	.nm_str = "255.255.255.0",
-	.operator_str = "unassigned",
-	.time_str = "00000000000000",
-	.password_str = "LWDAQ",
-	.lwdaq_port_str = "90",
-	.telnet_port_str = "23",
-	.security_level_str = "0",
-	.tcp_timeout_str = "10"
-};
+extern const server_config_type server_config_default;
 
 /*
 	The active server configuration is the one that is intended to reflect the current
@@ -172,7 +161,7 @@ const server_config_type server_config_default = {
 	cooperation of the procedures that modify the state of the server. If we modify the
 	IP address, for example, we must record our modification in the server configuration.
 */
-server_config_type server_config_active;
+extern server_config_type server_config_active;
 
 /*
 	We want to be able to update the server configuration and have the server

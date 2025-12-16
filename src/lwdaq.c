@@ -81,14 +81,12 @@ tcpip_server_type lwdaq_server = {
 int lwdaq_header(TCP_SOCKET s, uint32_t id, uint32_t len) {
 	uint8_t buff[FRAME_BUFF_SIZE];
 	uint32_t* lp;
-	
 	buff[START_OFFSET] = START_CODE;
 	lp = (uint32_t*) &buff[ID_OFFSET];
 	*lp = flip_bytes_u32(id);
 	lp = (uint32_t*) &buff[CLEN_OFFSET];
 	*lp = flip_bytes_u32(len);
 	tcp_writeall(&s, buff, CONTENT_OFFSET);
-	
 	return 0;
 }
 
@@ -97,10 +95,8 @@ int lwdaq_header(TCP_SOCKET s, uint32_t id, uint32_t len) {
 */
 int lwdaq_footer(TCP_SOCKET s) {
 	uint8_t buff[FRAME_BUFF_SIZE];
-	
 	buff[0] = END_CODE;
 	tcp_writeall(&s, buff, 1);
-	
 	return 0;
 }
 
@@ -110,12 +106,10 @@ int lwdaq_footer(TCP_SOCKET s) {
 */
 int lwdaq_byte_return(TCP_SOCKET s, uint8_t data) {
 	uint8_t buff[FRAME_BUFF_SIZE];
-	
 	lwdaq_header(s, DATA_RETURN, sizeof(data));
 	buff[0] = data;
 	tcp_writeall(&s, buff, sizeof(data));
 	lwdaq_footer(s);
-	
 	return 0;
 }
 
@@ -126,13 +120,11 @@ int lwdaq_byte_return(TCP_SOCKET s, uint8_t data) {
 int lwdaq_integer_return(TCP_SOCKET s, uint32_t data) {
 	uint8_t buff[FRAME_BUFF_SIZE];
 	uint32_t* lp;
-	
 	lwdaq_header(s, DATA_RETURN, sizeof(data));
 	lp = (uint32_t*) &buff[0];
 	*lp = flip_bytes_u32(data);
 	tcp_writeall(&s, buff, sizeof(data));
 	lwdaq_footer(s);
-	
 	return 0;
 }
 
@@ -143,9 +135,33 @@ int lwdaq_data_return(TCP_SOCKET s, uint8_t* block, uint32_t len) {
 	lwdaq_header(s, DATA_RETURN, len);
 	tcp_writeall(&s, block, len);
 	lwdaq_footer(s);
-	
 	return 0;
 }
+	
+/*
+	lwdaq_extract_server_config extracts configuration parameter values from a 
+	LWDAQ configuration string and places them in a server configuration record.
+	It returns the number of fields set by the string, or a negative number for
+	an error.
+*/
+int lwdaq_extract_server_config(server_config_type* config, char* str) {
+	(void) str;
+	(void) str;
+	return 0;
+}
+
+/*
+	lwdaq_create_config_str creates a LWDAQ configuration string from a server
+	configuration record. It returns the length of the created string, or a negative
+	number to indicate an error.
+*/
+int lwdaq_create_config_str(char* str, const server_config_type* config) {
+	(void) config;
+	str = "lwdaq_configuration:\r\n"
+		"ip_addr: 10.0.0.37";
+	return strlen(str);
+}
+
 
 /*
 	lwdaq_handle_message handles an incoming LWDAQ message. We pass the routine
@@ -153,7 +169,7 @@ int lwdaq_data_return(TCP_SOCKET s, uint8_t* block, uint32_t len) {
 	is required. We pass the LWDAQ message identifier, the length of the message
 	content, and a pointer to the content buffer.
 */
-int lwdaq_handle_message (TCP_SOCKET s, uint32_t id, uint32_t len, uint8_t* content) {
+int lwdaq_handle_message(TCP_SOCKET s, uint32_t id, uint32_t len, uint8_t* content) {
 	uint8_t register_addr = 0;
 	uint8_t value = 0;
 	uint32_t tx_len = 0;
@@ -162,7 +178,8 @@ int lwdaq_handle_message (TCP_SOCKET s, uint32_t id, uint32_t len, uint8_t* cont
 	static int logged_in = 0;
 	static int security_level = 0;
 	static char password[32] = "LWDAQ";
-	static char configuration[CONFIG_LENGTH];
+	static char config_str[CONFIG_LENGTH];
+	static server_config_type config;
 
 	switch (id) {
 		case BYTE_WRITE: {
@@ -253,11 +270,11 @@ int lwdaq_handle_message (TCP_SOCKET s, uint32_t id, uint32_t len, uint8_t* cont
 		case CONFIG_READ:{
 			if (debug) console_print("CONFIG_READ in %s.\r\n", __func__);
 			if ((logged_in==1) || (security_level==0)) {
-				server_config_read(configuration, sizeof(configuration));
-			  	lwdaq_data_return(s, (uint8_t*) configuration, strlen(configuration));
+				lwdaq_create_config_str(config_str, &server_config_active);
+			  	lwdaq_data_return(s, (uint8_t*) config_str, strlen(config_str));
 				if (debug) console_print(
 					"Transmitted configuration of %d characters.\r\n",
-					strlen(configuration));
+					strlen(config_str));
 			} else {
 				if (debug) console_print("Rejected: not logged in.\r\n");
 				return -1;
@@ -272,7 +289,8 @@ int lwdaq_handle_message (TCP_SOCKET s, uint32_t id, uint32_t len, uint8_t* cont
 					if (debug) console_print("Accepted: config %d characters.\r\n",len);
 					content[len]=0x00;
 					console_print("%s",(char*) content);
-					server_config_write((char*) content);
+					lwdaq_extract_server_config(&config, (char*) content);
+					server_config_write(&config);
 				} else {
 					if (debug) console_print("Rejected: %d characters too long.\r\n",len);
 					return -1;

@@ -385,8 +385,7 @@ void console_server(void) {
     enum {max_msg_len=2048};    
     static char msg_buff[max_msg_len];
     
-    int status;
-	bool ignore_lf = false;
+ 	bool ignore_lf = false;
 	bool process_command = false;    
     
 
