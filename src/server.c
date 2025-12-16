@@ -46,17 +46,18 @@ server_config_type server_config_active;
 	a configuration to non-volatile memory. 
 */
 const server_config_type server_config_default = {
-	.magic_str = "The Pelagic Argosy Sites Land",
+	.magic_str = CONFIG_NVM_MAGIC,
+	.password_str = "LWDAQ",
+	.operator_str = "unassigned",
 	.ip_str = "10.0.0.37",
 	.gw_str = "10.0.0.1",
 	.nm_str = "255.255.255.0",
-	.operator_str = "unassigned",
 	.time_str = "00000000000000",
-	.password_str = "LWDAQ",
-	.lwdaq_port_str = "90",
-	.telnet_port_str = "23",
-	.security_level_str = "0",
-	.tcp_timeout_str = "10"
+	.device_str = "A3053A",
+	.lwdaq_port = 90,
+	.telnet_port = 23,
+	.security_level = 0,
+	.tcp_timeout = 10
 };
 
 /*
@@ -87,7 +88,7 @@ int server_config_read(server_config_type* config_ptr) {
 		sizeof(server_config_type));
 	console_print("read %s\r\n",__func__);
 	config_ptr->magic_str[sizeof(config_ptr->magic_str)-1] = '\0';
-	if (strcmp(config_ptr->magic_str, "The Pelagic Argosy Sites Land") != 0) {
+	if (strcmp(config_ptr->magic_str, CONFIG_NVM_MAGIC) != 0) {
 		*config_ptr = server_config_default;
 		return 0;
 	} else {
@@ -97,35 +98,109 @@ int server_config_read(server_config_type* config_ptr) {
 
 /*
 	server_str_from_config takes a server configuration record and generates a
-	colon-delimited string of parameter names and values, each pair on a separate
-	line. The routine returns the length of the generated string. It does not 
-	check to make sure that the destination string is large enough.
+	colon-delimited string of parameter names and values, each pair on a
+	separate line. The newline is marked by one line-feed character, LF, not by
+	a pair of characters CRLF. The routine returns the length of the generated
+	string. It does not check to make sure that the destination string is large
+	enough.
 */
 int server_str_from_config(char* str, const server_config_type* config_ptr) {
 	int len = 0;
-	len += sprintf(str+len, "magic: %s\r\n", config_ptr->magic_str);
-	len += sprintf(str+len, "ip_addr: %s\r\n", config_ptr->ip_str);
-	len += sprintf(str+len, "gateway_addr: %s\r\n", config_ptr->gw_str);
-	len += sprintf(str+len, "network_mask: %s\r\n", config_ptr->nm_str);
-	len += sprintf(str+len, "operator: %s\r\n", config_ptr->operator_str);
-	len += sprintf(str+len, "time: %s\r\n", config_ptr->time_str);
-	len += sprintf(str+len, "password: %s\r\n", config_ptr->password_str);
-	len += sprintf(str+len, "lwdaq_port: %s\r\n", config_ptr->lwdaq_port_str);
-	len += sprintf(str+len, "telnet_port: %s\r\n", config_ptr->telnet_port_str);
-	len += sprintf(str+len, "security_level: %s\r\n", config_ptr->security_level_str);
-	len += sprintf(str+len, "tcp_timeout: %s\r\n", config_ptr->tcp_timeout_str);
+	len += sprintf(str+len, "ip_str: %s\n", config_ptr->ip_str);
+	len += sprintf(str+len, "gw_str: %s\n", config_ptr->gw_str);
+	len += sprintf(str+len, "nm_str: %s\n", config_ptr->nm_str);
+	len += sprintf(str+len, "operator_str: %s\n", config_ptr->operator_str);
+	len += sprintf(str+len, "time_str: %s\n", config_ptr->time_str);
+	len += sprintf(str+len, "password_str: %s\n", config_ptr->password_str);
+	len += sprintf(str+len, "device_str: %s\n", config_ptr->device_str);
+	len += sprintf(str+len, "lwdaq_port: %u\n", config_ptr->lwdaq_port);
+	len += sprintf(str+len, "telnet_port: %u\n", config_ptr->telnet_port);
+	len += sprintf(str+len, "security_level: %u\n", config_ptr->security_level);
+	len += sprintf(str+len, "tcp_timeout: %u\n", config_ptr->tcp_timeout);
 	return len;
 }
 
 /*
-	server_config_from_str looks through a string for pairs of colon-delimited
-	pairs of parameter names and values. If it finds a parameter with a name
-	that matches one of our server parameters, it copies the value into the
-	server the configuration record passed as an argument. The routine returns
-	the number of parameters if found, or -1 for an error.
+	server_config_from_str looks through a string for pairs "parameter: value"
+	on separate lines of a null-terminated string. The first line of the string
+	will begin with the first character of the string. The last line of the
+	string will end with the last character of the string. All other lines will
+	be delimited by line-feed characters. If it finds a parameter with a name
+	that matches one of our server parameters, it updates the corresponding
+	value in the server configuration pointed to by the config_ptr. The routine
+	returns the number of parameters if found, or a negative error code. The
+	codes are as follows. For a null pointer in either the config_ptr or str,
+	-1. For a line missing a colon, -2. For a line in which the colon is not
+	followed by a space, -3.
 */
-int server_config_from_str(server_config_type* config_ptr, const char* str) {
-	return 0;
+int server_config_from_str(server_config_type *config_ptr, const char *str) {
+	const char *p = str;
+	int num_copied = 0;
+	
+	if (!config_ptr || !str) return -1;
+	
+	while (*p) {
+		const char *line_start = p;
+		const char *line_end = strchr(p, '\n');
+		if (line_end == NULL) {line_end = p + strlen(p);}
+	
+		const char *colon = memchr(line_start, ':', line_end - line_start);
+		if (!colon) return -2;
+		if (colon + 1 >= line_end || colon[1] != ' ') return -3;
+	
+		const char *value = colon + 2;
+		size_t name_len = colon - line_start;
+		size_t value_len = line_end - value;
+	
+		if (strncmp(line_start, "ip_str", name_len) == 0 && name_len == 6) {
+			snprintf(config_ptr->ip_str, sizeof(config_ptr->ip_str),
+				"%.*s", (int)value_len, value);
+			num_copied++;
+		} else if (strncmp(line_start, "gw_str", name_len) == 0 && name_len == 6) {
+			snprintf(config_ptr->gw_str, sizeof(config_ptr->gw_str),
+				"%.*s", (int) value_len, value);
+			num_copied++;
+		} else if (strncmp(line_start, "nm_str", name_len) == 0 && name_len == 6) {
+			snprintf(config_ptr->nm_str, sizeof(config_ptr->nm_str),
+				"%.*s", (int) value_len, value);
+			num_copied++;
+		} else if (strncmp(line_start, "operator_str", name_len) == 0 && name_len == 12) {
+			snprintf(config_ptr->operator_str, sizeof(config_ptr->operator_str),
+				"%.*s", (int) value_len, value);
+			num_copied++;
+		} else if (strncmp(line_start, "time_str", name_len) == 0 && name_len == 8) {
+			snprintf(config_ptr->time_str, sizeof(config_ptr->time_str),
+				"%.*s", (int) value_len, value);
+			num_copied++;
+		} else if (strncmp(line_start, "password_str", name_len) == 0 && name_len == 12) {
+			snprintf(config_ptr->password_str, sizeof(config_ptr->password_str),
+				"%.*s", (int)value_len, value);
+			num_copied++;
+		} else if (strncmp(line_start, "device_str", name_len) == 0 && name_len == 12) {
+			snprintf(config_ptr->password_str, sizeof(config_ptr->device_str),
+				"%.*s", (int)value_len, value);
+			num_copied++;
+		} else if (strncmp(line_start, "lwdaq_port", name_len) == 0 && name_len == 10) {
+			config_ptr->lwdaq_port = (uint32_t) strtoul(value, NULL, 10);
+			num_copied++;
+		} else if (strncmp(line_start, "telnet_port", name_len) == 0 && name_len == 11) {
+			config_ptr->telnet_port = (uint32_t) strtoul(value, NULL, 10);
+			num_copied++;
+		} else if (strncmp(line_start, "security_level", name_len) == 0 && name_len == 14) {
+			config_ptr->security_level = (uint32_t) strtoul(value, NULL, 10);
+			num_copied++;
+		} else if (strncmp(line_start, "tcp_timeout", name_len) == 0 && name_len == 11) {
+			config_ptr->tcp_timeout = (uint32_t) strtoul(value, NULL, 10);
+			num_copied++;
+		}
+		
+		if (*line_end == '\n') {
+			p = line_end + 1;
+		} else {
+			p = line_end;
+		}
+	}
+	return num_copied;
 }
 
 /*

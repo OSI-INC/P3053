@@ -63,7 +63,7 @@
 #define REBOOT			13
 
 // Other constants.
-#define CONFIG_LENGTH 1023
+#define LWDAQ_CONFIG_LENGTH 1023
 #define LWDAQ_DEBUG 0
 
 // The LWDAQ server record.
@@ -139,30 +139,107 @@ int lwdaq_data_return(TCP_SOCKET s, uint8_t* block, uint32_t len) {
 }
 	
 /*
-	lwdaq_extract_server_config extracts configuration parameter values from a 
-	LWDAQ configuration string and places them in a server configuration record.
-	It returns the number of fields set by the string, or a negative number for
-	an error.
+	lwdaq_str_from_config takes a server configuration record and generates a
+	colon-delimited LWDAQ configuration string, as expected by the LWDAQ
+	Configurator tool. The newline is marked by one line-feed character, LF, not by
+	a pair of characters CRLF. The routine returns the length of the generated
+	string. It does not check to make sure that the destination string is large
+	enough.
 */
-int lwdaq_extract_server_config(server_config_type* config_ptr, char* str) {
-	(void) str;
-	(void) config_ptr;
-	return 0;
+int lwdaq_str_from_config(char* str, const server_config_type* config_ptr) {
+	int len = 0;
+	len += sprintf(str+len, "lwdaq_relay_configuration:\n");
+	len += sprintf(str+len, "configuration_time: %s\n", config_ptr->time_str);
+	len += sprintf(str+len, "driver_id: %s\n", config_ptr->device_str);
+	len += sprintf(str+len, "gateway_addr: %s\n", config_ptr->gw_str);
+	len += sprintf(str+len, "ip_addr: %s\n", config_ptr->ip_str);
+	len += sprintf(str+len, "ip_port: %u\n", config_ptr->lwdaq_port);
+	len += sprintf(str+len, "operator: %s\n", config_ptr->operator_str);
+	len += sprintf(str+len, "password: %s\n", config_ptr->password_str);
+	len += sprintf(str+len, "security_level: %u\n", config_ptr->security_level);
+	len += sprintf(str+len, "subnet_mask: %s\n", config_ptr->nm_str);
+	len += sprintf(str+len, "tcp_timeout: %u\n", config_ptr->tcp_timeout);
+	return len;
 }
 
 /*
-	lwdaq_create_config_str creates a LWDAQ configuration string from a server
-	configuration record. It returns the length of the created string, or a negative
-	number to indicate an error.
+	lwdaq_config_from_str skips the first line in a string, which it assumes to
+	be occupied by the word "lwdaq_relay_configuration:", and in the lines
+	following it looks for pairs "parameter: value". The last line of the string
+	will end with the last character of the string. All other lines will be
+	delimited by line-feed characters. If it finds a parameter with a name that
+	matches one of our lwdaq parameters, it updates the corresponding value in
+	the server configuration pointed to by the config_ptr. The routine
+	returns the number of parameters if found, or a negative error code. The
+	codes are as follows. For a null pointer in either the config_ptr or str,
+	-1. For a line missing a colon, -2. For a line in which the colon is not
+	followed by a space, -3.
 */
-int lwdaq_create_config_str(char* str, const server_config_type* config_ptr) {
-	(void) config_ptr;
-	str = "lwdaq_configuration:\r\n"
-		"ip_addr: 10.0.0.37";
-	return strlen(str);
+int lwdaq_config_from_str(server_config_type *config_ptr, const char *str) {
+	const char *p = str;
+	int num_copied = 0;
+	
+	if (!config_ptr || !str) return -1;
+
+	while (*p && *p != '\n') p++;
+	if (*p == '\n') p++;
+	
+	while (*p) {
+		const char *line_start = p;
+		const char *line_end = strchr(p, '\n');
+		if (line_end == NULL) {line_end = p + strlen(p);}
+	
+		const char *colon = memchr(line_start, ':', line_end - line_start);
+		if (!colon) return -2;
+		if (colon + 1 >= line_end || colon[1] != ' ') return -3;
+	
+		const char *value = colon + 2;
+		size_t name_len = colon - line_start;
+		size_t value_len = line_end - value;
+	
+		if (strncmp(line_start, "ip_addr", name_len) == 0 && name_len == 6) {
+			snprintf(config_ptr->ip_str, sizeof(config_ptr->ip_str),
+				"%.*s", (int)value_len, value);
+			num_copied++;
+		} else if (strncmp(line_start, "gateway_addr", name_len) == 0 && name_len == 6) {
+			snprintf(config_ptr->gw_str, sizeof(config_ptr->gw_str),
+				"%.*s", (int) value_len, value);
+			num_copied++;
+		} else if (strncmp(line_start, "subnet_mask", name_len) == 0 && name_len == 6) {
+			snprintf(config_ptr->nm_str, sizeof(config_ptr->nm_str),
+				"%.*s", (int) value_len, value);
+			num_copied++;
+		} else if (strncmp(line_start, "operator", name_len) == 0 && name_len == 12) {
+			snprintf(config_ptr->operator_str, sizeof(config_ptr->operator_str),
+				"%.*s", (int) value_len, value);
+			num_copied++;
+		} else if (strncmp(line_start, "configuration_time", name_len) == 0 && name_len == 8) {
+			snprintf(config_ptr->time_str, sizeof(config_ptr->time_str),
+				"%.*s", (int) value_len, value);
+			num_copied++;
+		} else if (strncmp(line_start, "password", name_len) == 0 && name_len == 12) {
+			snprintf(config_ptr->password_str, sizeof(config_ptr->password_str),
+				"%.*s", (int)value_len, value);
+			num_copied++;
+		} else if (strncmp(line_start, "ip_port", name_len) == 0 && name_len == 10) {
+			config_ptr->lwdaq_port = (uint32_t) strtoul(value, NULL, 10);
+			num_copied++;
+		} else if (strncmp(line_start, "security_level", name_len) == 0 && name_len == 14) {
+			config_ptr->security_level = (uint32_t) strtoul(value, NULL, 10);
+			num_copied++;
+		} else if (strncmp(line_start, "tcp_timeout", name_len) == 0 && name_len == 11) {
+			config_ptr->tcp_timeout = (uint32_t) strtoul(value, NULL, 10);
+			num_copied++;
+		}
+		
+		if (*line_end == '\n') {
+			p = line_end + 1;
+		} else {
+			p = line_end;
+		}
+	}
+	return num_copied;
 }
-
-
 /*
 	lwdaq_handle_message handles an incoming LWDAQ message. We pass the routine
 	a socket handle, which allows it to respond to the command when a response
@@ -178,7 +255,7 @@ int lwdaq_handle_message(TCP_SOCKET s, uint32_t id, uint32_t len, uint8_t* conte
 	static int logged_in = 0;
 	static int security_level = 0;
 	static char password[32] = "LWDAQ";
-	static char config_str[CONFIG_LENGTH];
+	static char config_str[LWDAQ_CONFIG_LENGTH];
 	static server_config_type config;
 
 	switch (id) {
@@ -270,7 +347,7 @@ int lwdaq_handle_message(TCP_SOCKET s, uint32_t id, uint32_t len, uint8_t* conte
 		case CONFIG_READ:{
 			if (debug) console_print("CONFIG_READ in %s.\r\n", __func__);
 			if ((logged_in==1) || (security_level==0)) {
-				lwdaq_create_config_str(config_str, &server_config_active);
+				lwdaq_str_from_config(config_str, &server_config_active);
 			  	lwdaq_data_return(s, (uint8_t*) config_str, strlen(config_str));
 				if (debug) console_print(
 					"Transmitted configuration of %d characters.\r\n",
@@ -285,12 +362,14 @@ int lwdaq_handle_message(TCP_SOCKET s, uint32_t id, uint32_t len, uint8_t* conte
 		case CONFIG_WRITE:{
 			if (debug) console_print("CONFIG_WRITE in %s.\r\n",__func__);
 			if ((logged_in==1) || (security_level==0)) {
-				if (len<CONFIG_LENGTH) {
+				if (len<LWDAQ_CONFIG_LENGTH) {
 					if (debug) console_print("Accepted: config %d characters.\r\n",len);
 					content[len]=0x00;
 					console_print("%s",(char*) content);
-					lwdaq_extract_server_config(&config, (char*) content);
+					config = server_config_active;
+					lwdaq_config_from_str(&config, (char*) content);
 					server_config_write(&config);
+					if (debug) console_print("Wrote new configuration to NVM.\r\n",len);
 				} else {
 					if (debug) console_print("Rejected: %d characters too long.\r\n",len);
 					return -1;

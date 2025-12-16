@@ -51,17 +51,29 @@
 typedef char server_config_str[SERVER_CONFIG_STR_SIZE];
 typedef struct {
 	server_config_str magic_str;
+    server_config_str password_str;
+    server_config_str operator_str;
 	server_config_str ip_str;
 	server_config_str gw_str;
 	server_config_str nm_str;
-    server_config_str operator_str;
     server_config_str time_str;
-    server_config_str password_str;
-    server_config_str lwdaq_port_str;
-    server_config_str telnet_port_str;
-    server_config_str security_level_str;
-    server_config_str tcp_timeout_str;
+    server_config_str device_str;
+    uint32_t lwdaq_port;
+	uint32_t telnet_port;
+    uint32_t security_level;
+    uint32_t tcp_timeout;
 } server_config_type;
+
+/*
+	Here is a string that is unlikely to appear in NVM at random. We use it to
+	determine if the NVM server configuration has been written by our code
+	deliberately some time in the past. We assign it to the configuration's
+	magic string, and we look for it in the magic string when we read a
+	configuration from NVM. If we see anything other than the correct magic
+	string, we assume the configuration is invalid and substitute the default
+	configuration.
+*/
+#define CONFIG_NVM_MAGIC "The Pelagic Argosy Sites Land"
 
 /*
 	The default server configuration is the one we use when we have not yet written
