@@ -169,11 +169,13 @@ int lwdaq_str_from_config(char* str, const server_config_type* config_ptr) {
 	will end with the last character of the string. All other lines will be
 	delimited by line-feed characters. If it finds a parameter with a name that
 	matches one of our lwdaq parameters, it updates the corresponding value in
-	the server configuration pointed to by the config_ptr. The routine
-	returns the number of parameters if found, or a negative error code. The
-	codes are as follows. For a null pointer in either the config_ptr or str,
-	-1. For a line missing a colon, -2. For a line in which the colon is not
-	followed by a space, -3.
+	the server configuration pointed to by the config_ptr. The routine checks
+	only that the beginning of the parameter name matches a server parameter
+	name. Thus a given name "ip_address" will match our parameter name
+	"ip_addr". The routine returns the number of parameters if found, or a
+	negative error code. The codes are as follows. For a null pointer in either
+	the config_ptr or str, -1. For a line missing a colon, -2. For a line in
+	which the colon is not followed by a space, -3.
 */
 int lwdaq_config_from_str(server_config_type *config_ptr, const char *str) {
 	const char *p = str;
@@ -197,37 +199,37 @@ int lwdaq_config_from_str(server_config_type *config_ptr, const char *str) {
 		size_t name_len = colon - line_start;
 		size_t value_len = line_end - value;
 	
-		if (strncmp(line_start, "ip_addr", name_len) == 0 && name_len == 6) {
+		if (strncmp(line_start, "ip_addr", name_len) == 0) {
 			snprintf(config_ptr->ip_str, sizeof(config_ptr->ip_str),
 				"%.*s", (int)value_len, value);
 			num_copied++;
-		} else if (strncmp(line_start, "gateway_addr", name_len) == 0 && name_len == 6) {
+		} else if (strncmp(line_start, "gateway_addr", name_len) == 0) {
 			snprintf(config_ptr->gw_str, sizeof(config_ptr->gw_str),
 				"%.*s", (int) value_len, value);
 			num_copied++;
-		} else if (strncmp(line_start, "subnet_mask", name_len) == 0 && name_len == 6) {
+		} else if (strncmp(line_start, "subnet_mask", name_len) == 0) {
 			snprintf(config_ptr->nm_str, sizeof(config_ptr->nm_str),
 				"%.*s", (int) value_len, value);
 			num_copied++;
-		} else if (strncmp(line_start, "operator", name_len) == 0 && name_len == 12) {
+		} else if (strncmp(line_start, "operator", name_len) == 0) {
 			snprintf(config_ptr->operator_str, sizeof(config_ptr->operator_str),
 				"%.*s", (int) value_len, value);
 			num_copied++;
-		} else if (strncmp(line_start, "configuration_time", name_len) == 0 && name_len == 8) {
+		} else if (strncmp(line_start, "configuration_time", name_len) == 0) {
 			snprintf(config_ptr->time_str, sizeof(config_ptr->time_str),
 				"%.*s", (int) value_len, value);
 			num_copied++;
-		} else if (strncmp(line_start, "password", name_len) == 0 && name_len == 12) {
+		} else if (strncmp(line_start, "password", name_len) == 0) {
 			snprintf(config_ptr->password_str, sizeof(config_ptr->password_str),
 				"%.*s", (int)value_len, value);
 			num_copied++;
-		} else if (strncmp(line_start, "ip_port", name_len) == 0 && name_len == 10) {
+		} else if (strncmp(line_start, "ip_port", name_len) == 0) {
 			config_ptr->lwdaq_port = (uint32_t) strtoul(value, NULL, 10);
 			num_copied++;
-		} else if (strncmp(line_start, "security_level", name_len) == 0 && name_len == 14) {
+		} else if (strncmp(line_start, "security_level", name_len) == 0) {
 			config_ptr->security_level = (uint32_t) strtoul(value, NULL, 10);
 			num_copied++;
-		} else if (strncmp(line_start, "tcp_timeout", name_len) == 0 && name_len == 11) {
+		} else if (strncmp(line_start, "tcp_timeout", name_len) == 0) {
 			config_ptr->tcp_timeout = (uint32_t) strtoul(value, NULL, 10);
 			num_copied++;
 		}

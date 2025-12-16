@@ -76,11 +76,11 @@ typedef struct {
 #define CONFIG_NVM_MAGIC "The Pelagic Argosy Sites Land"
 
 /*
-	The default server configuration is the one we use when we have not yet written
+	The factory server configuration is the one we use when we have not yet written
 	a configuration to non-volatile memory. Its contents are defined in the server
 	implementation file.
 */
-extern const server_config_type server_config_default;
+extern const server_config_type server_config_factory;
 
 /*
 	The active server configuration is the one that is intended to reflect the current

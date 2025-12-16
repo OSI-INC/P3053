@@ -235,14 +235,14 @@ void cli_ip_config(cli_chan_type *ch, char *args) {
     }
     
 	if (print_info) {
-		cli_message(ch, "List network configuration.\r\n");
+		cli_message(ch, "List internet protocol network configuration.\r\n");
 		return;
 	}
 
 	if (print_help) {
 		cli_message(ch,
 			"Usage:\r\n"
-			"  ip-config [--info] [--help]\r\n"
+			"  ip-config [--ip] [--gateway] [--mask] [--info] [--help]\r\n"
 			"\r\n"
 			"Summary:\r\n"
 			"  Change network configuration as specified by options, then print\r\n" 
@@ -330,72 +330,103 @@ void cli_pic_info(cli_chan_type *ch, char *args) {
 	active configuration.
 */
 void cli_server_config(cli_chan_type *ch, char *args) {
-	bool print_info = false;
-	bool print_help = false;
-	bool print_flash = false;
-	bool print_default = false;
-	server_config_type config;
-	char* tok = strtok(args, " \t");
+    bool print_info  = false;
+    bool print_help  = false;
+    bool do_set      = false;
+    bool verb_seen   = false;
 
+    enum {
+        CFG_ACTIVE,
+        CFG_FLASH,
+        CFG_FACTORY
+    } target = CFG_ACTIVE;
+	
+	char* tok = strtok(args, " \t");
 	while (tok != NULL) {
- 		if (strcmp(tok, "--info") == 0) {
- 			print_info = true;
-        } else if (strcmp(tok, "--help") == 0) {
-        	print_help = true;
-        } else if (strcmp(tok, "flash") == 0) {
-        	print_flash = true;
-        } else if (strcmp(tok, "active") == 0) {
-        	;
-        } else if (strcmp(tok, "default") == 0) {
-        	print_default = true;
-        } else {
-            cli_print(ch, "ERROR: Unrecognized option '%s' in %s.\r\n",
-            	tok, __func__);
-            return;
-        }
-        tok = strtok(NULL, " \t");
-    }
-    
+		if (strcmp(tok, "--info") == 0) {
+			print_info = true;
+		} else if (strcmp(tok, "--help") == 0) {
+			print_help = true;
+		} else if (strcmp(tok, "show") == 0) {
+			do_set = false;
+			verb_seen = true;
+		} else if (strcmp(tok, "set") == 0) {
+			do_set = true;
+			verb_seen = true;
+		} else if (strcmp(tok, "active") == 0) {
+			target = CFG_ACTIVE;
+		} else if (strcmp(tok, "flash") == 0) {
+			target = CFG_FLASH;
+		} else if (strcmp(tok, "factory") == 0) {
+			target = CFG_FACTORY;
+		} else {
+			cli_print(ch, "ERROR: Unrecognized option '%s' in %s.\r\n",
+			tok, __func__);
+			return;
+		}
+		tok = strtok(NULL, " \t");
+	}
+	
 	if (print_info) {
-		cli_message(ch, "Print server configuration records.\r\n");
+		cli_message(ch, "Display or modify server configuration records..\r\n");
 		return;
 	}
 
 	if (print_help) {
 		cli_message(ch,
 			"Usage:\r\n"
-			"  server-config [--info] [--help]\r\n"
+			"  server-config [show] [active|flash|factory]\r\n"
+			"  server-config set [active|flash] <options>\r\n"
 			"\r\n"
-			"Summary:\r\n"
-			"  Print server configuration records, as directed by options. If no\r\n"
-			"  record given, print the active record.\r\n"
+			"Description:\r\n"
+			"  Display or modify server configuration records. If no verb is\r\n"
+			"  specified, the 'show' operation is performed on the active\r\n"
+			"  configuration.\r\n"
 			"\r\n"
-			"Options:\r\n"
-			"  flash         Print the server configuration stored in flash memory.\r\n"
-			"  active        Print the active server configuration.\r\n"
-			"  default       Print the default server configuration.\r\n"
-			"  --info        Print a one-line summary of this command.\r\n"
-			"  --help        Print this help text.\r\n"
+			"Verbs:\r\n"
+			"  show       Display configuration records (default).\r\n"
+			"  set        Modify a configuration record.\r\n"
+			"\r\n"
+			"Selectors:\r\n"
+			"  active     Currently active configuration.\r\n"
+			"  flash      Configuration stored in flash memory.\r\n"
+			"  factory    Factory-default configuration (read-only).\r\n"
+			"\r\n"
+			"Options (set):\r\n"
+			"  --ip <addr>        Set IP address.\r\n"
+			"  --mask <addr>      Set subnet mask.\r\n"
+			"  --gateway <addr>   Set default gateway.\r\n"
+			"\r\n"
+			"Options (general):\r\n"
+			"  --info             Display a one-line summary.\r\n"
+			"  --help             Display this help text.\r\n"
 		);
 		return;
 	}
 	
-	if (print_flash) {
-		server_config_read(&config);
-		server_str_from_config(ch->tx_buff, &config);
+    if (!do_set || !verb_seen) {
+ 		switch (target) {
+			case CFG_ACTIVE: {
+				server_str_from_config(ch->tx_buff, &server_config_active);
+			}
+			break;
+			
+			case CFG_FLASH: {
+				server_config_type config;
+				server_config_read(&config); 
+				server_str_from_config(ch->tx_buff, &config);
+			}
+			break;
+
+			case CFG_FACTORY: {
+				server_str_from_config(ch->tx_buff, &server_config_factory);
+			}
+			break;
+		}
 		cli_print(ch, "%s\r\n", ch->tx_buff);
-		return;
+    } else {
+		cli_print(ch, "Configuration set awaiting implementation.");
 	}
-	
-	if (print_default) {
-		server_str_from_config(ch->tx_buff, &server_config_default);
-		cli_print(ch, "%s\r\n", ch->tx_buff);
-		return;
-	}
-	
-	server_str_from_config(ch->tx_buff, &server_config_active);
-	cli_print(ch, "%s\r\n", ch->tx_buff);
-	return;
 	
     return;
 }

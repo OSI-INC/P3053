@@ -137,7 +137,12 @@ int telnet_getchar(void *context) {
 }
 
 /*
-	telnet_tasks services a Telnet connection.
+	telnet_tasks services a Telnet connection with a command-line interpreter
+	(CLI). Consult the CLI header and implementation files for details of how
+	the CLI works. In the case of Telnet, it does not echo characters, but
+	assumes the client is buffering characters on each line. The CLI uses a
+	channel descriptor record to manage communication with the TCP socket. We
+	configure this descriptor when the socket starts listening for a connection.
 */
 int telnet_tasks(tcpip_server_type* server) {
 	static cli_chan_type cli_chan;
@@ -147,6 +152,7 @@ int telnet_tasks(tcpip_server_type* server) {
 		cli_chan.putchar = tcp_putchar;
 		cli_chan.flush = tcp_flush;
 		cli_chan.context  = (void *) &server->socket;
+		cli_chan.echo = false;
 		cli_chan.name = "CLI-Telnet";
 		cli_start(&cli_chan);
 		if (debug) console_print("Initialized %s connection in %s.\r\n",
@@ -159,10 +165,47 @@ int telnet_tasks(tcpip_server_type* server) {
 }
 
 /*
-	The main program, from which all other programs are called. In our case, we 
-	initialize the PIC processes, then enter an infinite loop from which there
-	should be no escape. So far as we can tell, the main program should return
-	an integer, so we return EXIT_FAILURE if ever the program escapes our loop.
+	lamp_signal uses an unsigned integer code, and an internal index, to apply
+	signals to the green lamp (d2) and the red lamp (d5). The blue (d3) and
+	white (d4) lamps are used by the UART2 console, so will show if the console
+	is enabled, and if a USB-to-UART bridge is connected. We will use d3 as a
+	power indicator, turning it on for 10% of the time so quickly that it looks
+	constant and dim so long as the loop is executing quickly. We will use d5 as
+	a heartbeat, flashing it every one or two seconds in the main loop, and five
+	or ten times a second in the networks startup loop. Both these flashs will
+	be slowed down if the loop tasks start to take hundreds of milliseconds to
+	complete, and stop entirely if we get stuck somewhere or the EEM crashes.
+*/
+void lamp_signal(uint32_t period) {
+	static uint32_t i = 0;
+	
+	if (period == 0) {
+		pic_d2_on();
+   		pic_d5_on();
+   		i = 0;
+   		return;
+	} else {
+		i++;
+		if (i % 100 == 0) pic_d2_off();
+		if (i % 1000 == 0) pic_d2_on();
+		if (i % 10000 == 0) pic_d5_off();
+		if (i == period) {
+			pic_d5_on();
+			i = 0;
+		}
+		return;
+	}
+}
+
+/*
+	The main program, from which all other programs are called. We initialize
+	all Embedded Ethernet Module (EEM) system processes. We wait for the TCP/IP
+	stack to start up. We assert IP configuration we read from non-volatile
+	memory. We enter the task management loop, in which we attend to our console
+	and our server sockets. During the network startup delay, and during the
+	task management loop, we manipulate the indicator lamps to show that the EEM
+	is running, which loop it is in, and whether the loop is slowing down with
+	the burden of its tasks.
 */
 int main (void) {
 
@@ -182,24 +225,30 @@ int main (void) {
 	cli_initialize();
 	
 	/*
-		Set up the embedded ethernet module for this particular appliction. Here
-		we turn on both the green LED (D2) and the red LED (D5) on an A3053A.
-		The white and blue LED pins are used for our UART2 console. We will use
-		D2 as a power indicator, turning it on for 10% of the time so quickly
-		that it looks constant and dim so long as the loop is executing quickly.
-		We will use D5 as a heartbeat, flashing it every one or two seconds.
-		This flash will be disrupted if the loop tasks start to take hundreds of
-		milliseconds to complete.
+		Start up the lamp signaling.
 	*/
-   	pic_d2_on();
-   	pic_d5_on();
+	lamp_signal(0);
+   	
+   	/*
+   		Apply the server settings we read from non-volatile memory (NVM). We read 
+   		the NVM configuration, then wait for the TCP/IP stack to establish itself.
+   		Once the stack is ready, we apply our IP address, gateway address, and
+   		network mask. Lamp signaling shows that the EEM is alive during the wait.
+   	*/
+   	server_config_read(&server_config_active);
+   	while (TCPIP_STACK_Status(sysObj.tcpip) != SYS_STATUS_READY) { 
+   		tcpip_tick();
+   		console_server();
+   		lamp_signal(100000);
+   	}
+   	server_set_ip(server_config_active.ip_str, 
+   		server_config_active.gw_str,
+   		server_config_active.nm_str);
  
    	/*
-   		This loop should never terminate. We perform maintenance tasks one after
-   		another. A loop counter allows us to blink lights to show heartbeat and 
-   		power.
+   		This loop should never terminate. We perform maintenance tasks one
+   		after another. The lamp signaling will show that the EEM is alive.
    	*/
-	int i = 0;
 	while (true) {
 		tcpip_tick();
 		console_server();
@@ -207,15 +256,7 @@ int main (void) {
 		if (telnet_enable) {
 			tcpip_server(&telnet_server, telnet_tasks);
 		}
-
-		i = i+1;
-		if (i % 100 == 0) pic_d2_off();
-		if (i % 1000 == 0) pic_d2_on();
-		if (i % 10000 == 0) pic_d5_off();
-		if (i == 500000) {
-			pic_d5_on();
-			i = 0;
-		}
+		lamp_signal(500000);
 	}
 	
 	return (EXIT_FAILURE);

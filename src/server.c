@@ -42,10 +42,10 @@
 server_config_type server_config_active;
 
 /*
-	The default server configuration is the one we use when we have not yet written
+	The factory server configuration is the one we use when we have not yet written
 	a configuration to non-volatile memory. 
 */
-const server_config_type server_config_default = {
+const server_config_type server_config_factory = {
 	.magic_str = CONFIG_NVM_MAGIC,
 	.password_str = "LWDAQ",
 	.operator_str = "unassigned",
@@ -76,7 +76,7 @@ int server_config_write(const server_config_type* config_ptr) {
 	configuration address in non-volatile memory. After reading the record, the
 	routine checks that its magic string matches that of a composed string, so
 	as to check for a random set of bytes read from uninitialized NVM. If the
-	magic string does not match, we create the default configuration record and
+	magic string does not match, we create the factory configuration record and
 	use that instead.
 */
 int server_config_read(server_config_type* config_ptr) {
@@ -89,7 +89,7 @@ int server_config_read(server_config_type* config_ptr) {
 	console_print("read %s\r\n",__func__);
 	config_ptr->magic_str[sizeof(config_ptr->magic_str)-1] = '\0';
 	if (strcmp(config_ptr->magic_str, CONFIG_NVM_MAGIC) != 0) {
-		*config_ptr = server_config_default;
+		*config_ptr = server_config_factory;
 		return 0;
 	} else {
 		return len;
@@ -128,10 +128,12 @@ int server_str_from_config(char* str, const server_config_type* config_ptr) {
 	be delimited by line-feed characters. If it finds a parameter with a name
 	that matches one of our server parameters, it updates the corresponding
 	value in the server configuration pointed to by the config_ptr. The routine
-	returns the number of parameters if found, or a negative error code. The
-	codes are as follows. For a null pointer in either the config_ptr or str,
-	-1. For a line missing a colon, -2. For a line in which the colon is not
-	followed by a space, -3.
+	checks only that the beginning of the parameter name matches a server
+	parameter name. Thus a given name "ip_str_extra" will match our parameter
+	name "ip_str". The routine returns the number of parameters if found, or a
+	negative error code. The codes are as follows. For a null pointer in either
+	the config_ptr or str, -1. For a line missing a colon, -2. For a line in
+	which the colon is not followed by a space, -3.
 */
 int server_config_from_str(server_config_type *config_ptr, const char *str) {
 	const char *p = str;
@@ -152,44 +154,44 @@ int server_config_from_str(server_config_type *config_ptr, const char *str) {
 		size_t name_len = colon - line_start;
 		size_t value_len = line_end - value;
 	
-		if (strncmp(line_start, "ip_str", name_len) == 0 && name_len == 6) {
+		if (strncmp(line_start, "ip_str", name_len) == 0) {
 			snprintf(config_ptr->ip_str, sizeof(config_ptr->ip_str),
 				"%.*s", (int)value_len, value);
 			num_copied++;
-		} else if (strncmp(line_start, "gw_str", name_len) == 0 && name_len == 6) {
+		} else if (strncmp(line_start, "gw_str", name_len) == 0) {
 			snprintf(config_ptr->gw_str, sizeof(config_ptr->gw_str),
 				"%.*s", (int) value_len, value);
 			num_copied++;
-		} else if (strncmp(line_start, "nm_str", name_len) == 0 && name_len == 6) {
+		} else if (strncmp(line_start, "nm_str", name_len) == 0) {
 			snprintf(config_ptr->nm_str, sizeof(config_ptr->nm_str),
 				"%.*s", (int) value_len, value);
 			num_copied++;
-		} else if (strncmp(line_start, "operator_str", name_len) == 0 && name_len == 12) {
+		} else if (strncmp(line_start, "operator_str", name_len) == 0) {
 			snprintf(config_ptr->operator_str, sizeof(config_ptr->operator_str),
 				"%.*s", (int) value_len, value);
 			num_copied++;
-		} else if (strncmp(line_start, "time_str", name_len) == 0 && name_len == 8) {
+		} else if (strncmp(line_start, "time_str", name_len) == 0) {
 			snprintf(config_ptr->time_str, sizeof(config_ptr->time_str),
 				"%.*s", (int) value_len, value);
 			num_copied++;
-		} else if (strncmp(line_start, "password_str", name_len) == 0 && name_len == 12) {
+		} else if (strncmp(line_start, "password_str", name_len) == 0) {
 			snprintf(config_ptr->password_str, sizeof(config_ptr->password_str),
 				"%.*s", (int)value_len, value);
 			num_copied++;
-		} else if (strncmp(line_start, "device_str", name_len) == 0 && name_len == 12) {
+		} else if (strncmp(line_start, "device_str", name_len) == 0) {
 			snprintf(config_ptr->password_str, sizeof(config_ptr->device_str),
 				"%.*s", (int)value_len, value);
 			num_copied++;
-		} else if (strncmp(line_start, "lwdaq_port", name_len) == 0 && name_len == 10) {
+		} else if (strncmp(line_start, "lwdaq_port", name_len) == 0) {
 			config_ptr->lwdaq_port = (uint32_t) strtoul(value, NULL, 10);
 			num_copied++;
-		} else if (strncmp(line_start, "telnet_port", name_len) == 0 && name_len == 11) {
+		} else if (strncmp(line_start, "telnet_port", name_len) == 0) {
 			config_ptr->telnet_port = (uint32_t) strtoul(value, NULL, 10);
 			num_copied++;
-		} else if (strncmp(line_start, "security_level", name_len) == 0 && name_len == 14) {
+		} else if (strncmp(line_start, "security_level", name_len) == 0) {
 			config_ptr->security_level = (uint32_t) strtoul(value, NULL, 10);
 			num_copied++;
-		} else if (strncmp(line_start, "tcp_timeout", name_len) == 0 && name_len == 11) {
+		} else if (strncmp(line_start, "tcp_timeout", name_len) == 0) {
 			config_ptr->tcp_timeout = (uint32_t) strtoul(value, NULL, 10);
 			num_copied++;
 		}

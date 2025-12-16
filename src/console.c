@@ -354,12 +354,28 @@ void console_initialize(void)
 	console_print("===========================================================\r\n");
 	console_print("=========    Embedded Ethernet Module (A3053)     =========\r\n");
 	console_print("===========================================================\r\n");
-	console_print("Command interface running, 'h' for help, 'r' for reset.\r\n");
-	if (debug) {
-		console_print("Console is verbose for diagnostic reporting.\r\n");
+	if (VERBOSE_CONSOLE) {
+		console_print("The VERBOSE_CONSOLE flag is set.\r\n");
 	} else {
-		console_print("Console is quiet to suppress diagnosic reporting.\r\n");	
+		console_print("The VERBOSE_CONSOLE flag is cleared..\r\n");	
 	}
+}
+
+/*
+	console_print_help prints a help message to the console for the console
+	server. We call it once when the console server starts up, and any time
+	the user presses "h".
+*/
+void console_print_help(void) {
+	console_message("Commands:\r\n");
+	console_message("  c - save string to flash\r\n");
+	console_message("  d - read string from flash\r\n");
+	console_message("  i - new ip addr\r\n");
+	console_message("  m - machine configuration\r\n");
+	console_message("  n - net info\r\n");
+	console_message("  p - ping gateway\r\n");
+	console_message("  r - software reset\r\n");
+	console_message("  h - print help\r\n");
 }
 
 /*
@@ -373,6 +389,8 @@ void console_initialize(void)
 */
 void console_server(void) {
 	#define CONSOLE_STR_ADDR 0xBD104000
+	static bool print_help = true;
+	
 	enum {max_cmd_len=255};
 	static char cmd_buff[max_cmd_len];
 	static uint32_t cmd_len = 0;
@@ -390,6 +408,10 @@ void console_server(void) {
 	bool ignore_lf = false;
 	bool process_command = false;    
     
+    if (print_help) {
+    	console_print_help();
+    	print_help = false;
+    }
 
 	while (console_readcount() > 0) {
 		c = console_getchar();
@@ -426,15 +448,7 @@ void console_server(void) {
 			char cmd = cmd_buff[0];
 			switch (cmd) {
 				case 'h':
-					console_message("Commands:\r\n");
-					console_message("  c - save string to flash\r\n");
-					console_message("  d - read string from flash\r\n");
-					console_message("  i - new ip addr\r\n");
-					console_message("  m - machine configuration\r\n");
-					console_message("  n - net info\r\n");
-					console_message("  p - ping gateway\r\n");
-					console_message("  r - software reset\r\n");
-					console_message("  h - print help\r\n");
+					console_print_help();
 					break;
 					
 				case 'c':
