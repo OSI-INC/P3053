@@ -426,8 +426,6 @@ void console_server(void) {
 			switch (cmd) {
 				case 'h':
 					console_message("Commands:\r\n");
-					console_message("  c - save string to flash\r\n");
-					console_message("  d - read string from flash\r\n");
 					console_message("  i - new ip addr\r\n");
 					console_message("  m - machine configuration\r\n");
 					console_message("  n - net info\r\n");
@@ -435,30 +433,7 @@ void console_server(void) {
 					console_message("  r - software reset\r\n");
 					console_message("  h - print help\r\n");
 					break;
-					
-				case 'c':
-					console_message("String: ");
-					console_readln(msg_buff, sizeof(msg_buff));
-					status = server_config_write(msg_buff);
-					if (status >= 0) {
-						console_print("Wrote: %s\r\n", msg_buff);
-					} else {
-						console_print("ERROR: String write failed in %s.\r\n",
-							__func__);
-					}	
-					break;
-					
-				case 'd':
-					console_message("Reading string...\r\n");
-					status = server_config_read(msg_buff, sizeof(msg_buff));
-					if (status >= 0) {
-						console_print("String: %s\r\n", msg_buff);
-					} else {
-						console_print("ERROR: String read failed in %s.\r\n",
-							__func__);
-					}
-					break;
-					
+										
 				case 'i':
 					console_message("New IP Address: ");
 					console_readln(ip_str, sizeof(ip_str));

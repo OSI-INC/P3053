@@ -265,8 +265,8 @@ static inline uint8_t lwdaq_byte_read_repeat(void) {
 	string, so we will suffer no loss of performance from reading direction from
 	NVM.
 */
-int pic_nvm_writestr(const char* str, uint32_t flash_addr);
-int pic_nvm_readstr(uint32_t flash_addr, char* str, uint32_t str_size);
+int pic_nvm_putbytes(uint32_t flash_addr, const uint8_t* buff, uint32_t len);
+int pic_nvm_getbytes(uint8_t* buff, uint32_t flash_addr, uint32_t len);
 
 /*
 	Reset, initialization, and configuration routines.

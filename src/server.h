@@ -129,10 +129,59 @@ bool server_linked(void);
 int server_info(char* out);
 
 /*
-	Routines that write and read the server configuration to and from
-	non-volatile memory (NVM). The configuration takes the form of a string in
-	which we have parameter names and values paired together so that they are
-	human-readable a and computer-extractable.
+	We store the configuration of our server in a server configuration record.
+*/
+#define SERVER_CONFIG_STR_SIZE 31
+static const char server_config_magic_str[] = "The Pelagic Argosy Sites Land";
+typedef char server_config_str[SERVER_CONFIG_STR_SIZE];
+typedef struct {
+	const char* magic_str;
+	server_config_str ip_str;
+	server_config_str gw_str;
+	server_config_str nm_str;
+    server_config_str operator_str;
+    server_config_str time_str;
+    server_config_str password_str;
+    server_config_str lwdaq_port_str;
+    server_config_str telnet_port_str;
+    server_config_str security_level_str;
+    server_config_str tcp_timeout_str;
+} server_config_type;
+
+/*
+	The default server configuration is the one we use when we have not yet written
+	a configuration to non-volatile memory.
+*/
+const server_config_type server_config_default = {
+	.magic_str = server_config_magic_str,
+	.ip_str = "10.0.0.37",
+	.gw_str = "10.0.0.1",
+	.nm_str = "255.255.255.0",
+	.operator_str = "unassigned",
+	.time_str = "00000000000000",
+	.password_str = "LWDAQ",
+	.lwdaq_port_str = "90",
+	.telnet_port_str = "23",
+	.security_level_str = "0",
+	.tcp_timeout_str = "10"
+};
+
+/*
+	The active server configuration is the one that is intended to reflect the current
+	state of the server. The accuracy of this record does, however, depend upon the
+	cooperation of the procedures that modify the state of the server. If we modify the
+	IP address, for example, we must record our modification in the server configuration.
+*/
+server_config_type server_config_active;
+
+/*
+	We want to be able to update the server configuration and have the server
+	remember the configuration through reset and power cycles. We can place all
+	necessary configuration information in a server configuration record, and
+	these records have fixed length, even though they consist of strings. We
+	store the configuration record in non-volatile memory as a table of
+	null-terminated strings. We read them in the same way, by copying directly
+	into a server configuration record.
 
 	The PIC32MZ2048EFH's 2 MByte of NVM appears twice in the CPU's virtual
 	address space. Once in the range 0x9D000000 to 0x9D0FFFFF, in which range
@@ -151,9 +200,9 @@ int server_info(char* out);
 	string, so we will suffer no loss of performance from reading direction from
 	NVM.
 */
-#define FLASH_CONFIG_ADDR	0xBD100000
-int server_config_write(const char* config);
-int server_config_read(char* config, uint32_t config_size);
+#define FLASH_CONFIG_ADDR 0xBD100000
+int server_config_write(const server_config_type* config);
+int server_config_read(server_config_type* config);
 
 /*
  	A tcpip_tasks_type is the type of procedure that will be called by our

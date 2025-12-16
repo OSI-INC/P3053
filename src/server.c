@@ -410,48 +410,37 @@ int server_info(char* out) {
 }
 
 /*
-	server_config_write writes a null-terminated string to the configuration
-	location in non-volatile memory.
+	server_config_write writes a server configuration record to the flash
+	configuration address in non-volatile memory.
 */
-int server_config_write(const char* config) {
-	return pic_nvm_writestr(config, FLASH_CONFIG_ADDR);
+int server_config_write(const server_config_type* config) {
+	return pic_nvm_putbytes(
+		FLASH_CONFIG_ADDR, 
+		(uint8_t*) config,
+		sizeof(server_config_type));
 }
 
 /*
-	server_config_read reads a null-terminated string from the configuration
-	location in non-volatile memory (NVM). If the read from NVM fails, the
-	routine generates a default string.
+	server_config_read reads a server configuration record from the flash
+	configuration address in non-volatile memory. After reading the record, the
+	routine checks that its magic string matches that of a composed string, so
+	as to check for a random set of bytes read from uninitialized NVM. If the
+	magic string does not match, we create the default configuration record and
+	use that instead.
 */
-int server_config_read(char* config, uint32_t config_size) {
-	int status;
-	char scratch[255];
-	status = pic_nvm_readstr(FLASH_CONFIG_ADDR, config, config_size);
-	if (status < 0) {
-		sprintf(config,"lwdaq_relay_configuration:\n");
-		sprintf(scratch,"operator: unassigned\r\n");
-		strcat(config,scratch);
-		sprintf(scratch,"configuration_time: 00000000000000\r\n");
-		strcat(config,scratch);
-		sprintf(scratch,"password: LWDAQ\r\n");
-		strcat(config,scratch);
-		sprintf(scratch,"driver_id: unassigned\r\n");
-		strcat(config,scratch);
-		sprintf(scratch,"ip_addr: 10.0.0.37\r\n");
-		strcat(config,scratch);
-		sprintf(scratch,"ip_port: 90\r\n");
-		strcat(config,scratch);
-		sprintf(scratch,"tcp_timeout: 0\r\n");
-		strcat(config,scratch);
-		sprintf(scratch,"security_level: 0\r\n");
-		strcat(config,scratch);
-		sprintf(scratch,"gateway_addr: 10.0.0.1\r\n");
-		strcat(config,scratch);
-		sprintf(scratch,"subnet_mask: 255.255.255.0\r\n");
-		strcat(config,scratch);		
+int server_config_read(server_config_type* config) {
+	int len;
+	len = pic_nvm_getbytes(
+		(uint8_t*) config,
+		FLASH_CONFIG_ADDR, 
+		sizeof(server_config_type));
+	if (strcmp(config->magic_str, server_config_magic_str) != 0) {
+		*config = server_config_default;
+		return 0;
+	} else {
+		return len;
 	}
-	return status;
 }
-
 
 /*
 	tcpip_server_check_ip_change checks to see if the network interface's IP address
