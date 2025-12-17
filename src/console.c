@@ -354,7 +354,7 @@ void console_initialize(void)
 	console_print("===========================================================\r\n");
 	console_print("=========    Embedded Ethernet Module (A3053)     =========\r\n");
 	console_print("===========================================================\r\n");
-	if (VERBOSE_CONSOLE) {
+	if (debug) {
 		console_print("The VERBOSE_CONSOLE flag is set.\r\n");
 	} else {
 		console_print("The VERBOSE_CONSOLE flag is cleared..\r\n");	

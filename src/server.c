@@ -57,7 +57,7 @@ const server_config_type server_config_factory = {
 	.lwdaq_port = 90,
 	.telnet_port = 23,
 	.security_level = 0,
-	.tcp_timeout = 10
+	.tcp_timeout = 0
 };
 
 /*
@@ -81,12 +81,10 @@ int server_config_write(const server_config_type* config_ptr) {
 */
 int server_config_read(server_config_type* config_ptr) {
 	int len;
-	console_print("entering %s\r\n",__func__);
 	len = pic_nvm_getbytes(
 		(uint8_t*) config_ptr,
 		FLASH_CONFIG_ADDR, 
 		sizeof(server_config_type));
-	console_print("read %s\r\n",__func__);
 	config_ptr->magic_str[sizeof(config_ptr->magic_str)-1] = '\0';
 	if (strcmp(config_ptr->magic_str, CONFIG_NVM_MAGIC) != 0) {
 		*config_ptr = server_config_factory;
@@ -116,7 +114,7 @@ int server_str_from_config(char* str, const server_config_type* config_ptr) {
 	len += sprintf(str+len, "lwdaq_port: %u\n", config_ptr->lwdaq_port);
 	len += sprintf(str+len, "telnet_port: %u\n", config_ptr->telnet_port);
 	len += sprintf(str+len, "security_level: %u\n", config_ptr->security_level);
-	len += sprintf(str+len, "tcp_timeout: %u\n", config_ptr->tcp_timeout);
+	len += sprintf(str+len, "tcp_timeout: %u", config_ptr->tcp_timeout);
 	return len;
 }
 
@@ -391,7 +389,8 @@ void ping_gateway(void) {
 	server_set_ip reconfigures the network interface with a new IP address, a new
 	gateway address, and a new network mask. We pass it three strings that specify
 	these three IP addresses, and the routine translates these into IPV4_ADDR types
-	and applies them. It also makes sure that DHCP is turned off.
+	and applies them. It also makes sure that DHCP is turned off. Once it is done,
+	it records the new IP values in the active server configuration.
 */
 int server_set_ip(const char* ip_str, const char* gw_str, const char* nm_str) {
 	IPV4_ADDR ip_addr;
@@ -427,6 +426,11 @@ int server_set_ip(const char* ip_str, const char* gw_str, const char* nm_str) {
 		return -1;
 	}
 	console_print("Succeeded with ip=%s, gw=%s, nm=%s.\r\n", ip_str, gw_str, nm_str);
+	
+	strcpy(server_config_active.ip_str, ip_str);
+	strcpy(server_config_active.gw_str, gw_str);
+	strcpy(server_config_active.nm_str, nm_str);
+	
 	return 0;
 }
 

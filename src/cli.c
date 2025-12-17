@@ -324,22 +324,27 @@ void cli_pic_info(cli_chan_type *ch, char *args) {
 }
 
 /*
-	cli_server_config converts a server configuration record into a string
-	of parameter names and values, and prints it to the console. We select which
-	record to print with the options. With no option, the routine returns the
-	active configuration.
+	cli_server_config shows or sets server configuration records. We specify
+	which we want to do: show or set. For "show", we name a configuration to
+	show, and there are three to choose from: active, flash, or factory. For
+	"set", we name a configuration to set and there is only one we can set: the
+	one in flash, which will be deployed on the next start-up. We cannot set the
+	factory configuration because it is read-only, and we cannot set the active
+	configuration because any changes to the active configuration would cause
+	the active configuration to be inaccurate.
 */
 void cli_server_config(cli_chan_type *ch, char *args) {
-    bool print_info  = false;
-    bool print_help  = false;
-    bool do_set      = false;
-    bool verb_seen   = false;
-
-    enum {
-        CFG_ACTIVE,
-        CFG_FLASH,
-        CFG_FACTORY
-    } target = CFG_ACTIVE;
+	enum {
+		CFG_NONE,
+		CFG_ACTIVE,
+		CFG_FLASH,
+		CFG_FACTORY
+	};
+	int destination = CFG_NONE;
+	int source = CFG_NONE;
+    bool do_set = false;
+    bool print_info = false;
+    bool print_help = false;
 	
 	char* tok = strtok(args, " \t");
 	while (tok != NULL) {
@@ -349,26 +354,64 @@ void cli_server_config(cli_chan_type *ch, char *args) {
 			print_help = true;
 		} else if (strcmp(tok, "show") == 0) {
 			do_set = false;
-			verb_seen = true;
 		} else if (strcmp(tok, "set") == 0) {
 			do_set = true;
-			verb_seen = true;
 		} else if (strcmp(tok, "active") == 0) {
-			target = CFG_ACTIVE;
-		} else if (strcmp(tok, "flash") == 0) {
-			target = CFG_FLASH;
+			if (!do_set) {
+				destination = CFG_ACTIVE;
+			} else if (destination == CFG_NONE) {
+				cli_print(ch,"ERROR: Cannot set active configuration in %s.\r\n",
+					__func__);
+				return;
+			} else if (source == CFG_NONE) {
+				source = CFG_ACTIVE;
+			} else {
+				cli_print(ch,"ERROR: Too many configuration selectors in %s.\r\n",
+					__func__);
+				return;
+			}		
+    	} else if (strcmp(tok, "flash") == 0) {
+			if (!do_set) {
+				destination = CFG_FLASH;
+			} else if (destination == CFG_NONE) {
+				destination = CFG_FLASH;
+			} else if (source == CFG_NONE) {
+				source = CFG_FLASH;
+			} else {
+				cli_print(ch,"ERROR: Too many configuration selectors in %s.\r\n",
+					__func__);
+				return;
+			}
 		} else if (strcmp(tok, "factory") == 0) {
-			target = CFG_FACTORY;
+			if (!do_set) {
+				destination = CFG_FACTORY;
+			} else if (destination == CFG_NONE) {
+				cli_print(ch,"ERROR: Cannot set factory configuration in %s.\r\n",
+					__func__);
+				return;
+			} else if (source == CFG_NONE) {
+				source = CFG_FACTORY;
+			} else {
+				cli_print(ch,"ERROR: Too many configuration selectors in %s.\r\n",
+					__func__);
+				return;
+			}
 		} else {
 			cli_print(ch, "ERROR: Unrecognized option '%s' in %s.\r\n",
-			tok, __func__);
+				tok, __func__);
 			return;
 		}
 		tok = strtok(NULL, " \t");
 	}
 	
+	if (do_set && destination == CFG_NONE) {
+		cli_print(ch, "ERROR: Set requires destination selector in %s.\r\n",
+			__func__);
+		return;
+	}
+
 	if (print_info) {
-		cli_message(ch, "Display or modify server configuration records..\r\n");
+		cli_message(ch, "Display or modify server configuration records.\r\n");
 		return;
 	}
 
@@ -376,7 +419,14 @@ void cli_server_config(cli_chan_type *ch, char *args) {
 		cli_message(ch,
 			"Usage:\r\n"
 			"  server-config [show] [active|flash|factory]\r\n"
-			"  server-config set [active|flash] <options>\r\n"
+			"  server-config set flash [active|flash|factory]\r\n"
+			"\r\n"
+			"Notes:\r\n"
+			"  - If no verb is specified, 'show' is assumed.\r\n"
+			"  - If no selector is specified, 'active' is assumed.\r\n"
+			"  - For 'set', the destination must be specified.\r\n"
+			"  - For 'set', the source defaults to 'active'.\r\n"
+			"  - For 'set', destination must be 'active' or 'flash'.\r\n"
 			"\r\n"
 			"Description:\r\n"
 			"  Display or modify server configuration records. If no verb is\r\n"
@@ -392,20 +442,16 @@ void cli_server_config(cli_chan_type *ch, char *args) {
 			"  flash      Configuration stored in flash memory.\r\n"
 			"  factory    Factory-default configuration (read-only).\r\n"
 			"\r\n"
-			"Options (set):\r\n"
-			"  --ip <addr>        Set IP address.\r\n"
-			"  --mask <addr>      Set subnet mask.\r\n"
-			"  --gateway <addr>   Set default gateway.\r\n"
-			"\r\n"
-			"Options (general):\r\n"
+			"Options:\r\n"
 			"  --info             Display a one-line summary.\r\n"
 			"  --help             Display this help text.\r\n"
 		);
 		return;
 	}
 	
-    if (!do_set || !verb_seen) {
- 		switch (target) {
+    if (!do_set) {
+    	if (source == CFG_NONE) source = CFG_ACTIVE;
+ 		switch (destination) {
 			case CFG_ACTIVE: {
 				server_str_from_config(ch->tx_buff, &server_config_active);
 			}
@@ -425,7 +471,36 @@ void cli_server_config(cli_chan_type *ch, char *args) {
 		}
 		cli_print(ch, "%s\r\n", ch->tx_buff);
     } else {
-		cli_print(ch, "Configuration set awaiting implementation.");
+    	if (source == CFG_NONE) source = CFG_ACTIVE;
+		if (source == destination) {
+			cli_print(ch, "Configuration unchanged, source = destination in %s.\r\n",
+				__func__);
+			return;
+		}
+		if (destination == CFG_FLASH) {
+			if (source == CFG_FACTORY) {
+				server_config_write(&server_config_factory);
+				console_print(
+					"Copied factory configuration to flash in %s.\r\n", __func__);
+			}
+			if (source == CFG_ACTIVE) {
+				server_config_write(&server_config_active);
+				console_print(
+					"Copied active configuration to flash in %s.\r\n", __func__);
+			}
+		}
+		if (destination == CFG_ACTIVE) {
+			if (source == CFG_FACTORY) {
+				server_config_active = server_config_factory;
+				console_print(
+					"Copied factory configuration to active in %s.\r\n", __func__);
+			}
+			if (source == CFG_FLASH) {
+				server_config_read(&server_config_active);
+				console_print(
+					"Copied flash configuration to active in %s.\r\n", __func__);
+			}
+		}
 	}
 	
     return;
