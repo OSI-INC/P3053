@@ -139,14 +139,14 @@ int lwdaq_data_return(TCP_SOCKET s, uint8_t* block, uint32_t len) {
 }
 	
 /*
-	lwdaq_str_from_config takes a server configuration record and generates a
+	lwdaq_str_from_config takes a EEM configuration record and generates a
 	colon-delimited LWDAQ configuration string, as expected by the LWDAQ
-	Configurator tool. The newline is marked by one line-feed character, LF, not by
-	a pair of characters CRLF. The routine returns the length of the generated
-	string. It does not check to make sure that the destination string is large
-	enough.
+	Configurator tool. The newline is marked by one line-feed character, LF, not
+	by a pair of characters CRLF. The routine returns the length of the
+	generated string. It does not check to make sure that the destination string
+	is large enough.
 */
-int lwdaq_str_from_config(char* str, const server_config_type* config_ptr) {
+int lwdaq_str_from_config(char* str, const eem_config_type* config_ptr) {
 	int len = 0;
 	len += sprintf(str+len, "lwdaq_relay_configuration:\n");
 	len += sprintf(str+len, "configuration_time: %s\n", config_ptr->time_str);
@@ -169,15 +169,15 @@ int lwdaq_str_from_config(char* str, const server_config_type* config_ptr) {
 	will end with the last character of the string. All other lines will be
 	delimited by line-feed characters. If it finds a parameter with a name that
 	matches one of our lwdaq parameters, it updates the corresponding value in
-	the server configuration pointed to by the config_ptr. The routine checks
-	only that the beginning of the parameter name matches a server parameter
-	name. Thus a given name "ip_address" will match our parameter name
-	"ip_addr". The routine returns the number of parameters if found, or a
-	negative error code. The codes are as follows. For a null pointer in either
-	the config_ptr or str, -1. For a line missing a colon, -2. For a line in
-	which the colon is not followed by a space, -3.
+	the EEM configuration pointed to by the config_ptr. The routine checks only
+	that the beginning of the parameter name matches a server parameter name.
+	Thus a given name "ip_address" will match our parameter name "ip_addr". The
+	routine returns the number of parameters if found, or a negative error code.
+	The codes are as follows. For a null pointer in either the config_ptr or
+	str, -1. For a line missing a colon, -2. For a line in which the colon is
+	not followed by a space, -3.
 */
-int lwdaq_config_from_str(server_config_type *config_ptr, const char *str) {
+int lwdaq_config_from_str(eem_config_type *config_ptr, const char *str) {
 	const char *p = str;
 	int num_copied = 0;
 	
@@ -258,13 +258,13 @@ int lwdaq_handle_message(TCP_SOCKET s, uint32_t id, uint32_t len, uint8_t* conte
 	static int security_level = 0;
 	static char password[32] = "LWDAQ";
 	static char config_str[LWDAQ_CONFIG_LENGTH];
-	static server_config_type config;
+	static eem_config_type config;
 
 	switch (id) {
 		case BYTE_WRITE: {
 			register_addr = content[3];
 			value = content[4];
-			if (debug) console_print("BYTE_WRITE to %d of %d in %s.\r\n",
+			if (debug) console_print("BYTE_WRITE to %d of %d in %s.\n",
 				register_addr, value, __func__);
 			lwdaq_byte_write(register_addr, value);
 		}
@@ -274,7 +274,7 @@ int lwdaq_handle_message(TCP_SOCKET s, uint32_t id, uint32_t len, uint8_t* conte
 			register_addr = content[3];
 			value = lwdaq_byte_read(register_addr);
 			lwdaq_byte_return(s, value);
-			if (debug) console_print("BYTE_READ from %d of %d in %s.\r\n",
+			if (debug) console_print("BYTE_READ from %d of %d in %s.\n",
 				register_addr, value, __func__);
 		}
 		break;
@@ -282,7 +282,7 @@ int lwdaq_handle_message(TCP_SOCKET s, uint32_t id, uint32_t len, uint8_t* conte
 		case BYTE_POLL: {
 			register_addr = content[3];
 			value = content[4];
-			if (debug) console_print("BYTE_POLL of %d for %d in %s.\r\n",
+			if (debug) console_print("BYTE_POLL of %d for %d in %s.\n",
 				register_addr, value, __func__);
 			while (lwdaq_byte_read(register_addr) != value) {
 				if (tcpip_socket_tick(&s)<0) return -1;
@@ -291,7 +291,7 @@ int lwdaq_handle_message(TCP_SOCKET s, uint32_t id, uint32_t len, uint8_t* conte
 		break;
 
 		case VERSION_READ: {
-			if (debug) console_print("VERSION_READ in %s.\r\n", __func__);
+			if (debug) console_print("VERSION_READ in %s.\n", __func__);
 			lwdaq_integer_return(s, RELAY_VERSION);
 		}
 		break;
@@ -299,7 +299,7 @@ int lwdaq_handle_message(TCP_SOCKET s, uint32_t id, uint32_t len, uint8_t* conte
 		case STREAM_READ: {
 			register_addr = content[3];
 			tx_len = reverse_load_u32(&content[4]);
-			if (debug) console_print("STREAM_READ from %d of %d bytes in %s.\r\n",
+			if (debug) console_print("STREAM_READ from %d of %d bytes in %s.\n",
 				register_addr, tx_len, __func__);
 			lwdaq_header(s, DATA_RETURN, tx_len);
 			if (tx_len > 0) {
@@ -315,91 +315,91 @@ int lwdaq_handle_message(TCP_SOCKET s, uint32_t id, uint32_t len, uint8_t* conte
 						tcp_writeall(&s, &tx_buffer[0], i);
 						if (tcpip_socket_tick(&s) < 0) {
 							if (debug) console_print(
-								"Failed to write %d bytes in %s.\r\n", i, __func__);
+								"Failed to write %d bytes in %s.\n", i, __func__);
 							return -1;
 						}
 						if (debug && LWDAQ_DEBUG) console_print(
-							"Wrote %u bytes in %s.\r\n", i, __func__);
+							"Wrote %u bytes in %s.\n", i, __func__);
 						i = 0;
 					}
 				}
 			}
 			lwdaq_footer(s);
-			if (debug) console_print("STREAM_READ complete in %s.\r\n", __func__);
+			if (debug) console_print("STREAM_READ complete in %s.\n", __func__);
 		}
 		break;
 
 		case LOGIN:{
-			if (debug) console_print("LOGIN in %s.\r\n", __func__);
+			if (debug) console_print("LOGIN in %s.\n", __func__);
 			if (len<1) {
 			  logged_in=0;
-				if (debug) console_print("Failed with empty password in %s.\r\n");
+				if (debug) console_print("Failed with empty password in %s.\n");
 			}
 			if (!strcmp(password,(char*) content)) {
 				logged_in=1;
-				if (debug) console_print("Logged in with password: %s.\r\n", content);
+				if (debug) console_print("Logged in with password: %s.\n", content);
 			} else {
 			  logged_in=0;
-				if (debug) console_print("Failed with password: %s.\r\n", content);
+				if (debug) console_print("Failed with password: %s.\n", content);
 			}
 			lwdaq_byte_return(s, logged_in);
 		}
 		break;
 
 		case CONFIG_READ:{
-			if (debug) console_print("CONFIG_READ in %s.\r\n", __func__);
+			if (debug) console_print("CONFIG_READ in %s.\n", __func__);
 			if ((logged_in==1) || (security_level==0)) {
-				lwdaq_str_from_config(config_str, &server_config_active);
+				lwdaq_str_from_config(config_str, &eem_config_active);
 			  	lwdaq_data_return(s, (uint8_t*) config_str, strlen(config_str));
 				if (debug) console_print(
-					"Transmitted configuration of %d characters.\r\n",
+					"Transmitted configuration of %d characters.\n",
 					strlen(config_str));
 			} else {
-				if (debug) console_print("Rejected: not logged in.\r\n");
+				if (debug) console_print("Rejected: not logged in.\n");
 				return -1;
 			}
 		}
 		break;
 
 		case CONFIG_WRITE:{
-			if (debug) console_print("CONFIG_WRITE in %s.\r\n",__func__);
+			if (debug) console_print("CONFIG_WRITE in %s.\n",__func__);
 			if ((logged_in==1) || (security_level==0)) {
 				if (len<LWDAQ_CONFIG_LENGTH) {
-					if (debug) console_print("Accepted: config %d characters.\r\n",len);
+					if (debug) console_print("Accepted: config %d characters.\n",len);
 					content[len]=0x00;
 					console_print("%s",(char*) content);
-					config = server_config_active;
+					config = eem_config_active;
 					lwdaq_config_from_str(&config, (char*) content);
-					server_config_write(&config);
-					if (debug) console_print("Wrote new configuration to NVM.\r\n",len);
+					eem_config_write(&config);
+					if (debug) console_print("Wrote new configuration to NVM.\n",len);
 				} else {
-					if (debug) console_print("Rejected: %d characters too long.\r\n",len);
+					if (debug) console_print("Rejected: %d characters too long.\n",len);
 					return -1;
 				}
 			} else {
-				if (debug) console_print("Rejected: not logged in.\r\n");
+				if (debug) console_print("Rejected: not logged in.\n");
 				return -1;
 			}
 		}
 		break;
 
 		case MAC_READ:{
-			if (debug) console_print("MAC_READ in %s.\r\n", __func__);
+			if (debug) console_print("MAC_READ in %s.\n", __func__);
 			server_mac(tx_buffer);
 			lwdaq_data_return(s, tx_buffer, strlen((char*) tx_buffer));
 		}
 		break;
 
 		case ECHO: {
-			if (debug) console_print("ECHO of %u bytes in %s.\r\n", len, __func__);
+			if (debug) console_print("ECHO of %u bytes in %s.\n", len, __func__);
 			lwdaq_data_return(s, content, len);
 			content[len] = 0x00;
-			if (debug) console_print("%s\r\n", content);
+			if (debug) console_print("%s\n", content);
 		}
 		break;
 
 		default: {
-			if (debug) console_print("Unrecognised message in %s.\r\n", __func__);
+			if (debug) console_print("Unrecognised message in %s.\n", __func__);
 		}
 		break;
 	}
@@ -465,7 +465,7 @@ int lwdaq_tasks(tcpip_server_type* server) {
 	*/
 	if (server->state == S_LISTENING) {
 		rx_available = 0;
-		if (debug) console_print("Initialized %s connection in %s.\r\n",
+		if (debug) console_print("Initialized %s connection in %s.\n",
 			server->protocol, __func__);
 		return 0;
 	};
@@ -488,13 +488,13 @@ int lwdaq_tasks(tcpip_server_type* server) {
 		message. We need at least nine bytes: the start code, the four-byte
 		message identifier, and the four-byte length.
 	*/
-	if (debug && LWDAQ_DEBUG) console_print("rx_ready=%u rx_available=%u in %s.\r\n",
+	if (debug && LWDAQ_DEBUG) console_print("rx_ready=%u rx_available=%u in %s.\n",
 		rx_ready, rx_available, __func__);
 	if (rx_buffer[0] != START_CODE) {
 		if (rx_buffer[0] == CLOSE_CODE) {
-			if (debug) console_print("Close code received in %s.\r\n", __func__);
+			if (debug) console_print("Close code received in %s.\n", __func__);
 		} else {
-			if (debug) console_print("Invalid start code in %s.\r\n", __func__);
+			if (debug) console_print("Invalid start code in %s.\n", __func__);
 		}
 		return -1;
 	}
@@ -508,7 +508,7 @@ int lwdaq_tasks(tcpip_server_type* server) {
 	id = reverse_load_u32(&rx_buffer[1]);
 	len = reverse_load_u32(&rx_buffer[5]);
 	if (debug && LWDAQ_DEBUG) console_print(
-		"id=%u len=%u in %s.\r\n", id, len, __func__);
+		"id=%u len=%u in %s.\n", id, len, __func__);
 	if (rx_available<len+FRAME_SIZE) return rx_available;
 	
 	/*
@@ -517,7 +517,7 @@ int lwdaq_tasks(tcpip_server_type* server) {
 		negative value to indicate an error.
 	*/
 	if (rx_buffer[len+CONTENT_OFFSET] != END_CODE) {
-		if (debug) console_print("Invalid end code in %s.\r\n", __func__);
+		if (debug) console_print("Invalid end code in %s.\n", __func__);
 		return -1;
 	}
 	
@@ -540,7 +540,7 @@ int lwdaq_tasks(tcpip_server_type* server) {
 	*/
 	if (rx_available>len+FRAME_SIZE) {
 		if (debug && LWDAQ_DEBUG) console_print(
-			"Copying %u to %u from %u in %s.\r\n",
+			"Copying %u to %u from %u in %s.\n",
 			rx_available-len-FRAME_SIZE, 0, len+FRAME_SIZE, __func__);
 		memmove(&rx_buffer[0], 
 			&rx_buffer[len+FRAME_SIZE], 
@@ -550,7 +550,7 @@ int lwdaq_tasks(tcpip_server_type* server) {
 		rx_available = 0;
 	}
 	if (debug && LWDAQ_DEBUG) console_print(
-		"rx_available=%u in %s.\r\n", rx_available, __func__);
+		"rx_available=%u in %s.\n", rx_available, __func__);
 		
 	/*
 		Return the number of bytes available. This will certainly be zero or greater,

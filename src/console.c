@@ -40,31 +40,6 @@ static inline bool is_printable(char c) {
 }
 
 /*
-	console_putchar writes one character to the UART2 transmit buffer. It calls
-	UART2_Write from plib_uart2.c, which returns zero if the transmit buffer is
-	full. We wait until the routine returns non-zeo, at which point we know our
-	character was written to the transmit buffer. Thus console_putchar blocks
-	until we are able to write to the buffer, but note that it does not block
-	waiting for the character to be transmitted by the UART. If we want to wait
-	for all characters to be transmitted, we use our flush procedure.
-*/
-void console_putchar(char c) {
-	uart2_putchar(NULL, c);
-}
-
-/*
-	console_flush waits until the UART2 has transmitted all pending characters.
-	It first waits for the software ring buffer to empty, then waits until the
-	UART's internal buffer is empty, then waits until the UART's transmit shift
-	register is empty. We use this routine when we want to pause before doing
-	some other task until all pending console printing is done, such as before
-	we reset the PIC.
-*/
-void console_flush(void) {
-	uart2_flush(NULL);
-}
-
-/*
 	console_put_int_hex takes a thirty-two bit integer, which is eight nibbles,
 	and prints it as eight hexadecimal digits, most significant nibble first, to
 	the console.
@@ -72,7 +47,7 @@ void console_flush(void) {
 void console_put_int_hex(uint32_t value) {
     const char hex[] = "0123456789ABCDEF";
     for (int shift = 28; shift >= 0; shift -= 4)
-        console_putchar(hex[(value >> shift) & 0xF]);
+        uart2_putchar(NULL, hex[(value >> shift) & 0xF]);
 }
 
 /*
@@ -91,7 +66,7 @@ void console_put_int_hex(uint32_t value) {
 */
 void console_put_int_trace(uint32_t value) {
 	int i;
-	for (i = 0; i <= 3; i++) console_putchar(((uint8_t*)&value)[i]);
+	for (i = 0; i <= 3; i++) uart2_putchar(NULL, ((uint8_t*)&value)[i]);
 }
 
 /*
@@ -103,7 +78,7 @@ void console_put_int_trace(uint32_t value) {
 void console_write(const void* buff, size_t size) {
     const uint8_t* p = (const uint8_t*) buff;
     for (size_t i = 0; i < size; i++) {
-        console_putchar(p[i]);
+        uart2_putchar(NULL, p[i]);
     }
 }
 
@@ -122,17 +97,17 @@ void console_message(const char *s) {
 
     while (*s) {
         if (*s == '\r') {
-            console_putchar('\r');
-            console_putchar('\n');
+            uart2_putchar(NULL, '\r');
+            uart2_putchar(NULL, '\n');
             expect_lf = true;
         } else if (*s == '\n') {
             if (!expect_lf) {
-                console_putchar('\r');
-                console_putchar('\n');
+                uart2_putchar(NULL, '\r');
+                uart2_putchar(NULL, '\n');
             }
             expect_lf = false;
         } else {
-            console_putchar(*s);
+            uart2_putchar(NULL, *s);
             expect_lf = false;
         }
         s++;
@@ -183,62 +158,13 @@ void console_dump_ascii(const char* s) {
     const unsigned char* p = (const unsigned char*) s;
     while (*p != '\0') {
         if (is_printable(*p)) {
-            console_putchar((char) *p);
+            uart2_putchar(NULL, (char) *p);
         } else {
-            console_putchar('.');
+            uart2_putchar(NULL, '.');
         }
         p++;
     }
     console_message("\r\n");
-}
-
-/*
-	console_readcount returns the number of bytes available for reading in the
-	console receive buffer.
-*/
-int console_readcount(void) {
-    return uart2_readcount(NULL);
-}
-
-/*
-	console_getchar reads one character from the console. It uses the UART2_Read
-	routine, defined in plib_uart2.c. It returns either a character or minus
-	one, which indicates no character was read. This routine can be polled, so
-	that when it returns characters, we keep reading until we get a minus one.
-*/
-int console_getchar(void) {
-    return uart2_getchar(NULL);
-}
-
-/*
-	console_readln reads from the console until it comes to a newline character.
-	Until such time, it blocks the processor, so only interrupts will be
-	services. When it receives the newline, it echoes characters and adds them
-	to the buffer it was passed as an argument. It makes sure it does not write
-	more than maxlen-1 characters to the buffer, and it terminates the string
-	with a null character.
-*/
-int console_readln(char* buff, int maxlen) {
-    int idx = 0;
-
-	while (1) {
-        char c = console_getchar();
-        if (c == '\r' || c == '\n') {
-            console_message("\r\n");
-            buff[idx] = '\0';
-            return idx;
-        } else if (c == '\b' || c == 0x7F) {
-            if (idx > 0) {
-                idx--;
-                console_message("\b \b");
-            }
-        } else if (idx < maxlen - 1) {
-        	if (!is_printable(c)) continue;
-			console_putchar(c);
-			buff[idx] = c;
-			idx++;
-        }
-    }
 }
 
 /*
@@ -292,7 +218,7 @@ void SYS_CONSOLE_Print(int index, const char* fmt, ...) {
 */
 int SYS_CONSOLE_ReadCountGet(int index) {
     (void) index;
-    return console_readcount();
+    return uart2_readcount(NULL);
 }
 
 /*
@@ -311,10 +237,10 @@ void SYS_CONSOLE_Read(int index, void* buff, size_t size) {
     (void) index;
     uint8_t* p = (uint8_t*) buff;
     for (size_t i = 0; i < size; i++) {
-        if (console_readcount() == 0) {
+        if (uart2_readcount(NULL) == 0) {
             return;
         }
-        p[i] = console_getchar();
+        p[i] = uart2_getchar(NULL);
     }
 }
 
@@ -350,174 +276,13 @@ void console_initialize(void)
 	};
 	UART2_SerialSetup(&uart2Setup, 0);
 
-	console_print("\r\n\r\n");
-	console_print("===========================================================\r\n");
-	console_print("=========    Embedded Ethernet Module (A3053)     =========\r\n");
-	console_print("===========================================================\r\n");
+	console_print("\n\n");
+	console_print("===========================================================\n");
+	console_print("=========    Embedded Ethernet Module Console     =========\n");
+	console_print("===========================================================\n");
 	if (debug) {
-		console_print("The VERBOSE_CONSOLE flag is set.\r\n");
+		console_print("The VERBOSE_CONSOLE flag is set.\n");
 	} else {
-		console_print("The VERBOSE_CONSOLE flag is cleared..\r\n");	
-	}
-}
-
-/*
-	console_print_help prints a help message to the console for the console
-	server. We call it once when the console server starts up, and any time
-	the user presses "h".
-*/
-void console_print_help(void) {
-	console_message("Commands:\r\n");
-	console_message("  c - save string to flash\r\n");
-	console_message("  d - read string from flash\r\n");
-	console_message("  i - new ip addr\r\n");
-	console_message("  m - machine configuration\r\n");
-	console_message("  n - net info\r\n");
-	console_message("  p - ping gateway\r\n");
-	console_message("  r - software reset\r\n");
-	console_message("  h - print help\r\n");
-}
-
-/*
-	console_server looks out for characters sent in through the console
-	interface, interpretes tham, and responds to them. It always provides an "h"
-	command for help, and the help menu in the code below shows the supported
-	and planned commands. The commands are all single-letter commands, but some
-	of them, such as the one to change the IP address, will subsequently accept
-	a string of characters. The console server is always active, regardless of
-	the state of the debug flag.
-*/
-void console_server(void) {
-	#define CONSOLE_STR_ADDR 0xBD104000
-	static bool print_help = true;
-	
-	enum {max_cmd_len=255};
-	static char cmd_buff[max_cmd_len];
-	static uint32_t cmd_len = 0;
-    char c;
-    
-	enum {max_str_len=31};
-	static char ip_str[max_str_len];
-	static char gw_str[max_str_len];
-	static char mask_str[max_str_len];
-	
-    enum {max_msg_len=2048};    
-    static char msg_buff[max_msg_len];
-    
-    int status;
-	bool ignore_lf = false;
-	bool process_command = false;    
-    
-    if (print_help) {
-    	console_print_help();
-    	print_help = false;
-    }
-
-	while (console_readcount() > 0) {
-		c = console_getchar();
-		if (c == '\r') {
-			process_command = true;
-			ignore_lf = true;
-		} else if (c == '\n') {
-			if (!ignore_lf) {
-				process_command = true;
-			} else {
-				ignore_lf = false;
-			}
-		} else if (c == '\b' || c == 0x7F) {
-			if (cmd_len > 0) {
-				cmd_len--;
-				console_message("\b \b");
-			}
-		} else if (is_printable(c)) {
-			console_print("%c", c);
-			if (cmd_len < max_cmd_len) {
-				cmd_buff[cmd_len] = c;
-				cmd_len++;
-			} else {
-				cmd_len = 0;
-				console_print("\r\nERROR: Have cmd_len>%d in %s.\r\n",
-					max_cmd_len, __func__);
-			}
-		}
-		
-		if (!process_command) {continue;}
-		
-		console_message("\r\n");
-		if (cmd_len == 1) {
-			char cmd = cmd_buff[0];
-			switch (cmd) {
-				case 'h':
-					console_print_help();
-					break;
-					
-				case 'c':
-					console_message("String: ");
-					console_readln(msg_buff, sizeof(msg_buff));
-					status = pic_nvm_writestr(CONSOLE_STR_ADDR, msg_buff);
-					if (status >= 0) {
-						console_print("Wrote: %s\r\n", msg_buff);
-					} else {
-						console_print("ERROR: String write failed in %s.\r\n",
-							__func__);
-					}	
-					break;
-					
-				case 'd':
-					console_message("Reading string...\r\n");
-					status = pic_nvm_readstr(
-						msg_buff,
-						CONSOLE_STR_ADDR,
-						sizeof(msg_buff));
-					if (status >= 0) {
-						console_print("String: %s\r\n", msg_buff);
-					} else {
-						console_print("ERROR: String read failed in %s.\r\n",
-							__func__);
-					}
-					break;
-					
-				case 'i':
-					console_message("New IP Address: ");
-					console_readln(ip_str, sizeof(ip_str));
-					console_message("New IP Mask: ");
-					console_readln(mask_str, sizeof(mask_str));
-					console_message("New Gateway: ");
-					console_readln(gw_str, sizeof(gw_str));
-					server_set_ip(ip_str, gw_str, mask_str);
-					break;
-					
-				case 'm':
-					pic_info(msg_buff);
-					console_print("%s\r\n", msg_buff);
-					break;
-				
-				case 'n':
-					server_info(msg_buff);
-					console_print("%s\r\n", msg_buff);
-					break;
-				
-				case 'p':
-					ping_gateway();
-					break;
-				
-				case 'r':
-					console_message("Resetting... \r\n");
-					console_flush();
-					pic_reset();
-					break;
-				
-				default:
-					console_print(
-						"ERROR: Unknown command '%c', type 'h' for help in %s.\r\n",
-						cmd, __func__);
-					break;
-			}
-		} else if (cmd_len > 1) {
-			console_print("ERROR: Single-letter commands only in %s.\r\n",
-				__func__);
-		}
-		cmd_len = 0;
-		console_message("EEM$ ");
+		console_print("The VERBOSE_CONSOLE flag is cleared.\n");	
 	}
 }

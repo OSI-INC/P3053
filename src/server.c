@@ -36,16 +36,16 @@
 #include "pic.h"
 
 /*
-	The active server configuration, a global variable. Intended to reflect the 
-	current server configuration.
+	The active EEM configuration, a global variable. Intended to reflect the
+	current EEM configuration.
 */
-server_config_type server_config_active;
+eem_config_type eem_config_active;
 
 /*
-	The factory server configuration is the one we use when we have not yet written
-	a configuration to non-volatile memory. 
+	The factory EEM configuration is the one we use when we have not yet written
+	a configuration to flash memory. 
 */
-const server_config_type server_config_factory = {
+const eem_config_type eem_config_factory = {
 	.magic_str = CONFIG_NVM_MAGIC,
 	.password_str = "LWDAQ",
 	.operator_str = "unassigned",
@@ -61,33 +61,33 @@ const server_config_type server_config_factory = {
 };
 
 /*
-	server_config_write writes a server configuration record to the flash
-	configuration address in non-volatile memory.
+	eem_config_write writes a EEM configuration record to the flash
+	configuration address in flash memory.
 */
-int server_config_write(const server_config_type* config_ptr) {
-	return pic_nvm_putbytes(
-		FLASH_CONFIG_ADDR, 
+int eem_config_write(const eem_config_type* config_ptr) {
+	return pic_flash_putbytes(
+		EEM_CONFIG_ADDR, 
 		(const uint8_t *) config_ptr,
-		sizeof(server_config_type));
+		sizeof(eem_config_type));
 }
 
 /*
-	server_config_read reads a server configuration record from the flash
-	configuration address in non-volatile memory. After reading the record, the
-	routine checks that its magic string matches that of a composed string, so
-	as to check for a random set of bytes read from uninitialized NVM. If the
-	magic string does not match, we create the factory configuration record and
-	use that instead.
+	eem_config_read reads a EEM configuration record from the flash
+	configuration address in flash memory. After reading the record, the routine
+	checks that its magic string matches that of a composed string, so as to
+	check for a random set of bytes read from uninitialized NVM. If the magic
+	string does not match, we create the factory configuration record and use
+	that instead.
 */
-int server_config_read(server_config_type* config_ptr) {
+int eem_config_read(eem_config_type* config_ptr) {
 	int len;
-	len = pic_nvm_getbytes(
+	len = pic_flash_getbytes(
 		(uint8_t*) config_ptr,
-		FLASH_CONFIG_ADDR, 
-		sizeof(server_config_type));
+		EEM_CONFIG_ADDR, 
+		sizeof(eem_config_type));
 	config_ptr->magic_str[sizeof(config_ptr->magic_str)-1] = '\0';
 	if (strcmp(config_ptr->magic_str, CONFIG_NVM_MAGIC) != 0) {
-		*config_ptr = server_config_factory;
+		*config_ptr = eem_config_factory;
 		return 0;
 	} else {
 		return len;
@@ -95,14 +95,14 @@ int server_config_read(server_config_type* config_ptr) {
 }
 
 /*
-	server_str_from_config takes a server configuration record and generates a
+	server_str_from_config takes a EEM configuration record and generates a
 	colon-delimited string of parameter names and values, each pair on a
 	separate line. The newline is marked by one line-feed character, LF, not by
 	a pair of characters CRLF. The routine returns the length of the generated
 	string. It does not check to make sure that the destination string is large
 	enough.
 */
-int server_str_from_config(char* str, const server_config_type* config_ptr) {
+int server_str_from_config(char* str, const eem_config_type* config_ptr) {
 	int len = 0;
 	len += sprintf(str+len, "ip_str: %s\n", config_ptr->ip_str);
 	len += sprintf(str+len, "gw_str: %s\n", config_ptr->gw_str);
@@ -119,13 +119,13 @@ int server_str_from_config(char* str, const server_config_type* config_ptr) {
 }
 
 /*
-	server_config_from_str looks through a string for pairs "parameter: value"
+	eem_config_from_str looks through a string for pairs "parameter: value"
 	on separate lines of a null-terminated string. The first line of the string
 	will begin with the first character of the string. The last line of the
 	string will end with the last character of the string. All other lines will
 	be delimited by line-feed characters. If it finds a parameter with a name
 	that matches one of our server parameters, it updates the corresponding
-	value in the server configuration pointed to by the config_ptr. The routine
+	value in the EEM configuration pointed to by the config_ptr. The routine
 	checks only that the beginning of the parameter name matches a server
 	parameter name. Thus a given name "ip_str_extra" will match our parameter
 	name "ip_str". The routine returns the number of parameters if found, or a
@@ -133,7 +133,7 @@ int server_str_from_config(char* str, const server_config_type* config_ptr) {
 	the config_ptr or str, -1. For a line missing a colon, -2. For a line in
 	which the colon is not followed by a space, -3.
 */
-int server_config_from_str(server_config_type *config_ptr, const char *str) {
+int eem_config_from_str(eem_config_type *config_ptr, const char *str) {
 	const char *p = str;
 	int num_copied = 0;
 	
@@ -379,9 +379,9 @@ void ping_gateway(void) {
 	echoReq.param = NULL;
 	res = TCPIP_ICMP_EchoRequest(&echoReq, &reqHandle);
 	if (res == ICMP_ECHO_OK) {
-		console_print("succeeded in %s.\r\n", __func__);
+		console_print("succeeded in %s.\n", __func__);
 	} else {
-		console_print("failed with code %u in %s.\r\n", res, __func__);
+		console_print("failed with code %u in %s.\n", res, __func__);
 	}
 }
 
@@ -390,7 +390,7 @@ void ping_gateway(void) {
 	gateway address, and a new network mask. We pass it three strings that specify
 	these three IP addresses, and the routine translates these into IPV4_ADDR types
 	and applies them. It also makes sure that DHCP is turned off. Once it is done,
-	it records the new IP values in the active server configuration.
+	it records the new IP values in the active EEM configuration.
 */
 int server_set_ip(const char* ip_str, const char* gw_str, const char* nm_str) {
 	IPV4_ADDR ip_addr;
@@ -398,38 +398,38 @@ int server_set_ip(const char* ip_str, const char* gw_str, const char* nm_str) {
 	IPV4_ADDR gw_addr;
 	TCPIP_NET_HANDLE net_hdl;
 
-	console_print("Setting IP address, gateway, and network mask in %s.\r\n", __func__);
+	console_print("Setting IP address, gateway, and network mask in %s.\n", __func__);
 	if (!TCPIP_Helper_StringToIPAddress(ip_str, &ip_addr)) {
-		console_print("ERROR: Invalid IP address '%s'.\r\n", ip_str);
+		console_print("ERROR: Invalid IP address '%s'.\n", ip_str);
 		return -1;
 	}
 	if (!TCPIP_Helper_StringToIPAddress(gw_str, &gw_addr)) {
-		console_print("ERROR: Invalid gateway '%s'.\r\n", gw_str);
+		console_print("ERROR: Invalid gateway '%s'.\n", gw_str);
 		return -1;
 	}
 	if (!TCPIP_Helper_StringToIPAddress(nm_str, &mask_addr)) {
-		console_print("ERROR: Invalid mask '%s'.\r\n", nm_str);
+		console_print("ERROR: Invalid mask '%s'.\n", nm_str);
 		return -1;
 	}
 	net_hdl = TCPIP_STACK_IndexToNet(0);
 	if (net_hdl == 0) {
-		console_print("ERROR: Failed to obtain interface handle.\r\n");
+		console_print("ERROR: Failed to obtain interface handle.\n");
 		return -1;
 	}
 	TCPIP_DHCP_Disable(net_hdl);
 	if (!TCPIP_STACK_NetAddressSet(net_hdl, &ip_addr, &mask_addr, true)) {
-		console_print("ERROR: Failed to set IP address.\r\n");
+		console_print("ERROR: Failed to set IP address.\n");
 		return -1;
 	}
 	if (!TCPIP_STACK_NetAddressGatewaySet(net_hdl, &gw_addr)) {
-		console_print("ERROR: Failed to set gateway.\r\n");
+		console_print("ERROR: Failed to set gateway.\n");
 		return -1;
 	}
-	console_print("Succeeded with ip=%s, gw=%s, nm=%s.\r\n", ip_str, gw_str, nm_str);
+	console_print("Succeeded with ip=%s, gw=%s, nm=%s.\n", ip_str, gw_str, nm_str);
 	
-	strcpy(server_config_active.ip_str, ip_str);
-	strcpy(server_config_active.gw_str, gw_str);
-	strcpy(server_config_active.nm_str, nm_str);
+	strcpy(eem_config_active.ip_str, ip_str);
+	strcpy(eem_config_active.gw_str, gw_str);
+	strcpy(eem_config_active.nm_str, nm_str);
 	
 	return 0;
 }
@@ -565,15 +565,15 @@ int server_info(char* out) {
 	int len = 0;
 	len += sprintf(out+len,     "Interface : ");
 	len += server_name_str(out+len);
-	len += sprintf(out+len, "\r\nIP        : ");
+	len += sprintf(out+len, "\nIP        : ");
 	len += server_ip_str(out+len);
-	len += sprintf(out+len, "\r\nMask      : ");
+	len += sprintf(out+len, "\nMask      : ");
 	len += server_nm_str(out+len);
-	len += sprintf(out+len, "\r\nGateway   : ");
+	len += sprintf(out+len, "\nGateway   : ");
 	len += server_gw_str(out+len);
-	len += sprintf(out+len, "\r\nMAC       : ");
+	len += sprintf(out+len, "\nMAC       : ");
 	len += server_mac_str(out+len);
-	len += sprintf(out+len, "\r\nLink      : ");
+	len += sprintf(out+len, "\nLink      : ");
 	if (server_linked()) {
 		len += sprintf(out+len, "UP");
 	} else {
@@ -600,7 +600,7 @@ bool tcpip_server_check_ip_change(tcpip_server_type* server) {
 	current_ip.Val = TCPIP_STACK_NetAddress(net_hdl);
 
 	if (current_ip.Val != server->ip_addr.Val) {
-		console_print("IP address change detected, restarting %s server.\r\n",
+		console_print("IP address change detected, restarting %s server.\n",
 			server->protocol);
 		if (server->socket != INVALID_SOCKET) {
 			TCPIP_TCP_Close(server->socket);
@@ -697,7 +697,7 @@ void tcpip_server(tcpip_server_type* server, tcpip_tasks_type tasks) {
 			if (tcpip_status < 0) {   
 				if (print_init_wait) {
 					console_print(
-						"TCP/IP stack initialization failed in %s.\r\n",
+						"TCP/IP stack initialization failed in %s.\n",
 						__func__);
 				}
 				server->state = S_ERROR;
@@ -706,14 +706,14 @@ void tcpip_server(tcpip_server_type* server, tcpip_tasks_type tasks) {
 				interface_name = TCPIP_STACK_NetNameGet(net_hdl);
 				host_name = TCPIP_STACK_NetBIOSName(net_hdl);
 				console_print(
-					"%s server, interface %s, host %s initialized in %s.\r\n",
+					"%s server, interface %s, host %s initialized in %s.\n",
 					server->protocol,
 					interface_name,
 					string_trim(host_name),
 					__func__);
 				server->state = S_WAIT_IP;
 			} else if (print_init_wait) {
-				console_print("Waiting for TCP/IP stack in %s.\r\n", __func__);
+				console_print("Waiting for TCP/IP stack in %s.\n", __func__);
 				print_init_wait = false;
 			}
 		}
@@ -724,7 +724,7 @@ void tcpip_server(tcpip_server_type* server, tcpip_tasks_type tasks) {
 			if (TCPIP_STACK_NetIsReady(net_hdl)) {
 				server->ip_addr.Val = TCPIP_STACK_NetAddress(net_hdl);
 				console_print(
-					"%s server assigned IP address %d.%d.%d.%d in %s.\r\n", 
+					"%s server assigned IP address %d.%d.%d.%d in %s.\n", 
 					server->protocol,
 					server->ip_addr.v[0], 
 					server->ip_addr.v[1], 
@@ -744,7 +744,7 @@ void tcpip_server(tcpip_server_type* server, tcpip_tasks_type tasks) {
 			server->socket = TCPIP_TCP_ServerOpen(IP_ADDRESS_TYPE_IPV4, server->port, 0);
 			if (server->socket == INVALID_SOCKET) {
 				if (debug) console_print(
-					"Failed to open %s server on %d.%d.%d.%d:%d in %s.\r\n",
+					"Failed to open %s server on %d.%d.%d.%d:%d in %s.\n",
 					server->protocol, 
 					server->ip_addr.v[0], 
 					server->ip_addr.v[1], 
@@ -755,7 +755,7 @@ void tcpip_server(tcpip_server_type* server, tcpip_tasks_type tasks) {
 				server->state = S_ERROR;
 			} else {
 				if (debug) console_print(
-					"Listening for %s connection on %d.%d.%d.%d:%d in %s.\r\n",
+					"Listening for %s connection on %d.%d.%d.%d:%d in %s.\n",
 					server->protocol, 
 					server->ip_addr.v[0], 
 					server->ip_addr.v[1], 
@@ -775,11 +775,11 @@ void tcpip_server(tcpip_server_type* server, tcpip_tasks_type tasks) {
 				if (TCPIP_TCP_SocketInfoGet(server->socket, &sock_info)) {
 					IPV4_ADDR ip = sock_info.remoteIPaddress.v4Add;
 					if (debug) console_print(
-						"%s connection from %u.%u.%u.%u in %s.\r\n",
+						"%s connection from %u.%u.%u.%u in %s.\n",
 						server->protocol, ip.v[0], ip.v[1], ip.v[2], ip.v[3], __func__);
 				} else {
 					if (debug) console_print(
-						"%s connection from unknown peer in %s.\r\n",
+						"%s connection from unknown peer in %s.\n",
 						server->protocol, __func__);
 				}
 				status = tasks(server);
@@ -787,7 +787,7 @@ void tcpip_server(tcpip_server_type* server, tcpip_tasks_type tasks) {
 					server->state = S_SERVING;
 				} else {
 					if (debug) console_print(
-						"%s socket closed by server in %s.\r\n",
+						"%s socket closed by server in %s.\n",
 						server->protocol, __func__);			
 					server->state = S_CLOSE;
 				}
@@ -800,13 +800,13 @@ void tcpip_server(tcpip_server_type* server, tcpip_tasks_type tasks) {
 				server->state = S_WAIT_IP;
 			} else if (!TCPIP_TCP_IsConnected(server->socket) ||
 					TCPIP_TCP_WasDisconnected(server->socket)) {
-				if (debug) console_print("%s socket closed by client in %s.\r\n",
+				if (debug) console_print("%s socket closed by client in %s.\n",
 					server->protocol, __func__);
 				server->state = S_CLOSE;
 			} else {
 				status = tasks(server);
 				if (status < 0) {
-					if (debug) console_print("%s socket closed by server in %s.\r\n",
+					if (debug) console_print("%s socket closed by server in %s.\n",
 						server->protocol, __func__);			
 					server->state = S_CLOSE;
 				}
@@ -827,7 +827,7 @@ void tcpip_server(tcpip_server_type* server, tcpip_tasks_type tasks) {
 		
 		default: {
 			if (rand() % HEARTBEAT_PERIOD == 0) {
-				if (debug) console_print("Unknown state %u for % server in %s.\r\n",
+				if (debug) console_print("Unknown state %u for % server in %s.\n",
 					server->protocol, server->state, __func__);
 			}		
 		}

@@ -45,82 +45,90 @@
 #define SERVER_H
 
 /*
-	We store the configuration of our server in a server configuration record.
+	We store the configuration of our server in a EEM configuration record.
 */
 #define SERVER_CONFIG_STR_SIZE 31
-typedef char server_config_str[SERVER_CONFIG_STR_SIZE];
+typedef char eem_config_str[SERVER_CONFIG_STR_SIZE];
 typedef struct {
-	server_config_str magic_str;
-    server_config_str password_str;
-    server_config_str operator_str;
-	server_config_str ip_str;
-	server_config_str gw_str;
-	server_config_str nm_str;
-    server_config_str time_str;
-    server_config_str device_str;
+	eem_config_str magic_str;
+    eem_config_str password_str;
+    eem_config_str operator_str;
+	eem_config_str ip_str;
+	eem_config_str gw_str;
+	eem_config_str nm_str;
+    eem_config_str time_str;
+    eem_config_str device_str;
     uint32_t lwdaq_port;
 	uint32_t telnet_port;
     uint32_t security_level;
     uint32_t tcp_timeout;
-} server_config_type;
+} eem_config_type;
 
 /*
-	Here is a string that is unlikely to appear in NVM at random. We use it to
-	determine if the NVM server configuration has been written by our code
-	deliberately some time in the past. We assign it to the configuration's
-	magic string, and we look for it in the magic string when we read a
-	configuration from NVM. If we see anything other than the correct magic
-	string, we assume the configuration is invalid and substitute the default
-	configuration.
+	Here is a string that is unlikely to appear in flash memory at random. We
+	use it to determine if the flash memory EEM configuration has been written
+	by our code deliberately some time in the past. We assign it to the
+	configuration's magic string, and we look for it in the magic string when we
+	read a configuration from NVM. If we see anything other than the correct
+	magic string, we assume the configuration is invalid and substitute the
+	default configuration.
 */
 #define CONFIG_NVM_MAGIC "The Pelagic Argosy Sites Land"
 
 /*
-	The factory server configuration is the one we use when we have not yet written
-	a configuration to non-volatile memory. Its contents are defined in the server
+	The factory EEM configuration is the one we use when we have not yet written
+	a configuration to flash memory. Its contents are defined in the server
 	implementation file.
 */
-extern const server_config_type server_config_factory;
+extern const eem_config_type eem_config_factory;
 
 /*
-	The active server configuration is the one that is intended to reflect the current
-	state of the server. The accuracy of this record does, however, depend upon the
-	cooperation of the procedures that modify the state of the server. If we modify the
-	IP address, for example, we must record our modification in the server configuration.
+	The active Embedded Ethernet Module (EEM) configuration is intended to
+	reflect the current state of the server. The accuracy of the record depends
+	upon the cooperation of the procedures that modify the server state. The
+	server_set_ip procedure, for example, changes the server IP address, gateway
+	address and network mask, and reboots all servers on the EEM. This routine
+	updates the active EEM configuration record when it is done, otherwise the
+	active configuration would be inaccurate. As a rule of thumb: any change to
+	the IP or TCP configuration should be followed by a re-start of all serers
+	and an update of the active configuration. On start-up, the EEM reads a
+	complete configuration record from flash memory into the active
+	configuration, and then applies all fields to the newly-started server.
 */
-extern server_config_type server_config_active;
+extern eem_config_type eem_config_active;
 
 /*
-	We want to be able to update the server configuration and have the server
-	remember the configuration through reset and power cycles. We can place all
-	necessary configuration information in a server configuration record, and
-	these records have fixed length, even though they consist of strings. We
-	store the configuration record in non-volatile memory as a table of
-	null-terminated strings. We read them in the same way, by copying directly
-	into a server configuration record.
+	We want to be able to update the Embedded Ethernet Module (EEM)
+	configuration and have the server remember the configuration through reset
+	and power cycles. We can place all necessary configuration information in a
+	EEM configuration record, and these records have fixed length, even though
+	they consist of strings. We store the configuration record in flash memory
+	as a table of null-terminated strings. We read them in the same way, by
+	copying directly into a EEM configuration record.
 
-	The PIC32MZ2048EFH's 2 MByte of NVM appears twice in the CPU's virtual
-	address space. Once in the range 0x9D000000 to 0x9D0FFFFF, in which range
-	the NVM is accessed by the CPU indirectly through a cache memory, and again
-	in the range 0xBD000000 to 0xBD0FFFFF, in which range the CPU accesses the
-	NVM directly, without a cache. We want to put our string in the un-cached
-	copy so that we can write with the direct memory access (DMA) hardware and
-	read back immediately from the physical NVM rather than getting a stale copy
-	of the NVM from cache. So we place our string in the 0xBD range. In that
-	range, we must make sure we are above the program itself. In our case, our
-	program is less than 256 KByte, so anywhere above 0xBD040000 will be fine.
-	The NVM pages are 16 Kbyte in the PIC32MZ, and NVM rows are 2 KByte. So we
-	must pick a location that is on a 16-KByte boundary. Reading repeatedly from
-	un-cached NVM is far slower than reading repeatedly from a cached copy of an
-	NVM page, but we do not plan to read repeatedly from our configuration
-	string, so we will suffer no loss of performance from reading direction from
-	NVM.
+	The PIC32MZ2048EFH's 2 MByte of flash memory appears twice in the CPU's
+	virtual address space. Once in the range 0x9D000000 to 0x9D0FFFFF, in which
+	range the flash memory is accessed by the CPU indirectly through a cache
+	memory, and again in the range 0xBD000000 to 0xBD0FFFFF, in which range the
+	CPU accesses the flash memory directly, without a cache. We want to put our
+	string in the un-cached copy so that we can write with the direct memory
+	access (DMA) hardware and read back immediately from the physical flash
+	memory rather than getting a stale copy of the flash memory from cache. So
+	we place our string in the 0xBD range. In that range, we must make sure we
+	are above the program itself. In our case, our program is less than 256
+	KByte, so anywhere above 0xBD040000 will be fine. The flash memory pages are
+	16 Kbyte in the PIC32MZ, and flash memory rows are 2 KByte. So we must pick
+	a location that is on a 16-KByte boundary. Reading repeatedly from un-cached
+	flash memory is far slower than reading repeatedly from a cached copy of an
+	flash memory page, but we do not plan to read repeatedly from our
+	configuration string, so we will suffer no loss of performance from reading
+	direction from flash memory.
 */
-#define FLASH_CONFIG_ADDR 0xBD100000
-int server_config_write(const server_config_type* config);
-int server_config_read(server_config_type* config);
-int server_str_from_config(char* str, const server_config_type* config_ptr);
-int server_config_from_str(server_config_type* config_ptr, const char* str);
+#define EEM_CONFIG_ADDR 0xBD100000
+int eem_config_write(const eem_config_type* config);
+int eem_config_read(eem_config_type* config);
+int server_str_from_config(char* str, const eem_config_type* config_ptr);
+int eem_config_from_str(eem_config_type* config_ptr, const char* str);
 
 /*
 	Buffer sizes we recommend for server tasks.

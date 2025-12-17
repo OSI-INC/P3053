@@ -1,8 +1,8 @@
 /*
 	pic.h -- Interface of the PIC32MZ Utility library for the Embedded Ethernet
 	Module (EEM). Provides communication with the system hardware, including
-	non-volatile memory, the MPCIE parallel bus, the PIC32MZ internal registers,
-	and the UART interfaces. Does not include control of the Ethernet physical
+	flash memory, the MPCIE parallel bus, the PIC32MZ internal registers, and
+	the UART interfaces. Does not include control of the Ethernet physical
 	layer, which you will find in server.h.
 
 	(C) 2025, Kevan Hashemi, Open Source Instruments Inc.
@@ -239,36 +239,37 @@ static inline uint8_t lwdaq_byte_read_repeat(void) {
 }
 
 /*
-	Reading and writing from non-volatile memory (NVM). These routines operate
-	upon the flash memory page pointed to by their flash_addr argument. The
-	write routines erases a page and then write either a byte array or a
-	null-terminated string to the page, followed by 0xFF erase bytes. The read
-	routines read from any location in NVM, either a byte array or a string.
-	When copying a string, if there is no null character to be found within the
-	maximum copy length, the routine returns an error code. Otherwise the
-	routines return the number of bytes read, or the length of the string read.
+	Reading and writing from flash memory. These routines operate upon the flash
+	memory page pointed to by their flash_addr argument. The write routines
+	erases a page and then write either a byte array or a null-terminated string
+	to the page, followed by 0xFF erase bytes. The read routines read from any
+	location in flash memory, either a byte array or a string. When copying a
+	string, if there is no null character to be found within the maximum copy
+	length, the routine returns an error code. Otherwise the routines return the
+	number of bytes read, or the length of the string read.
 
-	The PIC32MZ2048EFH's 2 MByte of NVM appears twice in the CPU's virtual
-	address space. Once in the range 0x9D000000 to 0x9D0FFFFF, in which range
-	the NVM is accessed by the CPU indirectly through a cache memory, and again
-	in the range 0xBD000000 to 0xBD0FFFFF, in which range the CPU accesses the
-	NVM directly, without a cache. We want to put our string in the un-cached
-	copy so that we can write with the direct memory access (DMA) hardware and
-	read back immediately from the physical NVM rather than getting a stale copy
-	of the NVM from cache. So we place our string in the 0xBD range. In that
-	range, we must make sure we are above the program itself. In our case, our
-	program is less than 256 KByte, so anywhere above 0xBD040000 will be fine.
-	The NVM pages are 16 Kbyte in the PIC32MZ, and NVM rows are 2 KByte. So we
-	must pick a location that is on a 16-KByte boundary. Reading repeatedly from
-	un-cached NVM is far slower than reading repeatedly from a cached copy of an
-	NVM page, but we do not plan to read repeatedly from our configuration
-	string, so we will suffer no loss of performance from reading direction from
-	NVM.
+	The PIC32MZ2048EFH's 2 MByte of flash memory appears twice in the CPU's
+	virtual address space. Once in the range 0x9D000000 to 0x9D0FFFFF, in which
+	range the flash memory is accessed by the CPU indirectly through a cache
+	memory, and again in the range 0xBD000000 to 0xBD0FFFFF, in which range the
+	CPU accesses the flash memory directly, without a cache. We want to put our
+	string in the un-cached copy so that we can write with the direct memory
+	access (DMA) hardware and read back immediately from the physical flash
+	memory rather than getting a stale copy of the flash memory from cache. So
+	we place our string in the 0xBD range. In that range, we must make sure we
+	are above the program itself. In our case, our program is less than 256
+	KByte, so anywhere above 0xBD040000 will be fine. The flash memory pages are
+	16 Kbyte in the PIC32MZ, and flash memory rows are 2 KByte. So we must pick
+	a location that is on a 16-KByte boundary. Reading repeatedly from un-cached
+	flash memory is far slower than reading repeatedly from a cached copy of an
+	flash memory page, but we do not plan to read repeatedly from our
+	configuration string, so we will suffer no loss of performance from reading
+	direction from flash memory.
 */
-int pic_nvm_putbytes(uint32_t flash_addr, const uint8_t* buff, uint32_t len);
-int pic_nvm_writestr(uint32_t flash_addr, const char* str);
-int pic_nvm_getbytes(uint8_t* buff, uint32_t flash_addr, uint32_t len);
-int pic_nvm_readstr(char* str, uint32_t flash_addr, uint32_t str_size);
+int pic_flash_putbytes(uint32_t flash_addr, const uint8_t* buff, uint32_t len);
+int pic_flash_writestr(uint32_t flash_addr, const char* str);
+int pic_flash_getbytes(uint8_t* buff, uint32_t flash_addr, uint32_t len);
+int pic_flash_readstr(char* str, uint32_t flash_addr, uint32_t str_size);
 
 /*
 	Reset, initialization, and configuration routines.

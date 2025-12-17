@@ -32,40 +32,41 @@
 #include "pic.h"
 
 /*
-	The buffer we use when writing to non-volatile memory (NVM). We are reading
-	plib_nvm.h through definitions.h. The NVM header file declares the constants
-	that define the address range, erase page size and write row size of the
-	program flash memory, as well as the routines we use to erase and write to
-	the NVM, these being NVM_PageErase, NVM_IsBusy, and NVM_RowWrite. In order
-	to write to NVM, we need a row-sized buffer in RAM that we can fill with the
-	content we wish to write, and then we will pass a pointer to this buffer
-	into the RowWrite routine.
+	The buffer we use when writing to flash memory. We are reading plib_nvm.h
+	through definitions.h. The flash header file declares the constants that
+	define the address range, erase page size and write row size of the program
+	flash memory, as well as the routines we use to erase and write to the
+	flash, these being NVM_PageErase, NVM_IsBusy, and NVM_RowWrite (here "NVM"
+	is for "non-volatile memory", which in the PIC32MZ is flash memory). In
+	order to write to flash, we need a row-sized buffer in RAM that we can fill
+	with the content we wish to write, and then we will pass a pointer to this
+	buffer into the RowWrite routine.
 
 	Most of the dynamic random-access memory (DRAM) available to the CPU is
 	accessed by the CPU indirectly through a faster cache memory. Pages of DRAM
 	are read into the cache and the CPU operates upon the cached copies. Every
 	now and then, the microcontroller's memory management system writes the
 	cached page to DRAM so that it can read a new page from DRAM into the cache
-	for the CPU to use. When RowWrite copies from our RAM buffer to NVM, it uses
-	the direct memory access (DMA) hardware in the microcontroller. The DMA
+	for the CPU to use. When RowWrite copies from our RAM buffer to flash, it
+	uses the direct memory access (DMA) hardware in the microcontroller. The DMA
 	hardware operates upon the DRAM, not upon the cache. If our buffer resides
 	in the DRAM cache, we will write our row to the cache, and the DMA will
 	operate upon the DRAM. Instead of seeing the row we just copied to our
-	buffer appearing in NVM, we will see some row we copied previously appear in
-	our NVM.
+	buffer appearing in flash, we will see some row we copied previously appear
+	in our flash.
 
 	In the PIC32MZ2048EFH, we have both cached and non-chached copies of the
 	same 512 KByte of DRAM. The cached copy is at 0x80000000 to 0x8007FFFFF and
 	the non-cached is at 0x80000000 to 0x8007FFFFF. The "coherent" declaration
 	attribute tells the compiler to place a variable in the non-chached copy.
 	Accesses to the non-cached copy will be direct, so we will write directly
-	into the DRAM and the DMA will copy directly from DRAM into NVM.
+	into the DRAM and the DMA will copy directly from DRAM into flash.
 
 	We also specify the "aligned" attribute with the value "32", which puts the
 	buffer's first byte on a 32-byte boundary. We have done this not because we
 	have observed ill-effects from failing to specify a 32-byte boundary, but
 	because we want to avoid some pernicious bug in the future that arises from
-	our buffer being mis-aligned with the boundaries expected by an NVM write
+	our buffer being mis-aligned with the boundaries expected by an flash write
 	routine. We have no evidence that failing to place the buffer on a 32-byte
 	boundary will cause any problems, but we read passages in the code comments
 	stating that there will be a problem if the buffer is not on a 4-byte
@@ -74,87 +75,90 @@
 	We use our non-cached and aligned buffer in our pic_flash_write and
 	pic_flash_read routines.
 */
-static uint8_t pic_nvm_write_buff[NVM_FLASH_ROWSIZE]
+static uint8_t pic_flash_write_buff[NVM_FLASH_ROWSIZE]
     __attribute__((coherent, aligned(32)));
 
 /*
-	pic_nvm_putbytes writes an array of bytes to non-volatile memory (NVM). It
-	takes as arguments an address in NVM, a pointer to a byte array, and a
-	number of bytes to write. When we copy from RAM to NVM, the buffer from
+	pic_flash_putbytes writes an array of bytes to flash memory. It takes as
+	arguments an address in flash memory, a pointer to a byte array, and a
+	number of bytes to write. When we copy from RAM to flash, the buffer from
 	which we copy must reside in non-chached RAM because the NVM_RowWrite
 	routine uses direct memory access (DMA) to make the transfer, and the DMA
 	engine uses physical addresses of actual memory locations, not cached copies
-	of memory. We first copy the bytes into our non-cached NVM write buffer,
-	then from that buffer into NVM. The NVM destination location can be either
-	in the cashed or non-cached NVM address ranges. If we want to read the bytes
-	back immediately and see what we just wrote, we should choose the non-cached
-	address range. If we want to read repeatedly from the flash memory, we
-	should choose the cached address range and somehow force a refresh of the
-	page from flash after writing. We have not yet figured out how to force such
-	a refresh, other than to reset the microcontroller.
+	of memory. We first copy the bytes into our non-cached flash memory write
+	buffer, then from that buffer into flash memory. The flash memmory
+	destination location can be either in the cashed or non-cached flash memmory
+	address ranges. If we want to read the bytes back immediately and see what
+	we just wrote, we should choose the non-cached address range. If we want to
+	read repeatedly from the flash memory, we should choose the cached address
+	range and somehow force a refresh of the page from flash after writing. We
+	have not yet figured out how to force such a refresh, other than to reset
+	the microcontroller.
 
 	The routine erases an entire page of memory and then writes not more than
-	one row to the NVM. On the PIC32MZ, the pages are 16 KB and the rows are 2
-	KB. The destination address in NVM should lie on a 16-KB boundary or we may
-	have trouble with the erase procedure. The routine is wasteful of NVM space
-	in that it makes no use of the other 14 KB in the page, nor does it permit
-	any other process to use the other 14 KB. If the number of specified length
-	of the copy is greater than a row, we truncate it to one row. If the length
-	is less than one row, we fill the rest of the row with erase bytes 0xFF. The
-	routine returns the number of bytes it wrote, not counting erase bytes.
+	one row to the flash memmory. On the PIC32MZ, the pages are 16 KB and the
+	rows are 2 KB. The destination address in flash memmory should lie on a
+	16-KB boundary or we may have trouble with the erase procedure. The routine
+	is wasteful of flash memmory space in that it makes no use of the other 14
+	KB in the page, nor does it permit any other process to use the other 14 KB.
+	If the number of specified length of the copy is greater than a row, we
+	truncate it to one row. If the length is less than one row, we fill the rest
+	of the row with erase bytes 0xFF. The routine returns the number of bytes it
+	wrote, not counting erase bytes.
 */
-int pic_nvm_putbytes(uint32_t flash_addr, const uint8_t* buff, uint32_t len) {
+int pic_flash_putbytes(uint32_t flash_addr, const uint8_t* buff, uint32_t len) {
     uint32_t i = 0;
     if (len >= NVM_FLASH_ROWSIZE) {len = NVM_FLASH_ROWSIZE;}
-    memcpy(pic_nvm_write_buff, buff, len);
-    for (i = len; i < NVM_FLASH_ROWSIZE; i++) {pic_nvm_write_buff[i] = 0xFF;}
+    memcpy(pic_flash_write_buff, buff, len);
+    for (i = len; i < NVM_FLASH_ROWSIZE; i++) {pic_flash_write_buff[i] = 0xFF;}
 	if (!NVM_PageErase(flash_addr)) {return -1;}
 	while (NVM_IsBusy()) {;}
-    if (!NVM_RowWrite((uint32_t*) pic_nvm_write_buff, flash_addr)) {return -1;}
+    if (!NVM_RowWrite((uint32_t*) pic_flash_write_buff, flash_addr)) {return -1;}
     while (NVM_IsBusy()) {;}
 	return len;
 }
 
 /*
-	pic_nvm_writestr copies a string to non-volatile memory (NVM). We pass it an
-	address in NVM and a pointer to a null-terminated string. The routine calls
-	pic_nvm_putbytes to perform the copy. It returns the number of characters
+	pic_flash_writestr copies a string to flash memory. We pass it an address in
+	flash memmory and a pointer to a null-terminated string. The routine calls
+	pic_flash_putbytes to perform the copy. It returns the number of characters
 	written, which will be the string length plus one, or an error code.
 */
-int pic_nvm_writestr(uint32_t flash_addr, const char* str) {
+int pic_flash_writestr(uint32_t flash_addr, const char* str) {
     uint32_t len = strlen(str) + 1;
-    return pic_nvm_putbytes(flash_addr, (const uint8_t*) str, len);
+    return pic_flash_putbytes(flash_addr, (const uint8_t*) str, len);
 }
 
 /*
-	pic_nvm_getbytes reads an array of bytes from non-volatile memory (NVM) into
-	a byte array in RAM. We pass as arguments the byte array address we want to
-	write to, the NVM address we want to read from, and the number of bytes to
-	copy. If the flash address we specify is in the cached range of program
-	flash, we will read from the cached copy of the NVM. If the address is in
-	the non-cached range, we will read directly from NVM. The routine returns
-	the number of bytes it read. Reading from NVM is not subject to the same
-	2-KB boundary constraint as writing to NVM. We can read from any address
-	and we can read any number of bytes, by simply using memcpy.
+	pic_flash_getbytes reads an array of bytes from flash memory into a byte
+	array in RAM. We pass as arguments the byte array address we want to write
+	to, the flash memmory address we want to read from, and the number of bytes
+	to copy. If the flash address we specify is in the cached range of program
+	flash, we will read from the cached copy of the flash memmory. If the
+	address is in the non-cached range, we will read directly from flash
+	memmory. The routine returns the number of bytes it read. Reading from flash
+	memmory is not subject to the same 2-KB boundary constraint as writing to
+	flash memmory. We can read from any address and we can read any number of
+	bytes, by simply using memcpy.
 */
-int pic_nvm_getbytes(uint8_t* buff, uint32_t flash_addr, uint32_t len)  {
+int pic_flash_getbytes(uint8_t* buff, uint32_t flash_addr, uint32_t len)  {
 	const uint8_t* row = (const uint8_t*) flash_addr;
 	memcpy(buff, row, len);
 	return len;
 }
 
 /*
-	pic_nvm_readstr reads a null-terminated string from non-volatile memory
-	(NVM) and copies the string into a buffer we provide. We pass as arguments
-	the NVM address (flash memory address) we wish to read from, a pointer to
-	the buffer we want to copy into, and the maximum length of string we can
-	copy. The flash address does not need to be on a 2-KB boundary. The routine
-	scans forward from the flash address looking for a null, then copies all
-	characters up to and including the null to the destination string. It
-	returns the length of the string it copied. If it does not find a null, it
-	will make an empty string and return a negative value.
+	pic_flash_readstr reads a null-terminated string from flash memory and
+	copies the string into a buffer we provide. We pass as arguments the flash
+	memory we wish to read from, a pointer to the buffer we want to copy into,
+	and the maximum length of string we can copy. The flash address does not
+	need to be on a 2-KB boundary. The routine scans forward from the flash
+	address looking for a null, then copies all characters up to and including
+	the null to the destination string. It returns the length of the string it
+	copied. If it does not find a null, it will make an empty string and return
+	a negative value.
 */
-int pic_nvm_readstr(char* str, uint32_t flash_addr, uint32_t str_size) {
+int pic_flash_readstr(char* str, uint32_t flash_addr, uint32_t str_size) {
 	const uint8_t* row = (const uint8_t*) flash_addr;
 	uint32_t i = 0;
 	while ((i < str_size) && (row[i] != '\0')) {i++;}
@@ -277,7 +281,7 @@ void pic_initialize(void) {
 	// single-bit errors and report double-bit errors.
 	CFGCONbits.ECCCON = 3;
 	
-	// Initialize the non-volatile memory controller, clear NVM error flags.
+	// Initialize the flash memory controller, clear flash memory error flags.
 	// Necessary if we use the flash memory.
 	NVM_Initialize();
 	
@@ -311,8 +315,8 @@ void pic_initialize(void) {
 */
 void pic_info(char* out) {
 	sprintf(out, 
-		"Tick Counter Frequency (kHz):   %.3f\r\n"
-		"System Counter Frequency (MHz): %.3f\r\n"
+		"Tick Counter Frequency (kHz):   %.3f\n"
+		"System Counter Frequency (MHz): %.3f\n"
 		"Sytem Clock Frequency (MHz):    %.3f",
 		(double) SYS_TMR_TickCounterFrequencyGet() * 1e-3,
 		(double) SYS_TMR_SystemCountFrequencyGet() * 1e-6,

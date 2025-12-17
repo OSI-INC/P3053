@@ -93,6 +93,22 @@ void cli_print(cli_chan_type* ch, const char* fmt, ...) {
 }
 
 /*
+	cli_start starts up a new command-line interpreter. We pass it a completed
+	channel structure. It clears the receive buffer in this structure and it
+	prints an introductory message. With any luck we have already called the CLI
+	initialization routine by the time we start this CLI, so the help command
+	will be installed in all CLI server.
+*/
+void cli_start(cli_chan_type* ch) {
+	ch->rx_len = 0;
+	ch->rx_buff[0] = '\0';
+	cli_print(ch, "===========================================================\n");
+	cli_print(ch, "====  Embedded Ethernet Module Command-Line Interface =====\n");
+	cli_print(ch, "===========================================================\n");
+	cli_print(ch, "Command-line interpreter running, try 'help' for help.\n");
+}
+
+/*
 	Command line interpreter (CLI) command list. See the accompanying header file
 	for the declaration of the command procedure type. We keep track of the number
 	of commands registered so we will know where to register the next command in
@@ -146,7 +162,7 @@ void cli_help(cli_chan_type *ch, char *args) {
 	while (tok != NULL) {
  		if (strcmp(tok, "--info") == 0) {print_info = true;} 
  		else if (strcmp(tok, "--help") == 0) {print_help = true;} else {
-            cli_print(ch, "ERROR: Unrecognized option '%s' in %s.\r\n", tok, __func__);
+            cli_print(ch, "ERROR: Unrecognized option '%s' in %s.\n", tok, __func__);
             return;
         }
         tok = strtok(NULL, " \t");
@@ -156,7 +172,7 @@ void cli_help(cli_chan_type *ch, char *args) {
 	// response, the command must print an information string to the CLI
 	// channel.
 	if (print_info) {
-		cli_message(ch, "List all commands with descriptions.\r\n");
+		cli_message(ch, "List all commands with descriptions.\n");
 		return;
 	}
 
@@ -165,22 +181,22 @@ void cli_help(cli_chan_type *ch, char *args) {
 	// all options and their functions.
 	if (print_help) {
 		cli_message(ch,
-			"Usage:\r\n"
-			"  help [--info] [--help]\r\n"
-			"\r\n"
-			"Summary:\r\n"
-			"  List all registered commands and show their '--info' descriptions.\r\n"
-			"\r\n"
-			"Options:\r\n"
-			"  --info        Print a one-line summary of this command.\r\n"
-			"  --help        Print this help text.\r\n"
+"Usage:\n"
+"  help [--info] [--help]\n"
+"\n"
+"Summary:\n"
+"  List all registered commands and show their '--info' descriptions.\n"
+"\n"
+"Options:\n"
+"  --info        Print a one-line summary of this command.\n"
+"  --help        Print this help text.\n"
 		);
 		return;
 	}
 
 	// No options were given, so perform the default function: print the full
 	// CLI command help list.
-    cli_message(ch, "Available commands:\r\n");
+    cli_message(ch, "Available commands:\n");
     for (int i = 0; i < cli_num_commands; i++) {
         const char *name = cli_commands[i].name;
         cli_cmd_proc proc = cli_commands[i].proc;
@@ -192,84 +208,173 @@ void cli_help(cli_chan_type *ch, char *args) {
 }
 
 /*
+	cli_reset performs a software reset of the Embedded Ethernet Module (EEM). 
+*/
+void cli_reset(cli_chan_type *ch, char *args) {
+	bool print_info = false;
+	bool print_help = false;
+	char* tok = strtok(args, " \t");
+
+	while (tok != NULL) {
+ 		if (strcmp(tok, "--info") == 0) {print_info = true;} 
+ 		else if (strcmp(tok, "--help") == 0) {print_help = true;} 
+ 		else {
+            cli_print(ch, "ERROR: Unrecognized option '%s' in %s.\n", tok, __func__);
+            return;
+        }
+        tok = strtok(NULL, " \t");
+    }
+    
+	if (print_info) {
+		cli_message(ch, "Initiate a software reset of the EEM.\n");
+		return;
+	}
+
+	if (print_help) {
+		cli_message(ch,
+"Usage:\n"
+"  reset [--info] [--help]\n"
+"\n"
+"Summary:\n"
+"  Performs a software reset of the Embedded Ethernet Module (EEM). With no options,\n"
+"  the command prints a reset notification. It waits for a quarter-second before\n"
+"  initiating the reset.\n"
+"\n"
+"Options:\n"
+"  --info        Print a one-line summary of this command.\n"
+"  --help        Print this help text.\n"
+		);
+		return;
+	}
+	
+	cli_message(ch, "Resetting the EEM...\n");
+	int counter = 1e6;
+	while (counter > 0) {
+		tcpip_tick();
+		counter--;
+	}
+	pic_reset();
+    return;
+}
+
+/*
 	cli_ip_config with no arguments prints to the specified channel a list of
 	network information. With the --ip, --gateway, or --mask options, it changes
 	the current server values and copies the new values into the active 
-	server configuration. 
+	Embedded Ethernet Module (EEM) configuration. 
 */
 void cli_ip_config(cli_chan_type *ch, char *args) {
 	bool print_info = false;
 	bool print_help = false;
 	bool update = false;
-	char ip_str[31];
-	char gw_str[31];
-	char nm_str[31];
+	char ip_str[32];
+	char gw_str[32];
+	char nm_str[32];
+	uint32_t lp;
+	uint32_t tp;
 	
 	server_ip_str(ip_str);
 	server_gw_str(gw_str);
 	server_nm_str(nm_str);
+	tp = eem_config_active.telnet_port;
+	lp = eem_config_active.lwdaq_port;
 	
 	char* tok = strtok(args, " \t");
 	while (tok != NULL) {
 		if (strcmp(tok, "--ip") == 0) {
-			strcpy( ip_str, strtok(NULL, " \t"));
+			strcpy(ip_str, strtok(NULL, " \t"));
 			update = true;
-		}
-		else if (strcmp(tok, "--gateway") == 0) {
+		} else if (strcmp(tok, "--gateway") == 0) {
 			strcpy(gw_str, strtok(NULL, " \t"));
 			update = true;
-		}
-		else if (strcmp(tok, "--mask") == 0) {
-			strcpy( nm_str, strtok(NULL, " \t"));
+		} else if (strcmp(tok, "--mask") == 0) {
+			strcpy(nm_str, strtok(NULL, " \t"));
 			update = true;
-		}
-		else if (strcmp(tok, "--info") == 0) {
-			print_info = true;}
-		else if (strcmp(tok, "--help") == 0) {
+		}  else if (strcmp(tok, "--telnet-port") == 0 
+				|| strcmp(tok, "--lwdaq-port") == 0) {
+			char* val = strtok(NULL, " \t");
+			if (!val) {
+    			cli_print(ch, 
+    				"ERROR: Option '%s' requires value in %s.\n", 
+    				tok, __func__);
+        		return;
+			}
+			char *end;
+    		unsigned long p = strtoul(val, &end, 10);
+			if (*end != '\0') {
+				cli_print(ch,
+					"ERROR: Value '%s' invalid for %s in %s.\n", 
+					val, tok, __func__);
+				return;
+			}
+			if (p == 0 || p > 65535) {
+				cli_print(ch,
+					"ERROR: Value '%lu' out of range (1-65535) for %s in %s.\n", 
+					p, tok, __func__);
+				return;
+			}
+			if (strcmp(tok, "--telnet-port") == 0) {
+				tp = (uint32_t) p;
+			} else {
+				lp = (uint32_t) p;
+			}
+			update = true;
+		} else if (strcmp(tok, "--info") == 0) {
+			print_info = true;
+		} else if (strcmp(tok, "--help") == 0) {
 			print_help = true;
 		} else {
-    		cli_print(ch, "ERROR: Unrecognized option '%s' in %s.\r\n",tok, __func__);
+    		cli_print(ch, "ERROR: Unrecognized option '%s' in %s.\n", tok, __func__);
         	return;
         }
         tok = strtok(NULL, " \t");
     }
     
 	if (print_info) {
-		cli_message(ch, "List internet protocol network configuration.\r\n");
+		cli_message(ch, "List internet protocol network configuration.\n");
 		return;
 	}
 
 	if (print_help) {
 		cli_message(ch,
-			"Usage:\r\n"
-			"  ip-config [--ip] [--gateway] [--mask] [--info] [--help]\r\n"
-			"\r\n"
-			"Summary:\r\n"
-			"  Change network configuration as specified by options, then print\r\n" 
-			"  network configuration. With no options, no changes will be made.\r\n"
-			"\r\n"
-			"Options:\r\n"
-			"  --ip          Set IP address to new string 'x.x.x.x'.\r\n"
-			"  --gateway     Set gateway address to new string 'x.x.x.x'.\r\n"
-			"  --mask        Set network mask to new string 'x.x.x.x'.\r\n"
-			"  --info        Print a one-line summary of this command.\r\n"
-			"  --help        Print this help text.\r\n"
+"Usage:\n"
+"  ip-config [OPTIONS]\n"
+"\n"
+"Summary:\n"
+"  Change network configuration as specified by options, then display the network\n" 
+"  configuration. With no options, no changes will be made, but network information.\n"
+"  will still be displayed.\n"
+"\n"
+"Options:\n"
+"  --ip <addr>           Set IP address to new string 'x.x.x.x'.\n"
+"  --gateway <addr>      Set gateway address to new string 'x.x.x.x'.\n"
+"  --mask <addr>         Set network mask to new string 'x.x.x.x'.\n"
+"  --telnet-port <port>  Set the port used for the Telnet server.\n"
+"  --lwdaq-port <port>   Set the port used for the LWDAQ server.\n"
+"\n"
+"  --info                Display a one-line summary of this command. When specified,\n"
+"                        no configuration changes are made.\n"
+"  --help                Display detailed help for this command. When specified, no\n"
+"                        configuration changes are made.\n"
 		);
 		return;
 	}
 	
 	if (update) {
-		if (server_set_ip(ip_str, gw_str, nm_str) < 0) {
-			cli_message(ch,"ERROR: Failed to update IP interface.\r\n");
+		eem_config_active.telnet_port = tp;
+		eem_config_active.lwdaq_port = lp;
+		if (server_set_ip(ip_str, gw_str, nm_str) >= 0) {
+			server_ip_str(eem_config_active.ip_str);
+			server_gw_str(eem_config_active.gw_str);
+			server_nm_str(eem_config_active.nm_str);
 		} else {
-			strcpy(server_config_active.ip_str,ip_str);
-			strcpy(server_config_active.gw_str,gw_str);
-			strcpy(server_config_active.nm_str,nm_str);			
+			cli_print(ch,
+				"ERROR: Failed to update IP interface in %s.\n", __func__);
 		}
 	}
-
+	
 	server_info(ch->tx_buff);
-	cli_print(ch, "%s\r\n", ch->tx_buff);
+	cli_print(ch, "%s\n", ch->tx_buff);
 
     return;
 }
@@ -289,7 +394,7 @@ void cli_pic_info(cli_chan_type *ch, char *args) {
         } else if (strcmp(tok, "--help") == 0) {
         	print_help = true;
         } else {
-            cli_print(ch, "ERROR: Unrecognized option '%s' in %s.\r\n",
+            cli_print(ch, "ERROR: Unrecognized option '%s' in %s.\n",
             	tok, __func__);
             return;
         }
@@ -297,43 +402,43 @@ void cli_pic_info(cli_chan_type *ch, char *args) {
     }
     
 	if (print_info) {
-		cli_message(ch, "List PIC32MZ internal information.\r\n");
+		cli_message(ch, "List PIC32MZ internal information.\n");
 		return;
 	}
 
 	if (print_help) {
 		cli_message(ch,
-			"Usage:\r\n"
-			"  pic-info [--info] [--help]\r\n"
-			"\r\n"
-			"Summary:\r\n"
-			"  List internal PIC32MZ microcontroller configuration values. Provides\r\n"
-			"  no means to change any of these values.\r\n"
-			"\r\n"
-			"Options:\r\n"
-			"  --info        Print a one-line summary of this command.\r\n"
-			"  --help        Print this help text.\r\n"
+"Usage:\n"
+"  pic-info [--info] [--help]\n"
+"\n"
+"Summary:\n"
+"  List internal PIC32MZ microcontroller configuration values. Provides no means to\n"
+"  hange any of these values.\n"
+"\n"
+"Options:\n"
+"  --info        Print a one-line summary of this command.\n"
+"  --help        Print this help text.\n"
 		);
 		return;
 	}
 
  	pic_info(ch->tx_buff);
-	cli_print(ch, "%s\r\n", ch->tx_buff);
+	cli_print(ch, "%s\n", ch->tx_buff);
 
     return;
 }
 
 /*
-	cli_server_config shows or sets server configuration records. We specify
-	which we want to do: show or set. For "show", we name a configuration to
-	show, and there are three to choose from: active, flash, or factory. For
-	"set", we name a configuration to set and there is only one we can set: the
-	one in flash, which will be deployed on the next start-up. We cannot set the
-	factory configuration because it is read-only, and we cannot set the active
-	configuration because any changes to the active configuration would cause
-	the active configuration to be inaccurate.
+	cli_eem_config shows or sets Embedded Ethernet Module (EEM) configuration
+	records. We specify which we want to do: show or set. For "show", we name a
+	configuration to show, and there are three to choose from: active, flash, or
+	factory. For "set", we name a configuration to set and there is only one we
+	can set: the one in flash, which will be deployed on the next start-up. We
+	cannot set the factory configuration because it is read-only, and we cannot
+	set the active configuration because any changes to the active configuration
+	would cause the active configuration to be inaccurate.
 */
-void cli_server_config(cli_chan_type *ch, char *args) {
+void cli_eem_config(cli_chan_type *ch, char *args) {
 	enum {
 		CFG_NONE,
 		CFG_ACTIVE,
@@ -360,13 +465,13 @@ void cli_server_config(cli_chan_type *ch, char *args) {
 			if (!do_set) {
 				destination = CFG_ACTIVE;
 			} else if (destination == CFG_NONE) {
-				cli_print(ch,"ERROR: Cannot set active configuration in %s.\r\n",
+				cli_print(ch,"ERROR: Cannot set active configuration in %s.\n",
 					__func__);
 				return;
 			} else if (source == CFG_NONE) {
 				source = CFG_ACTIVE;
 			} else {
-				cli_print(ch,"ERROR: Too many configuration selectors in %s.\r\n",
+				cli_print(ch,"ERROR: Too many configuration selectors in %s.\n",
 					__func__);
 				return;
 			}		
@@ -378,7 +483,7 @@ void cli_server_config(cli_chan_type *ch, char *args) {
 			} else if (source == CFG_NONE) {
 				source = CFG_FLASH;
 			} else {
-				cli_print(ch,"ERROR: Too many configuration selectors in %s.\r\n",
+				cli_print(ch,"ERROR: Too many configuration selectors in %s.\n",
 					__func__);
 				return;
 			}
@@ -386,18 +491,18 @@ void cli_server_config(cli_chan_type *ch, char *args) {
 			if (!do_set) {
 				destination = CFG_FACTORY;
 			} else if (destination == CFG_NONE) {
-				cli_print(ch,"ERROR: Cannot set factory configuration in %s.\r\n",
+				cli_print(ch,"ERROR: Cannot set factory configuration in %s.\n",
 					__func__);
 				return;
 			} else if (source == CFG_NONE) {
 				source = CFG_FACTORY;
 			} else {
-				cli_print(ch,"ERROR: Too many configuration selectors in %s.\r\n",
+				cli_print(ch,"ERROR: Too many configuration selectors in %s.\n",
 					__func__);
 				return;
 			}
 		} else {
-			cli_print(ch, "ERROR: Unrecognized option '%s' in %s.\r\n",
+			cli_print(ch, "ERROR: Unrecognized option '%s' in %s.\n",
 				tok, __func__);
 			return;
 		}
@@ -405,100 +510,113 @@ void cli_server_config(cli_chan_type *ch, char *args) {
 	}
 	
 	if (do_set && destination == CFG_NONE) {
-		cli_print(ch, "ERROR: Set requires destination selector in %s.\r\n",
+		cli_print(ch, "ERROR: Set requires destination selector in %s.\n",
 			__func__);
 		return;
 	}
 
 	if (print_info) {
-		cli_message(ch, "Display or modify server configuration records.\r\n");
+		cli_message(ch, "Display or modify EEM configuration records.\n");
 		return;
 	}
 
 	if (print_help) {
 		cli_message(ch,
-			"Usage:\r\n"
-			"  server-config [show] [active|flash|factory]\r\n"
-			"  server-config set flash [active|flash|factory]\r\n"
-			"\r\n"
-			"Notes:\r\n"
-			"  - If no verb is specified, 'show' is assumed.\r\n"
-			"  - If no selector is specified, 'active' is assumed.\r\n"
-			"  - For 'set', the destination must be specified.\r\n"
-			"  - For 'set', the source defaults to 'active'.\r\n"
-			"  - For 'set', destination must be 'active' or 'flash'.\r\n"
-			"\r\n"
-			"Description:\r\n"
-			"  Display or modify server configuration records. If no verb is\r\n"
-			"  specified, the 'show' operation is performed on the active\r\n"
-			"  configuration.\r\n"
-			"\r\n"
-			"Verbs:\r\n"
-			"  show       Display configuration records (default).\r\n"
-			"  set        Modify a configuration record.\r\n"
-			"\r\n"
-			"Selectors:\r\n"
-			"  active     Currently active configuration.\r\n"
-			"  flash      Configuration stored in flash memory.\r\n"
-			"  factory    Factory-default configuration (read-only).\r\n"
-			"\r\n"
-			"Options:\r\n"
-			"  --info             Display a one-line summary.\r\n"
-			"  --help             Display this help text.\r\n"
+"Usage:\n"
+"  eem-config [show] [active|flash|factory]\n"
+"  eem-config set flash [active|flash|factory]\n"
+"\n"
+"Notes:\n"
+"  - If no verb is specified, 'show' is assumed.\n"
+"  - If no selector is specified, 'active' is assumed.\n"
+"  - For 'set', the destination must be specified.\n"
+"  - For 'set', the source defaults to 'active'.\n"
+"  - For 'set', destination must be 'flash'.\n"
+"\n"
+"Description:\n"
+"  Display or modify Embedded Ethernet Module (EEM) configuration records. If no\n"
+"  verb is specified, the 'show' operation is performed on the active configuration.\n"
+"  The flash configuration is the only one the 'set' operation can modify. The three\n"
+"  available configuration records are: active, flash, and factory. We can show any\n"
+"  one, but we can set only the flash record. The active configuration represents\n"
+"  the current state of the EEM. The flash configuration is the one that resides in\n"
+"  flash memory. The factory configuration is a read-only record that will be loaded\n"
+"  when the EEM boots up and sees that its host's configuration switch is depressed\n"
+"  The configuration switch initiates a 'factory reset'. The EEM will copy the\n"
+"  factory configuration to the flash configuration, load the flash configuration\n"
+"  into the active configuration, and implement the active configuration. Duruing a\n"
+"  normal start-up, in wich the configuration switch on the host is not depressed,\n"
+"  the EEM loads the flash configuration directly into the active configuration and\n"
+"  implements the active configuraiton. By this means we provide both persistent EEM\n"
+"  configuration through reset and power cycles, and also the means to restore the\n"
+"  EEM to a known state.\n"
+"\n"
+"Verbs:\n"
+"  show       Display configuration records (default).\n"
+"  set        Modify a configuration record.\n"
+"\n"
+"Selectors:\n"
+"  active     Currently active configuration.\n"
+"  flash      Configuration stored in flash memory.\n"
+"  factory    Factory-default configuration (read-only).\n"
+"\n"
+"Options:\n"
+"  --info     Display a one-line summary.\n"
+"  --help     Display this help text.\n"
 		);
 		return;
 	}
 	
     if (!do_set) {
-    	if (source == CFG_NONE) source = CFG_ACTIVE;
+    	if (destination == CFG_NONE) source = CFG_ACTIVE;
  		switch (destination) {
 			case CFG_ACTIVE: {
-				server_str_from_config(ch->tx_buff, &server_config_active);
+				server_str_from_config(ch->tx_buff, &eem_config_active);
 			}
 			break;
 			
 			case CFG_FLASH: {
-				server_config_type config;
-				server_config_read(&config); 
+				eem_config_type config;
+				eem_config_read(&config); 
 				server_str_from_config(ch->tx_buff, &config);
 			}
 			break;
 
 			case CFG_FACTORY: {
-				server_str_from_config(ch->tx_buff, &server_config_factory);
+				server_str_from_config(ch->tx_buff, &eem_config_factory);
 			}
 			break;
 		}
-		cli_print(ch, "%s\r\n", ch->tx_buff);
+		cli_print(ch, "%s\n", ch->tx_buff);
     } else {
     	if (source == CFG_NONE) source = CFG_ACTIVE;
 		if (source == destination) {
-			cli_print(ch, "Configuration unchanged, source = destination in %s.\r\n",
+			cli_print(ch, "Configuration unchanged, source = destination in %s.\n",
 				__func__);
 			return;
 		}
 		if (destination == CFG_FLASH) {
 			if (source == CFG_FACTORY) {
-				server_config_write(&server_config_factory);
+				eem_config_write(&eem_config_factory);
 				console_print(
-					"Copied factory configuration to flash in %s.\r\n", __func__);
+					"Copied factory configuration to flash in %s.\n", __func__);
 			}
 			if (source == CFG_ACTIVE) {
-				server_config_write(&server_config_active);
+				eem_config_write(&eem_config_active);
 				console_print(
-					"Copied active configuration to flash in %s.\r\n", __func__);
+					"Copied active configuration to flash in %s.\n", __func__);
 			}
 		}
 		if (destination == CFG_ACTIVE) {
 			if (source == CFG_FACTORY) {
-				server_config_active = server_config_factory;
+				eem_config_active = eem_config_factory;
 				console_print(
-					"Copied factory configuration to active in %s.\r\n", __func__);
+					"Copied factory configuration to active in %s.\n", __func__);
 			}
 			if (source == CFG_FLASH) {
-				server_config_read(&server_config_active);
+				eem_config_read(&eem_config_active);
 				console_print(
-					"Copied flash configuration to active in %s.\r\n", __func__);
+					"Copied flash configuration to active in %s.\n", __func__);
 			}
 		}
 	}
@@ -513,27 +631,10 @@ void cli_server_config(cli_chan_type *ch, char *args) {
 */
 void cli_initialize(void) {
 	cli_cmd_register("help",cli_help);
+	cli_cmd_register("reset",cli_reset);
+	cli_cmd_register("eem-config",cli_eem_config);
 	cli_cmd_register("ip-config",cli_ip_config);
 	cli_cmd_register("pic-info",cli_pic_info);
-	cli_cmd_register("server-config",cli_server_config);
-}
-
-/*
-	cli_start starts up a new command-line interpreter. We pass it a completed
-	channel structure. It clears the receive buffer in this structure and it
-	prints an introductory message. With any luck we have already called the CLI
-	initialization routine by the time we start this CLI, so the help command
-	will be installed in all CLI server.
-*/
-void cli_start(cli_chan_type* ch) {
-	ch->rx_len = 0;
-	ch->rx_buff[0] = '\0';
-	ch->echo = false;
-	cli_print(ch, "===========================================================\r\n");
-	cli_print(ch, "=========    Embedded Ethernet Module (A3053)     =========\r\n");
-	cli_print(ch, "===========================================================\r\n");
-	cli_print(ch, "Command-line interpreter running, try 'help' for help.\r\n");
-	cli_print(ch, "$ ");
 }
 
 /*
@@ -571,13 +672,29 @@ void cli_server(cli_chan_type *ch) {
     static char args[CLI_ARGS_SIZE];
 	
 
-	// Read all available bytes into the channel's receive buffer.
+	// Read all available bytes into the channel's receive buffer. We execute
+	// backspace and delete immediately we see them. If echo is enabled, we echo
+	// all characters, with backspace and delete being echoed as "backspace
+	// space backspace" in order to remove the most-recently echoed character
+	// from view.
     while (ch->rx_len < CLI_RX_SIZE - 1) {
     	int c = ch->getchar(ch->context);
-    	if (c < 0) break;
-		ch->rx_buff[ch->rx_len] = (char) c;
-		ch->rx_len++;
-		ch->rx_buff[ch->rx_len] = '\0';
+    	if (c < 0) {
+    		break;
+		} else if (c == '\b' || c == 0x7F) {
+			if (ch->rx_len > 0) {
+				ch->rx_len--;
+				ch->rx_buff[ch->rx_len] = '\0';
+			}
+			if (ch->echo) {
+				cli_message(ch->context, "\nBACKSPACE");
+			}
+		} else {
+			ch->rx_buff[ch->rx_len] = (char) c;
+			ch->rx_len++;
+			ch->rx_buff[ch->rx_len] = '\0';
+			if (ch->echo) ch->putchar(ch->context, c);
+		}
     }
 
 	// If we have no characters at all, return now.
@@ -586,7 +703,7 @@ void cli_server(cli_chan_type *ch) {
 	// If the buffer has overflowed, reset it and report an error.
 	if (ch->rx_len >= CLI_RX_SIZE) {
 		cli_print(ch,"ERROR: Receive buffer overflow, "
-			"discarding all characters in %s.\r\n", ch->name);
+			"discarding all characters in %s.\n", ch->name);
 		ch->rx_len = 0;
 		ch->rx_buff[0] = '\0';
 		return;
@@ -622,9 +739,9 @@ void cli_server(cli_chan_type *ch) {
 	// Now we normalize the line by executing backspace and delete characters. We
 	// make sure we treat characters we read from the receive buffer as unsigned
 	// values so that we can compare them to ASCII decimal values. Each time we read
-	// a printable character, we add it to the normalized string. Each time we see
-	// backspace or delete, we remove the previous character. We add a new null
-	// terminator at the end.
+	// a printable character, we add it to the normalized string. Backspaces and
+	// deletes should have been implemented and eliminated from the string by now,
+	// but we look out for them anyway. We add a new null terminator at the end.
     char *src = ch->rx_buff;
     char *dst = ch->rx_buff;
     while (*src != '\0') {
@@ -651,7 +768,7 @@ void cli_server(cli_chan_type *ch) {
 			&& ch->rx_buff[p] != '\t') {
 		if (t >= sizeof(cmd) - 1) {
 			cli_print(ch,"ERROR: Command name buffer overflow, "
-				"discarding all characters in %s.\r\n", ch->name);
+				"discarding all characters in %s.\n", ch->name);
 			ch->rx_len = 0;
 			ch->rx_buff[0] = '\0';
 			return;
@@ -672,7 +789,7 @@ void cli_server(cli_chan_type *ch) {
 	while (ch->rx_buff[p] != '\0') {
 		if (l >= sizeof(args) - 1) {
 			cli_print(ch,"ERROR: Argument list buffer overflow, "
-				"discarding all characters in %s.\r\n", ch->name);
+				"discarding all characters in %s.\n", ch->name);
 			ch->rx_len = 0;
 			ch->rx_buff[0] = '\0';
 			return;
@@ -683,9 +800,6 @@ void cli_server(cli_chan_type *ch) {
 	}
 	args[l] = '\0';
 	
-	// In debug mode, we report the command, arguments, and channel name.
-    if (debug) console_print("[%s] %s %s\r\n", ch->name, cmd, args);
-
 	// Shift any remaining characters all the way to the start of the receive
 	// buffer. We will deal with them the next time we call this routine.
 	uint32_t shift = eol + consume;
@@ -705,7 +819,7 @@ void cli_server(cli_chan_type *ch) {
     cli_cmd_proc proc = NULL;
 	proc = cli_cmd_find(cmd);
     if (proc == NULL) {
-        cli_print(ch, "ERROR: Unknown command '%s' in %s.\r\n", cmd, __func__);
+        cli_print(ch, "ERROR: Unknown command '%s' in %s.\n", cmd, __func__);
 	    cli_message(ch, prompt);
         return;
     }
