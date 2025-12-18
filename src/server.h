@@ -195,6 +195,8 @@ typedef enum {
 	server will restart. When we chanage the IP address or port number at which
 	we want the server to listen, we must close the server sockets and re-open
 	them again so they will be bound to the new IP address and port number. The
+	last_tick field records the time when a byte was last received on the
+	socket. We use this in the server state machine to implement a timeout. The
 	only feature of the server that is not encoded in this structure is the
 	protocol task procedure, which we pass into the server routine as a separate
 	argument.
@@ -205,7 +207,9 @@ typedef struct {
  	tcpip_server_state_type state;
 	uint16_t* port_ptr;
 	uint16_t bound_port;
-	IPV4_ADDR bound_ip_addr;
+	char* ip_str;
+	char bound_ip_str[EEM_CONFIG_STR_SIZE];
+	uint32_t last_tick;
 } tcpip_server_type;
 
 /*
@@ -238,5 +242,13 @@ typedef int (*tcpip_tasks_type)(tcpip_server_type* s);
 	machine of its own.
 */
 void tcpip_server(tcpip_server_type* s, tcpip_tasks_type tasks);
+
+/*
+	Command-Line Interpreter (CLI) procedures that can be registered with our CLI
+	to add server functions.
+*/
+#include "cli.h"
+void cli_ip_config(cli_chan_type *ch, char *args);
+void cli_eem_config(cli_chan_type *ch, char *args);
 
 #endif

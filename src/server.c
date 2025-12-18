@@ -386,11 +386,16 @@ void ping_gateway(void) {
 }
 
 /*
-	server_set_ip reconfigures the network interface with a new IP address, a new
-	gateway address, and a new network mask. We pass it three strings that specify
-	these three IP addresses, and the routine translates these into IPV4_ADDR types
-	and applies them. It also makes sure that DHCP is turned off. Once it is done,
-	it records the new IP values in the active EEM configuration.
+	server_set_ip reconfigures the network interface with a new IP address, a
+	new gateway address, and a new network mask. We pass it three strings that
+	specify these three IP addresses. The routine checks all three strings to
+	make sure they are formatted correctly. It makes sure DHCP is turned off, so
+	as to ensure that the TCP/IP stack will accept a static IP address. It
+	applies all three addresses. It does not need to, nor does it attempt to,
+	re-start the stack. Once it is done, the routine records the new IP values
+	in the active EEM configuration. Any servers running on the EEM within the
+	server_task procedure will detect a change in the active EEM configuration
+	IP address and restart automatically.
 */
 int server_set_ip(const char* ip_str, const char* gw_str, const char* nm_str) {
 	IPV4_ADDR ip_addr;
@@ -410,12 +415,14 @@ int server_set_ip(const char* ip_str, const char* gw_str, const char* nm_str) {
 		console_print("ERROR: Invalid mask '%s' in %s.\n", nm_str, __func__);
 		return -1;
 	}
+	
 	net_hdl = TCPIP_STACK_IndexToNet(0);
 	if (net_hdl == 0) {
 		console_print("ERROR: Failed to obtain interface handle in %s.\n", __func__);
 		return -1;
 	}
 	TCPIP_DHCP_Disable(net_hdl);
+	
 	if (!TCPIP_STACK_NetAddressSet(net_hdl, &ip_addr, &mask_addr, true)) {
 		console_print("ERROR: Failed to set IP address in %s.\n", __func__);
 		return -1;
@@ -586,25 +593,24 @@ int server_info(char* out) {
 /*
 	tcpip_server_restart checks to see if the network interface's IP address or
 	assigned TCP port has been changed since a server started listening for
-	connections, or started serving a connection. It compares the IP address and
-	port saved in the server record with the current IP address asserted by the
-	TCP/IP stack. It compares the TCP port pointed to by the server record's
-	port pointer to the one saved in the server record. The port pointed to
-	should be the one assigned to the server in the EEM active configuration. If
-	either differ, it closes the existing listening or connected socket, marks
-	the socket as invalid, calls the TCP/IP maintenance routine a few times to
-	make sure the new IP address propagates through the stack, and returns true.
-	Otherwise it returns false.
+	connections, or started serving a connection. It compares its bound IP
+	address to the address pointed to by its address pointer, and it compares
+	its bound TCP port to the port pointed to by its port pointer. If either
+	disagree with one another, this routine closes the existing listening or
+	connected socket, marks the socket as invalid, calls the TCP/IP maintenance
+	routine a few times to make sure changes in TCP/IP settings propagate
+	through the stack, and returns true. Otherwise it returns false. Note that
+	the routine does not query the TCP/IP stack to obtain the current IP
+	address. It assumes that the values pointed to by its address and port
+	pointers are accurate. This will be the case if they point to the active EEM
+	configuration, and provided any process that updates the EEM's IP address,
+	or the port number of any of its servers, also updates the active EEM
+	configuration.
 */
 bool tcpip_server_restart(tcpip_server_type* server) {
-	TCPIP_NET_HANDLE net_hdl;
-	IPV4_ADDR current_ip;
 	bool restart = false;
 
-	net_hdl = TCPIP_STACK_IndexToNet(0);
-	current_ip.Val = TCPIP_STACK_NetAddress(net_hdl);
-
-	if (current_ip.Val != server->bound_ip_addr.Val) {
+	if (strcmp(server->ip_str, &server->bound_ip_str[0]) != 0) {
 		console_print("IP address change detected, restarting %s server.\n",
 			server->protocol);
 		restart = true;
@@ -737,15 +743,9 @@ void tcpip_server(tcpip_server_type* server, tcpip_tasks_type tasks) {
 		case S_WAIT_IP: {
 			net_hdl = TCPIP_STACK_IndexToNet(0);
 			if (TCPIP_STACK_NetIsReady(net_hdl)) {
-				server->bound_ip_addr.Val = TCPIP_STACK_NetAddress(net_hdl);
-				console_print(
-					"%s server assigned IP address %d.%d.%d.%d in %s.\n", 
-					server->protocol,
-					server->bound_ip_addr.v[0], 
-					server->bound_ip_addr.v[1], 
-					server->bound_ip_addr.v[2], 
-					server->bound_ip_addr.v[3],
-					__func__);
+				server_ip_str(server->bound_ip_str);
+				console_print("%s server assigned IP address %s in %s.\n", 
+					server->protocol, server->bound_ip_str, __func__);
 				if (!ping_sent) {
 					ping_gateway();
 					ping_sent = true;
@@ -761,26 +761,14 @@ void tcpip_server(tcpip_server_type* server, tcpip_tasks_type tasks) {
 				*server->port_ptr, 0);
 			server->bound_port = *server->port_ptr;
 			if (server->socket == INVALID_SOCKET) {
-				if (debug) console_print(
-					"Failed to open %s server on %d.%d.%d.%d:%d in %s.\n",
-					server->protocol, 
-					server->bound_ip_addr.v[0], 
-					server->bound_ip_addr.v[1], 
-					server->bound_ip_addr.v[2], 
-					server->bound_ip_addr.v[3],
-					server->bound_port, 
-					__func__);
+				if (debug) console_print("Failed to open %s server on %s:%d in %s.\n",
+					server->protocol, server->bound_ip_str,
+					server->bound_port, __func__);
 				server->state = S_ERROR;
 			} else {
-				if (debug) console_print(
-					"Listening for %s connection on %d.%d.%d.%d:%d in %s.\n",
-					server->protocol, 
-					server->bound_ip_addr.v[0], 
-					server->bound_ip_addr.v[1], 
-					server->bound_ip_addr.v[2], 
-					server->bound_ip_addr.v[3],
-					server->bound_port, 
-					__func__);
+				if (debug) console_print("Listening for %s connection on %s:%d in %s.\n",
+					server->protocol, server->bound_ip_str,
+					server->bound_port, __func__);
 				server->state = S_LISTENING;
 			}
 		}
@@ -792,6 +780,7 @@ void tcpip_server(tcpip_server_type* server, tcpip_tasks_type tasks) {
 			} else if (TCPIP_TCP_IsConnected(server->socket)) {
 				if (TCPIP_TCP_SocketInfoGet(server->socket, &sock_info)) {
 					IPV4_ADDR ip = sock_info.remoteIPaddress.v4Add;
+					server->last_tick = SYS_TMR_TickCountGet();
 					if (debug) console_print(
 						"%s connection from %u.%u.%u.%u in %s.\n",
 						server->protocol, ip.v[0], ip.v[1], ip.v[2], ip.v[3], __func__);
@@ -822,6 +811,18 @@ void tcpip_server(tcpip_server_type* server, tcpip_tasks_type tasks) {
 					server->protocol, __func__);
 				server->state = S_CLOSE;
 			} else {
+				if (TCPIP_TCP_GetIsReady(server->socket) > 0) {
+					server->last_tick = SYS_TMR_TickCountGet();
+				}
+				if (eem_config_active.tcp_timeout > 0) {
+					if (SYS_TMR_TickCountGet() - server->last_tick 
+						>  (eem_config_active.tcp_timeout * 1000u)) {
+						if (debug) console_print(
+							"%s server timeout, closing socket in %s.\n",
+							server->protocol, __func__);			
+						server->state = S_CLOSE;
+					}
+				}
 				status = tasks(server);
 				if (status < 0) {
 					if (debug) console_print("%s socket closed by server in %s.\n",
@@ -851,6 +852,335 @@ void tcpip_server(tcpip_server_type* server, tcpip_tasks_type tasks) {
 		}
 		break;
 	}
+}
+
+/*
+	cli_ip_config is a CLI procedure that displays TCP/IP interface parameters
+	and allows us to set TCP/IP interface parameters as well. With the --ip,
+	--gateway, or --mask options, it sets the current server IP address, gateway
+	address, and network masks respectively. With the --telnet-port and
+	--lwdaq-port options, it changes the ports associated with these two
+	protocol servers. It updates the active EEM configuration after making any
+	such changes, which allows servers to restart automatically, because the 
+	servers monitor the active configuration for changes.
+*/
+void cli_ip_config(cli_chan_type *ch, char *args) {
+	bool print_info = false;
+	bool print_help = false;
+	bool update = false;
+	char ip_str[32];
+	char gw_str[32];
+	char nm_str[32];
+	uint32_t lp;
+	uint32_t tp;
+	
+	server_ip_str(ip_str);
+	server_gw_str(gw_str);
+	server_nm_str(nm_str);
+	tp = eem_config_active.telnet_port;
+	lp = eem_config_active.lwdaq_port;
+	
+	char* tok = strtok(args, " \t");
+	while (tok != NULL) {
+		if (strcmp(tok, "--ip") == 0) {
+			strcpy(ip_str, strtok(NULL, " \t"));
+			update = true;
+		} else if (strcmp(tok, "--gateway") == 0) {
+			strcpy(gw_str, strtok(NULL, " \t"));
+			update = true;
+		} else if (strcmp(tok, "--mask") == 0) {
+			strcpy(nm_str, strtok(NULL, " \t"));
+			update = true;
+		}  else if (strcmp(tok, "--telnet-port") == 0 
+				|| strcmp(tok, "--lwdaq-port") == 0) {
+			char* val = strtok(NULL, " \t");
+			if (!val) {
+    			cli_print(ch, 
+    				"ERROR: Option '%s' requires value in %s.\n", 
+    				tok, __func__);
+        		return;
+			}
+			char *end;
+    		unsigned long p = strtoul(val, &end, 10);
+			if (*end != '\0') {
+				cli_print(ch,
+					"ERROR: Value '%s' invalid for %s in %s.\n", 
+					val, tok, __func__);
+				return;
+			}
+			if (p == 0 || p > 65535) {
+				cli_print(ch,
+					"ERROR: Value '%lu' out of range (1-65535) for %s in %s.\n", 
+					p, tok, __func__);
+				return;
+			}
+			if (strcmp(tok, "--telnet-port") == 0) {
+				tp = (uint32_t) p;
+			} else {
+				lp = (uint32_t) p;
+			}
+			update = true;
+		} else if (strcmp(tok, "--info") == 0) {
+			print_info = true;
+		} else if (strcmp(tok, "--help") == 0) {
+			print_help = true;
+		} else {
+    		cli_print(ch, "ERROR: Unrecognized option '%s' in %s.\n", tok, __func__);
+        	return;
+        }
+        tok = strtok(NULL, " \t");
+    }
+    
+	if (print_info) {
+		cli_message(ch, "List internet protocol network configuration.\n");
+		return;
+	}
+
+	if (print_help) {
+		cli_message(ch,
+"Usage:\n"
+"  ip-config [OPTIONS]\n"
+"\n"
+"Summary:\n"
+"  Change network configuration as specified by options. With no options, no changes\n"
+"  will be made. Instead, a network information table will be displayed.\n"
+"\n"
+"Options:\n"
+"  --ip <addr>           Set IP address to new string 'x.x.x.x'.\n"
+"  --gateway <addr>      Set gateway address to new string 'x.x.x.x'.\n"
+"  --mask <addr>         Set network mask to new string 'x.x.x.x'.\n"
+"  --telnet-port <port>  Set the port used for the Telnet server.\n"
+"  --lwdaq-port <port>   Set the port used for the LWDAQ server.\n"
+"  --info                Display a one-line summary of this command. When specified,\n"
+"                        no configuration changes are made.\n"
+"  --help                Display detailed help for this command. When specified, no\n"
+"                        configuration changes are made.\n"
+		);
+		return;
+	}
+	
+	if (update) {
+		eem_config_active.telnet_port = tp;
+		eem_config_active.lwdaq_port = lp;
+		if (server_set_ip(ip_str, gw_str, nm_str) >= 0) {
+			server_ip_str(eem_config_active.ip_str);
+			server_gw_str(eem_config_active.gw_str);
+			server_nm_str(eem_config_active.nm_str);
+		} else {
+			cli_print(ch,
+				"ERROR: Failed to update IP interface in %s.\n", __func__);
+		}
+	} else {	
+		server_info(ch->tx_buff);
+		cli_print(ch, "%s\n", ch->tx_buff);
+	}
+	
+    return;
+}
+
+/*
+	cli_eem_config is a CLI command procedure that shows or sets Embedded
+	Ethernet Module (EEM) configuration records. We can register it with the CLI
+	using the CLI command registration routine. We suggest the name "eem-config"
+	in the CLI. When we call the procedure from the CLI, we specify "show" or
+	"set". For "show", we name a target EEM configuration to show. There are
+	three to choose from: active, flash, or factory. For "set", we name a target
+	configuration to set. There is only one we can set: the one in flash, which
+	will be deployed on the next start-up. We cannot set the factory
+	configuration because it is read-only. We cannot set the active
+	configuration with such a copy operation because doing so would render the
+	active configuration inaccurate. The active EEM configuration is supposed to
+	reflect the actual current state of the EEM.
+*/
+void cli_eem_config(cli_chan_type *ch, char *args) {
+	enum {
+		CFG_NONE,
+		CFG_ACTIVE,
+		CFG_FLASH,
+		CFG_FACTORY
+	};
+	int target = CFG_NONE;
+	int source = CFG_NONE;
+    bool do_set = false;
+    bool print_info = false;
+    bool print_help = false;
+	
+	char* tok = strtok(args, " \t");
+	while (tok != NULL) {
+		if (strcmp(tok, "--info") == 0) {
+			print_info = true;
+		} else if (strcmp(tok, "--help") == 0) {
+			print_help = true;
+		} else if (strcmp(tok, "show") == 0) {
+			do_set = false;
+		} else if (strcmp(tok, "set") == 0) {
+			do_set = true;
+		} else if (strcmp(tok, "active") == 0) {
+			if (!do_set) {
+				target = CFG_ACTIVE;
+			} else if (target == CFG_NONE) {
+				cli_print(ch,"ERROR: Cannot set active configuration in %s.\n",
+					__func__);
+				return;
+			} else if (source == CFG_NONE) {
+				source = CFG_ACTIVE;
+			} else {
+				cli_print(ch,"ERROR: Too many configuration selectors in %s.\n",
+					__func__);
+				return;
+			}		
+    	} else if (strcmp(tok, "flash") == 0) {
+			if (!do_set) {
+				target = CFG_FLASH;
+			} else if (target == CFG_NONE) {
+				target = CFG_FLASH;
+			} else if (source == CFG_NONE) {
+				source = CFG_FLASH;
+			} else {
+				cli_print(ch,"ERROR: Too many configuration selectors in %s.\n",
+					__func__);
+				return;
+			}
+		} else if (strcmp(tok, "factory") == 0) {
+			if (!do_set) {
+				target = CFG_FACTORY;
+			} else if (target == CFG_NONE) {
+				cli_print(ch,"ERROR: Cannot set factory configuration in %s.\n",
+					__func__);
+				return;
+			} else if (source == CFG_NONE) {
+				source = CFG_FACTORY;
+			} else {
+				cli_print(ch,"ERROR: Too many configuration selectors in %s.\n",
+					__func__);
+				return;
+			}
+		} else {
+			cli_print(ch, "ERROR: Unrecognized option '%s' in %s.\n",
+				tok, __func__);
+			return;
+		}
+		tok = strtok(NULL, " \t");
+	}
+	
+	if (do_set && target == CFG_NONE) {
+		cli_print(ch, "ERROR: Set requires target configuration selector in %s.\n",
+			__func__);
+		return;
+	}
+
+	if (print_info) {
+		cli_message(ch, "Display or modify EEM configuration records.\n");
+		return;
+	}
+
+	if (print_help) {
+		cli_message(ch,
+"Usage:\n"
+"  eem-config [show] [active|flash|factory]\n"
+"  eem-config set flash [active|flash|factory]\n"
+"\n"
+"Notes:\n"
+"  - If no verb is specified, 'show' is the assumed verb.\n"
+"  - If no target is specified, 'active' is the assumed target.\n"
+"  - For 'set', the target configuration must be specified.\n"
+"  - For 'set', the source defaults to 'active'.\n"
+"  - For 'set', destination must be 'flash'.\n"
+"\n"
+"Description:\n"
+"  Display or modify Embedded Ethernet Module (EEM) configuration records. If no\n"
+"  verb is specified, the 'show' operation is performed on the active configuration.\n"
+"  The flash configuration is the only one the 'set' operation can modify. The three\n"
+"  available configuration records are: active, flash, and factory. We can show any\n"
+"  one, but we can set only the flash record. The active configuration represents\n"
+"  the current state of the EEM. The flash configuration is the one that resides in\n"
+"  flash memory. The factory configuration is a read-only record that will be loaded\n"
+"  when the EEM boots up and sees that its host's configuration switch is depressed\n"
+"  The configuration switch initiates a 'factory reset'. The EEM will copy the\n"
+"  factory configuration to the flash configuration, load the flash configuration\n"
+"  into the active configuration, and implement the active configuration. During a\n"
+"  normal start-up, in wich the configuration switch on the host is not depressed,\n"
+"  the EEM loads the flash configuration directly into the active configuration and\n"
+"  implements the active configuraiton. By this means we provide both persistent EEM\n"
+"  configuration through reset and power cycles, and also the means to restore the\n"
+"  EEM to a known state.\n"
+"\n"
+"Verbs:\n"
+"  show       Display configuration records (default).\n"
+"  set        Modify a configuration record.\n"
+"\n"
+"Selectors:\n"
+"  active     Currently active configuration.\n"
+"  flash      Configuration stored in flash memory.\n"
+"  factory    Factory-default configuration (read-only).\n"
+"\n"
+"Options:\n"
+"  --info     Display a one-line summary.\n"
+"  --help     Display this help text.\n"
+		);
+		return;
+	}
+	
+    if (!do_set) {
+    	if (target == CFG_NONE) target = CFG_ACTIVE;
+ 		switch (target) {
+			case CFG_ACTIVE: {
+				server_str_from_config(ch->tx_buff, &eem_config_active);
+			}
+			break;
+			
+			case CFG_FLASH: {
+				eem_config_type config;
+				eem_config_read(&config); 
+				server_str_from_config(ch->tx_buff, &config);
+			}
+			break;
+
+			case CFG_FACTORY: {
+				server_str_from_config(ch->tx_buff, &eem_config_factory);
+			}
+			break;
+			
+			default: {
+				cli_print(ch, "ERROR: Unknown target in %s.\n", __func__);
+			}
+			break;
+		}
+		cli_print(ch, "%s\n", ch->tx_buff);
+    } else {
+    	if (source == CFG_NONE) source = CFG_ACTIVE;
+		if (source == target) {
+			cli_print(ch, "Configuration unchanged, source = target in %s.\n",
+				__func__);
+			return;
+		}
+		if (target == CFG_FLASH) {
+			if (source == CFG_FACTORY) {
+				eem_config_write(&eem_config_factory);
+				console_print(
+					"Copied factory configuration to flash in %s.\n", __func__);
+			}
+			if (source == CFG_ACTIVE) {
+				eem_config_write(&eem_config_active);
+				console_print(
+					"Copied active configuration to flash in %s.\n", __func__);
+			}
+		}
+		if (target == CFG_ACTIVE) {
+			if (source == CFG_FACTORY) {
+				eem_config_active = eem_config_factory;
+				console_print(
+					"Copied factory configuration to active in %s.\n", __func__);
+			}
+			if (source == CFG_FLASH) {
+				eem_config_read(&eem_config_active);
+				console_print(
+					"Copied flash configuration to active in %s.\n", __func__);
+			}
+		}
+	}
+	
+    return;
 }
 
 

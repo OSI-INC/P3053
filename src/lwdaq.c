@@ -79,7 +79,8 @@ tcpip_server_type lwdaq_server = {
     .state = S_WAIT_STACK,
     .port_ptr = NULL,
     .bound_port = 0,
-    .bound_ip_addr = { .Val = 0 }
+    .ip_str = NULL,
+    .bound_ip_str = "0.0.0.0"
 };
 	
 /*
@@ -262,7 +263,6 @@ int lwdaq_handle_message(TCP_SOCKET s, uint32_t id, uint32_t len, uint8_t* conte
 	static uint8_t tx_buff[TCP_TX_BUFF_SIZE];
 	uint32_t i = 0;
 	static int logged_in = 0;
-	static int security_level = 0;
 	static char password[32] = "LWDAQ";
 	static char config_str[LWDAQ_CONFIG_LENGTH];
 	static eem_config_type config;
@@ -355,7 +355,7 @@ int lwdaq_handle_message(TCP_SOCKET s, uint32_t id, uint32_t len, uint8_t* conte
 
 		case CONFIG_READ:{
 			if (debug) console_print("CONFIG_READ in %s.\n", __func__);
-			if ((logged_in==1) || (security_level==0)) {
+			if ((logged_in==1) || (eem_config_active.security_level==0)) {
 				lwdaq_str_from_config(config_str, &eem_config_active);
 			  	lwdaq_data_return(s, (uint8_t*) config_str, strlen(config_str));
 				if (debug) console_print(
@@ -370,7 +370,7 @@ int lwdaq_handle_message(TCP_SOCKET s, uint32_t id, uint32_t len, uint8_t* conte
 
 		case CONFIG_WRITE:{
 			if (debug) console_print("CONFIG_WRITE in %s.\n",__func__);
-			if ((logged_in==1) || (security_level==0)) {
+			if ((logged_in==1) || (eem_config_active.security_level==0)) {
 				if (len<LWDAQ_CONFIG_LENGTH) {
 					if (debug) console_print("Accepted: config %d characters.\n",len);
 					content[len]=0x00;

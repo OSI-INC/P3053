@@ -38,10 +38,14 @@
 #include "console.h"
 #include "server.h"
 
-// LWDAQ Controller register addresses on the MPCIE bus.
+/*
+	LWDAQ Controller register addresses on the MPCIE bus.
+*/
 #define LWDAQ_CONFIG_ADDR 40
 
-// LWDAQ Server routines and configuration.
+/*
+	LWDAQ Server routines and configuration.
+*/
 extern tcpip_server_type lwdaq_server;
 int lwdaq_tasks(tcpip_server_type* s);
 

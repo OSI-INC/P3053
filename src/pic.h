@@ -25,6 +25,12 @@
 #define PIC_H
 
 /*
+	We need the CLI declarations for the CLI channel types. These are used by the
+	PIC command procedures we declare below.
+*/
+#include "cli.h"
+
+/*
 	These routines turn on, turn off, and toggle D2 and D5. We declare them as
 	static inline so they can be fast, which we like when we use these outputs
 	as test points.
@@ -283,7 +289,7 @@ void pic_info(char* out);
 /*
 	Generic UART2 communication routines. Each of these takes a context pointer
 	argument that allows it to be used with channel descriptors, such as our
-	command-line interpreter (CLI) uses to manage communication with a generic
+	Command-Line Interpreter (CLI) uses to manage communication with a generic
 	channel. These context pointers are not used by our UART2 routines, because
 	the channel they use is always the same channel.
 */
@@ -293,5 +299,12 @@ int uart2_getchar(void *context);
 int uart2_write(void *context, const uint8_t* buff, uint32_t len);
 int uart2_putchar(void *context, char c);
 int uart2_flush(void *context);
+
+/*
+	cli_pic_info is a CLI interface for PIC details.
+*/
+void cli_reset(cli_chan_type *ch, char *args);
+void cli_mpcie(cli_chan_type *ch, char *args);
+void cli_pic_info(cli_chan_type *ch, char *args);
 
 #endif

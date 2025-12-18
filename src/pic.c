@@ -28,7 +28,10 @@
 #include <string.h>
 #include "configuration.h"
 #include "definitions.h"
+#include "utils.h"
 #include "console.h"
+#include "server.h"
+#include "cli.h"
 #include "pic.h"
 
 /*
@@ -328,7 +331,7 @@ void pic_info(char* out) {
 	uart2_readcount returns the number of bytes that are available in the UART2
 	input buffer. It takes as an argument a generic pointer, which allows the
 	routine to be used in generic channel-descriptor records, such as those used
-	by our command-line interpreter (CLI). Our UART2 routines make no use of
+	by our Command-Line Interpreter (CLI). Our UART2 routines make no use of
 	this pointer, so they mark it as "void" to stop a compiler warning about an
 	unused variable.
 */
@@ -407,3 +410,223 @@ int uart2_flush(void *context) {
     while (U2STAbits.TRMT == 0) { ; }
     return 0;
 }
+
+/*
+	cli_reset is a Command-Line Interpreter (CLI) procedure that performs a
+	software reset of the Embedded Ethernet Module (EEM). It notifies the client
+	on the CLI that the reset is about to take place, waits for a fraction of a
+	second to make sure this announcement propagates, and resets the PIC32MZ.
+*/
+void cli_reset(cli_chan_type *ch, char *args) {
+	bool print_info = false;
+	bool print_help = false;
+	char* tok = strtok(args, " \t");
+
+	while (tok != NULL) {
+ 		if (strcmp(tok, "--info") == 0) {print_info = true;} 
+ 		else if (strcmp(tok, "--help") == 0) {print_help = true;} 
+ 		else {
+            cli_print(ch, "ERROR: Unrecognized option '%s' in %s.\n", tok, __func__);
+            return;
+        }
+        tok = strtok(NULL, " \t");
+    }
+    
+	if (print_info) {
+		cli_message(ch, "Initiate a software reset of the EEM.\n");
+		return;
+	}
+
+	if (print_help) {
+		cli_message(ch,
+"Usage:\n"
+"  reset [--info] [--help]\n"
+"\n"
+"Summary:\n"
+"  Performs a software reset of the Embedded Ethernet Module (EEM). With no options,\n"
+"  the command prints a reset notification. It waits for a quarter-second before\n"
+"  initiating the reset.\n"
+"\n"
+"Options:\n"
+"  --info        Print a one-line summary of this command.\n"
+"  --help        Print this help text.\n"
+		);
+		return;
+	}
+	
+	cli_message(ch, "Resetting the EEM...\n");
+	int counter = 1e6;
+	while (counter > 0) {
+		tcpip_tick();
+		counter--;
+	}
+	pic_reset();
+    return;
+}
+
+/*
+	cli_mpcie is a Command-Line Interpreter (CLI) procedure that reads and
+	writes form the MPCIE bus. We can install this procedure in the CLI and so
+	gain access to the MPCIE bus with byte-wize reads and writes.
+*/
+void cli_mpcie(cli_chan_type *ch, char *args) {
+	bool print_info = false;
+	bool print_help = false;
+	bool decimal_format = false;
+	bool write_access = false;
+	bool addr_received = false;
+	uint8_t addr = 0;
+	uint8_t val = 0;
+	uint8_t data[64];
+	uint8_t data_len = 0;
+	uint8_t read_len = 1;
+	
+	char* tok = strtok(args, " \t");
+	while (tok != NULL) {
+ 		if (strcmp(tok, "--info") == 0) {
+ 			print_info = true;
+ 		} else if (strcmp(tok, "--help") == 0) {
+ 			print_help = true;
+ 		} else if (strcmp(tok, "--decimal") == 0) {
+ 			decimal_format = true;
+ 		} else if (strcmp(tok, "read") == 0 || strcmp(tok, "write") == 0) {
+			if (strcmp(tok, "write") == 0) write_access = true;
+ 			tok = strtok(NULL, " \t");
+ 			if (!parse_uint8(tok, &addr)) {
+ 				cli_print(ch, "ERROR: Invalid address '%s' in %s.\r\n", tok, __func__);
+				return;
+			} 
+			addr_received = true;
+ 		} else if (parse_uint8(tok, &val) && addr_received) {
+ 			if (write_access) {
+ 				data[data_len] = val;
+ 				data_len++;
+ 				if (data_len > 64) {
+ 					cli_print(ch, "ERROR: More than 64 data bytes in %s.\n", __func__);
+            		return;
+ 				}
+ 			} else {
+ 				read_len = val;
+ 			}
+ 		} else {
+            cli_print(ch, "ERROR: Unrecognized option '%s' in %s.\n", tok, __func__);
+            return;
+        }
+        tok = strtok(NULL, " \t");
+    }
+    
+	if (print_info) {
+		cli_message(ch, "Read and write from the eight-bit MPCIE bus.\n");
+		return;
+	}
+
+	if (print_help) {
+		cli_message(ch,
+"Usage:\n"
+"  mpcie [read] <addr> [length] [--decimal] [--info] [--help]\n"
+"  mpcie write <addr> [--info] [--help] <value> [value...]\n"
+"\n"
+"Summary:\n"
+"  Reads to and reads from the MPCIE eight-bit bus. For both actions, we must specify.\n"
+"  an address. This we can do either in hexadecimal with a '0x' prefix, or in decimal\n"
+"  with no prefix. In a read access, the number of bytes read defaults to one, but we\n"
+"  can read multiple bytes. The command will list the bytes separated by spaces, and\n"
+"  in hexadecimal format by default, although we can ask for decimal with an option.\n"
+"  The write command does not accept a length. Instead, it writes as many bytes as we\n"
+"  provide in a space-delimited string containing either hexadecimal or decimal values.\n"
+"  Even if we ask for decimal display, the addresses at the start of each line of\n"
+"  bytes displayed will be in hexadecimal with a '0x' prefix.\n"
+"\n"
+"Verbs:\n"
+"  read       Read and display bytes from the MPCIE bus.\n"
+"  write      Write bytes to the MPCIE bus.\n"
+"\n"
+"Selectors:\n"
+"  length     The number of bytes to read and display.\n"
+"\n"
+"Options:\n"
+"  --decimal  Display bytes read as positive decimal values, addresses still in hex.\n"
+"  --info     Display a one-line summary. When specified, no bus access is performed.\n"
+"  --help     Display this help text. When specified, no bus access is performed.\n"
+		);
+		return;
+	}
+
+	if (!write_access) {
+		while (read_len > 0) {
+			uint8_t line_len = (read_len > 16) ? 16 : read_len;
+			cli_print(ch, "0x%02X: ", addr);
+			for (uint8_t i = 0; i < line_len; i++) {
+				val = mpcie_byte_read(addr);
+				if (!decimal_format) {
+					cli_print(ch, "%02X", val);
+				} else {
+					cli_print(ch, "%3u", val);
+				}
+				if (i + 1 < line_len)
+				cli_print(ch, " ");
+				addr++;
+			}
+			cli_print(ch, "\n");
+			read_len -= line_len;
+		}	
+	} else {
+		for (uint8_t i = 0; i < data_len; i++) {
+			mpcie_byte_write(addr, data[i]);
+			addr++;
+		}
+	}
+
+    return;
+}
+
+/*
+	cli_pic_info is a Command-Line Interpreter (CLI) procedure. With no
+	arguments prints PIC32MZ characteristics. It does not offer any way to
+	change those characteristics.
+*/
+void cli_pic_info(cli_chan_type *ch, char *args) {
+	bool print_info = false;
+	bool print_help = false;
+	char* tok = strtok(args, " \t");
+
+	while (tok != NULL) {
+ 		if (strcmp(tok, "--info") == 0) {
+ 			print_info = true;
+        } else if (strcmp(tok, "--help") == 0) {
+        	print_help = true;
+        } else {
+            cli_print(ch, "ERROR: Unrecognized option '%s' in %s.\n",
+            	tok, __func__);
+            return;
+        }
+        tok = strtok(NULL, " \t");
+    }
+    
+	if (print_info) {
+		cli_message(ch, "List PIC32MZ internal information.\n");
+		return;
+	}
+
+	if (print_help) {
+		cli_message(ch,
+"Usage:\n"
+"  pic-info [--info] [--help]\n"
+"\n"
+"Summary:\n"
+"  List internal PIC32MZ microcontroller configuration values. Provides no means to\n"
+"  hange any of these values.\n"
+"\n"
+"Options:\n"
+"  --info        Print a one-line summary of this command.\n"
+"  --help        Print this help text.\n"
+		);
+		return;
+	}
+
+ 	pic_info(ch->tx_buff);
+	cli_print(ch, "%s\n", ch->tx_buff);
+
+    return;
+}
+
