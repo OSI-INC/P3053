@@ -84,11 +84,11 @@
 	A3053, provided that the VERBOSE_CONSOLE macro is defined, which is our way
 	of enabling debugging features.
 */
-#define TELNET_PORT 23
+#define DEFAULT_TELNET_PORT 23
 tcpip_server_type telnet_server = {
     .socket   = INVALID_SOCKET,
     .state    = S_WAIT_STACK,
-    .port     = TELNET_PORT,
+    .port     = DEFAULT_TELNET_PORT,
     .protocol = "Telnet",
     .ip_addr = { .Val = 0 }
 };
@@ -228,15 +228,26 @@ int main (void) {
 		Start up the lamp signaling.
 	*/
 	lamp_signal(0);
+	
+	/*
+		Check the configuration switch on the host board. If it is depressed,
+		the least significant bit of location forty will be zero. If depressed,
+		write the factory EEM configuration to flash, for factory reset. Read
+		the flash configuration int the active configuration.
+	*/
+	uint8_t val = mpcie_byte_read(40);
+   	if ((val & 0x01) == 0) {
+   		console_message("FACTORY RESET: Configuration switch pressed on host board.\n");
+    	eem_config_write(&eem_config_factory);
+	}
+	eem_config_read(&eem_config_active);
 
    	/*
-   		Apply the server settings we read from flash memory. We read the
-   		flash configuration, then wait for the TCP/IP stack to establish
-   		itself. Once the stack is ready, we apply our IP address, gateway
-   		address, and network mask. Lamp signaling shows that the EEM is alive
-   		during the wait.
+		Wait for the TCP/IP stack to establish itself. Once the stack is ready,
+		we apply our IP address, gateway address, and network mask, as read from
+		the active configuration. Lamp signaling shows that the EEM is alive
+		during the wait.
    	*/
-   	eem_config_read(&eem_config_active);
    	while (TCPIP_STACK_Status(sysObj.tcpip) != SYS_STATUS_READY) { 
    		tcpip_tick();
    		lamp_signal(1e5);
@@ -257,6 +268,12 @@ int main (void) {
 	console_chan.echo = true;
 	console_chan.name = "CLI-Console";
 	cli_start(&console_chan);
+	
+	/* 
+		Set the LWDAQ and Telnet server ports.
+	*/
+	lwdaq_server.port = eem_config_active.lwdaq_port;	
+	telnet_server.port = eem_config_active.telnet_port;
 
    	/*
    		This loop should never terminate. We perform maintenance tasks one

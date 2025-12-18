@@ -69,11 +69,11 @@ typedef struct {
 	use it to determine if the flash memory EEM configuration has been written
 	by our code deliberately some time in the past. We assign it to the
 	configuration's magic string, and we look for it in the magic string when we
-	read a configuration from NVM. If we see anything other than the correct
-	magic string, we assume the configuration is invalid and substitute the
-	default configuration.
+	read a configuration from flash memory. If we see anything other than the
+	correct magic string, we assume the configuration is invalid and substitute
+	the default configuration.
 */
-#define CONFIG_NVM_MAGIC "The Pelagic Argosy Sites Land"
+#define CONFIG_FLASH_MAGIC "The Pelagic Argosy Sites Land"
 
 /*
 	The factory EEM configuration is the one we use when we have not yet written

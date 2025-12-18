@@ -297,3 +297,163 @@ void APP_Tasks ( void )
     }
 }
 
+/*
+	console_print_help prints a help message to the console for the console
+	server. We call it once when the console server starts up, and any time
+	the user presses "h".
+*/
+void console_print_help(void) {
+	console_message("Commands:\r\n");
+	console_message("  c - save string to flash\r\n");
+	console_message("  d - read string from flash\r\n");
+	console_message("  i - new ip addr\r\n");
+	console_message("  m - machine configuration\r\n");
+	console_message("  n - net info\r\n");
+	console_message("  p - ping gateway\r\n");
+	console_message("  r - software reset\r\n");
+	console_message("  h - print help\r\n");
+}
+
+/*
+	console_server looks out for characters sent in through the console
+	interface, interpretes tham, and responds to them. It always provides an "h"
+	command for help, and the help menu in the code below shows the supported
+	and planned commands. The commands are all single-letter commands, but some
+	of them, such as the one to change the IP address, will subsequently accept
+	a string of characters. The console server is always active, regardless of
+	the state of the debug flag.
+*/
+void console_server(void) {
+	#define CONSOLE_STR_ADDR 0xBD104000
+	static bool print_help = true;
+	
+	enum {max_cmd_len=255};
+	static char cmd_buff[max_cmd_len];
+	static uint32_t cmd_len = 0;
+    char c;
+    
+	enum {max_str_len=31};
+	static char ip_str[max_str_len];
+	static char gw_str[max_str_len];
+	static char mask_str[max_str_len];
+	
+    enum {max_msg_len=2048};    
+    static char msg_buff[max_msg_len];
+    
+    int status;
+	bool ignore_lf = false;
+	bool process_command = false;    
+    
+    if (print_help) {
+    	console_print_help();
+    	print_help = false;
+    }
+
+	while (console_readcount() > 0) {
+		c = console_getchar();
+		if (c == '\r') {
+			process_command = true;
+			ignore_lf = true;
+		} else if (c == '\n') {
+			if (!ignore_lf) {
+				process_command = true;
+			} else {
+				ignore_lf = false;
+			}
+		} else if (c == '\b' || c == 0x7F) {
+			if (cmd_len > 0) {
+				cmd_len--;
+				console_message("\b \b");
+			}
+		} else if (is_printable(c)) {
+			console_print("%c", c);
+			if (cmd_len < max_cmd_len) {
+				cmd_buff[cmd_len] = c;
+				cmd_len++;
+			} else {
+				cmd_len = 0;
+				console_print("\r\nERROR: Have cmd_len>%d in %s.\r\n",
+					max_cmd_len, __func__);
+			}
+		}
+		
+		if (!process_command) {continue;}
+		
+		console_message("\r\n");
+		if (cmd_len == 1) {
+			char cmd = cmd_buff[0];
+			switch (cmd) {
+				case 'h':
+					console_print_help();
+					break;
+					
+				case 'c':
+					console_message("String: ");
+					console_readln(msg_buff, sizeof(msg_buff));
+					status = pic_nvm_writestr(CONSOLE_STR_ADDR, msg_buff);
+					if (status >= 0) {
+						console_print("Wrote: %s\r\n", msg_buff);
+					} else {
+						console_print("ERROR: String write failed in %s.\r\n",
+							__func__);
+					}	
+					break;
+					
+				case 'd':
+					console_message("Reading string...\r\n");
+					status = pic_nvm_readstr(
+						msg_buff,
+						CONSOLE_STR_ADDR,
+						sizeof(msg_buff));
+					if (status >= 0) {
+						console_print("String: %s\r\n", msg_buff);
+					} else {
+						console_print("ERROR: String read failed in %s.\r\n",
+							__func__);
+					}
+					break;
+					
+				case 'i':
+					console_message("New IP Address: ");
+					console_readln(ip_str, sizeof(ip_str));
+					console_message("New IP Mask: ");
+					console_readln(mask_str, sizeof(mask_str));
+					console_message("New Gateway: ");
+					console_readln(gw_str, sizeof(gw_str));
+					server_set_ip(ip_str, gw_str, mask_str);
+					break;
+					
+				case 'm':
+					pic_info(msg_buff);
+					console_print("%s\r\n", msg_buff);
+					break;
+				
+				case 'n':
+					server_info(msg_buff);
+					console_print("%s\r\n", msg_buff);
+					break;
+				
+				case 'p':
+					ping_gateway();
+					break;
+				
+				case 'r':
+					console_message("Resetting... \r\n");
+					console_flush();
+					pic_reset();
+					break;
+				
+				default:
+					console_print(
+						"ERROR: Unknown command '%c', type 'h' for help in %s.\r\n",
+						cmd, __func__);
+					break;
+			}
+		} else if (cmd_len > 1) {
+			console_print("ERROR: Single-letter commands only in %s.\r\n",
+				__func__);
+		}
+		cmd_len = 0;
+		console_message("EEM$ ");
+	}
+}

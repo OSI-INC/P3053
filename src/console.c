@@ -33,13 +33,6 @@
 #include "console.h"
 
 /*
-	An in-line routine to test a character to see if it is printable.
-*/
-static inline bool is_printable(char c) {
-    return (c >= 32 && c <= 126);
-}
-
-/*
 	console_put_int_hex takes a thirty-two bit integer, which is eight nibbles,
 	and prints it as eight hexadecimal digits, most significant nibble first, to
 	the console.
@@ -281,8 +274,8 @@ void console_initialize(void)
 	console_print("=========    Embedded Ethernet Module Console     =========\n");
 	console_print("===========================================================\n");
 	if (debug) {
-		console_print("The VERBOSE_CONSOLE flag is set.\n");
+		console_print("The debug flag is set, expect verbose output.\n");
 	} else {
-		console_print("The VERBOSE_CONSOLE flag is cleared.\n");	
+		console_print("The debug flag is not set, expect quiet output.\n");	
 	}
 }

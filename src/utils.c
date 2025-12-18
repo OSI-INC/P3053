@@ -52,5 +52,21 @@ const char* string_trim(const char *s) {
     return buf;
 }
 
+/*
+	parse_uint8 attempst to parse a string into a valid unsigned eight-bit 
+	variable pointed to by out_ptr. If it fails, it does not write to the
+	output byte, but instead returns false.
+*/
+bool parse_uint8(const char *tok, uint8_t *out_ptr) {
+    char *end;
+	if (!tok || !out_ptr) return false;
+    if (*tok == '-') return false;
+    unsigned long v = strtoul(tok, &end, 0);
+    if (*tok == '\0' || *end != '\0' || v > 0xFF) return false;
+    *out_ptr = (uint8_t) v;
+    return true;
+}
+
+
 
 

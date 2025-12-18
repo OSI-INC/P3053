@@ -233,19 +233,19 @@ void pic_gpio_initialize(void) {
 	// the three key values we use to unlock the registers.
 	SYSKEY = 0x33333333;
 	
-    // Configure the LWDAQ Controller address bus lines as outputs.
-    TRISCCLR = LWDAQ_CA_MASK_RC;   // RC1–RC4
-    TRISECLR = LWDAQ_CA_MASK_RE;   // RE0–RE1
+    // Configure the MPCIE address bus lines as outputs.
+    TRISCCLR = MPCIE_CA_MASK_RC;   // RC1–RC4
+    TRISECLR = MPCIE_CA_MASK_RE;   // RE0–RE1
 
-	// Configure the LWDAQ Controller data strobe and write lines as outputs.
-	TRISDCLR = LWDAQ_DS_RD4 | LWDAQ_CW_RD5;
+	// Configure the MPCIE data strobe and write lines as outputs.
+	TRISDCLR = MPCIE_DS_RD4 | MPCIE_CW_RD5;
 
-    // Set the LWDAQ Controller data bus initially as inputs.
-    TRISCSET = LWDAQ_CD_MASK_RC;   // RC13, RC14
-    TRISESET = LWDAQ_CD_MASK_RE;   // RE2–RE7
+    // Set the MPCIE data bus initially as inputs.
+    TRISCSET = MPCIE_CD_MASK_RC;   // RC13, RC14
+    TRISESET = MPCIE_CD_MASK_RE;   // RE2–RE7
 
-    // Unassert LWDAQ Controller data strobe and write.
-    LATDSET = LWDAQ_DS_RD4 | LWDAQ_CW_RD5;
+    // Unassert MPCIE bus data strobe and control write.
+    LATDSET = MPCIE_DS_RD4 | MPCIE_CW_RD5;
 
 	// So far, on our A3053A, we have have D3 and D4 dedicated to UART2, but D2
 	// and D5 are available as test points. Pin U1-56 is RF3, so we want to set

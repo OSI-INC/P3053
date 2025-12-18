@@ -49,8 +49,16 @@ static inline uint32_t reverse_load_u32(const uint8_t *p) {
 }
 
 /*
-	String manipulation procedures.
+	An in-line routine to test a character to see if it is printable.
+*/
+static inline bool is_printable(char c) {
+    return (c >= 32 && c <= 126);
+}
+
+/*
+	String manipulation and checking procedures.
 */
 const char* string_trim(const char *s);
+bool parse_uint8(const char *tok, uint8_t *out_ptr);
 
 #endif

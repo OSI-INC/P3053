@@ -67,10 +67,11 @@
 #define LWDAQ_DEBUG 0
 
 // The LWDAQ server record.
+#define DEFAULT_LWDAQ_PORT 90
 tcpip_server_type lwdaq_server = {
     .socket   = INVALID_SOCKET,
     .state    = S_WAIT_STACK,
-    .port     = LWDAQ_PORT,
+    .port     = DEFAULT_LWDAQ_PORT,
     .protocol = "LWDAQ",
     .ip_addr = { .Val = 0 }
 };
@@ -252,7 +253,7 @@ int lwdaq_handle_message(TCP_SOCKET s, uint32_t id, uint32_t len, uint8_t* conte
 	uint8_t register_addr = 0;
 	uint8_t value = 0;
 	uint32_t tx_len = 0;
-	static uint8_t tx_buffer[TCP_TX_BUFF_SIZE];
+	static uint8_t tx_buff[TCP_TX_BUFF_SIZE];
 	uint32_t i = 0;
 	static int logged_in = 0;
 	static int security_level = 0;
@@ -266,13 +267,13 @@ int lwdaq_handle_message(TCP_SOCKET s, uint32_t id, uint32_t len, uint8_t* conte
 			value = content[4];
 			if (debug) console_print("BYTE_WRITE to %d of %d in %s.\n",
 				register_addr, value, __func__);
-			lwdaq_byte_write(register_addr, value);
+			mpcie_byte_write(register_addr, value);
 		}
 		break;
 
 		case BYTE_READ: {
 			register_addr = content[3];
-			value = lwdaq_byte_read(register_addr);
+			value = mpcie_byte_read(register_addr);
 			lwdaq_byte_return(s, value);
 			if (debug) console_print("BYTE_READ from %d of %d in %s.\n",
 				register_addr, value, __func__);
@@ -284,7 +285,7 @@ int lwdaq_handle_message(TCP_SOCKET s, uint32_t id, uint32_t len, uint8_t* conte
 			value = content[4];
 			if (debug) console_print("BYTE_POLL of %d for %d in %s.\n",
 				register_addr, value, __func__);
-			while (lwdaq_byte_read(register_addr) != value) {
+			while (mpcie_byte_read(register_addr) != value) {
 				if (tcpip_socket_tick(&s)<0) return -1;
 			}
 		}
@@ -305,14 +306,14 @@ int lwdaq_handle_message(TCP_SOCKET s, uint32_t id, uint32_t len, uint8_t* conte
 			if (tx_len > 0) {
 				i = 0;
 				for (int j = 0; j < tx_len; j++) {
-					lwdaq_byte_write(62, 0);
-					while (lwdaq_byte_read(62) == 0) {
+					mpcie_byte_write(62, 0);
+					while (mpcie_byte_read(62) == 0) {
 						if (tcpip_socket_tick(&s)<0) return -1;
 					}
-					tx_buffer[i] = lwdaq_byte_read(register_addr);
+					tx_buff[i] = mpcie_byte_read(register_addr);
 					i++;
-					if ((i == sizeof(tx_buffer)) || (j == tx_len - 1)) {
-						tcp_writeall(&s, &tx_buffer[0], i);
+					if ((i == sizeof(tx_buff)) || (j == tx_len - 1)) {
+						tcp_writeall(&s, tx_buff, i);
 						if (tcpip_socket_tick(&s) < 0) {
 							if (debug) console_print(
 								"Failed to write %d bytes in %s.\n", i, __func__);
@@ -329,10 +330,10 @@ int lwdaq_handle_message(TCP_SOCKET s, uint32_t id, uint32_t len, uint8_t* conte
 		}
 		break;
 
-		case LOGIN:{
+		case LOGIN: {
 			if (debug) console_print("LOGIN in %s.\n", __func__);
 			if (len<1) {
-			  logged_in=0;
+				logged_in=0;
 				if (debug) console_print("Failed with empty password in %s.\n");
 			}
 			if (!strcmp(password,(char*) content)) {
@@ -371,7 +372,7 @@ int lwdaq_handle_message(TCP_SOCKET s, uint32_t id, uint32_t len, uint8_t* conte
 					config = eem_config_active;
 					lwdaq_config_from_str(&config, (char*) content);
 					eem_config_write(&config);
-					if (debug) console_print("Wrote new configuration to NVM.\n",len);
+					if (debug) console_print("Wrote new configuration to flash.\n",len);
 				} else {
 					if (debug) console_print("Rejected: %d characters too long.\n",len);
 					return -1;
@@ -385,8 +386,8 @@ int lwdaq_handle_message(TCP_SOCKET s, uint32_t id, uint32_t len, uint8_t* conte
 
 		case MAC_READ:{
 			if (debug) console_print("MAC_READ in %s.\n", __func__);
-			server_mac(tx_buffer);
-			lwdaq_data_return(s, tx_buffer, strlen((char*) tx_buffer));
+			server_mac(tx_buff);
+			lwdaq_data_return(s, tx_buff, strlen((char*) tx_buff));
 		}
 		break;
 
@@ -395,6 +396,19 @@ int lwdaq_handle_message(TCP_SOCKET s, uint32_t id, uint32_t len, uint8_t* conte
 			lwdaq_data_return(s, content, len);
 			content[len] = 0x00;
 			if (debug) console_print("%s\n", content);
+		}
+		break;
+
+		case REBOOT: {
+			if (debug) console_print("REBOOT in %s.\n", __func__);
+			tx_buff[0] = CLOSE_CODE;
+			tcp_writeall(&s, tx_buff, 1);
+			int counter = 1e6;
+			while (counter > 0) {
+				tcpip_tick();
+				counter--;
+			}
+			pic_reset();
 		}
 		break;
 

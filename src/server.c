@@ -46,7 +46,7 @@ eem_config_type eem_config_active;
 	a configuration to flash memory. 
 */
 const eem_config_type eem_config_factory = {
-	.magic_str = CONFIG_NVM_MAGIC,
+	.magic_str = CONFIG_FLASH_MAGIC,
 	.password_str = "LWDAQ",
 	.operator_str = "unassigned",
 	.ip_str = "10.0.0.37",
@@ -75,9 +75,9 @@ int eem_config_write(const eem_config_type* config_ptr) {
 	eem_config_read reads a EEM configuration record from the flash
 	configuration address in flash memory. After reading the record, the routine
 	checks that its magic string matches that of a composed string, so as to
-	check for a random set of bytes read from uninitialized NVM. If the magic
-	string does not match, we create the factory configuration record and use
-	that instead.
+	check for a random set of bytes read from uninitialized flash memory. If the
+	magic string does not match, we create the factory configuration record and
+	use that instead.
 */
 int eem_config_read(eem_config_type* config_ptr) {
 	int len;
@@ -86,7 +86,7 @@ int eem_config_read(eem_config_type* config_ptr) {
 		EEM_CONFIG_ADDR, 
 		sizeof(eem_config_type));
 	config_ptr->magic_str[sizeof(config_ptr->magic_str)-1] = '\0';
-	if (strcmp(config_ptr->magic_str, CONFIG_NVM_MAGIC) != 0) {
+	if (strcmp(config_ptr->magic_str, CONFIG_FLASH_MAGIC) != 0) {
 		*config_ptr = eem_config_factory;
 		return 0;
 	} else {
@@ -379,9 +379,9 @@ void ping_gateway(void) {
 	echoReq.param = NULL;
 	res = TCPIP_ICMP_EchoRequest(&echoReq, &reqHandle);
 	if (res == ICMP_ECHO_OK) {
-		console_print("succeeded in %s.\n", __func__);
+		console_print(" Succeeded in %s.\n", __func__);
 	} else {
-		console_print("failed with code %u in %s.\n", res, __func__);
+		console_print(" Failed with code %u in %s.\n", res, __func__);
 	}
 }
 
@@ -398,34 +398,34 @@ int server_set_ip(const char* ip_str, const char* gw_str, const char* nm_str) {
 	IPV4_ADDR gw_addr;
 	TCPIP_NET_HANDLE net_hdl;
 
-	console_print("Setting IP address, gateway, and network mask in %s.\n", __func__);
 	if (!TCPIP_Helper_StringToIPAddress(ip_str, &ip_addr)) {
-		console_print("ERROR: Invalid IP address '%s'.\n", ip_str);
+		console_print("ERROR: Invalid IP address '%s' in %s.\n", ip_str, __func__);
 		return -1;
 	}
 	if (!TCPIP_Helper_StringToIPAddress(gw_str, &gw_addr)) {
-		console_print("ERROR: Invalid gateway '%s'.\n", gw_str);
+		console_print("ERROR: Invalid gateway '%s' in %s.\n", gw_str, __func__);
 		return -1;
 	}
 	if (!TCPIP_Helper_StringToIPAddress(nm_str, &mask_addr)) {
-		console_print("ERROR: Invalid mask '%s'.\n", nm_str);
+		console_print("ERROR: Invalid mask '%s' in %s.\n", nm_str, __func__);
 		return -1;
 	}
 	net_hdl = TCPIP_STACK_IndexToNet(0);
 	if (net_hdl == 0) {
-		console_print("ERROR: Failed to obtain interface handle.\n");
+		console_print("ERROR: Failed to obtain interface handle in %s.\n", __func__);
 		return -1;
 	}
 	TCPIP_DHCP_Disable(net_hdl);
 	if (!TCPIP_STACK_NetAddressSet(net_hdl, &ip_addr, &mask_addr, true)) {
-		console_print("ERROR: Failed to set IP address.\n");
+		console_print("ERROR: Failed to set IP address in %s.\n", __func__);
 		return -1;
 	}
 	if (!TCPIP_STACK_NetAddressGatewaySet(net_hdl, &gw_addr)) {
-		console_print("ERROR: Failed to set gateway.\n");
+		console_print("ERROR: Failed to set gateway in %s.\n", __func__);
 		return -1;
 	}
-	console_print("Succeeded with ip=%s, gw=%s, nm=%s.\n", ip_str, gw_str, nm_str);
+	console_print("Set ip=%s, gw=%s, nm=%s in %s.\n", 
+		ip_str, gw_str, nm_str, __func__);
 	
 	strcpy(eem_config_active.ip_str, ip_str);
 	strcpy(eem_config_active.gw_str, gw_str);

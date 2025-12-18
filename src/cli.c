@@ -137,16 +137,11 @@ int cli_cmd_register(const char *name, cli_cmd_proc proc) {
     return 0;
 }
 
-
 /*
-	cli_help with no arguments prints to the specified channel a list of all
-	registered commands and their information strings. If we pass it "--info" it
-	prints its info string only. Otherwise, if we pass it "--help", it prints
-	its own help string.
+	cli_cmd_template is a template for us to copy when making new commands. It 
+	contains the essential logic and arguments, as well as comments.
 */
-void cli_help(cli_chan_type *ch, char *args) {
-
-	// Option flags.
+void cli_cmd_template(cli_chan_type *ch, char *args) {
 	bool print_info = false;
 	bool print_help = false;
 
@@ -156,7 +151,7 @@ void cli_help(cli_chan_type *ch, char *args) {
 	// invalid combination of arguments, we print an error to the channel and
 	// exit.
 	char* tok = strtok(args, " \t");
-	
+
 	// If tok is not null, we have found an argument. If the argument is valid,
 	// set a flag. If invalid, print an error message and return.
 	while (tok != NULL) {
@@ -170,7 +165,8 @@ void cli_help(cli_chan_type *ch, char *args) {
     
 	// The --info option must be implemented by every CLI command. In
 	// response, the command must print an information string to the CLI
-	// channel.
+	// channel. It short-circuits the command: any time we see this option,
+	// we print description and return.
 	if (print_info) {
 		cli_message(ch, "List all commands with descriptions.\n");
 		return;
@@ -178,7 +174,58 @@ void cli_help(cli_chan_type *ch, char *args) {
 
 	// The --help option must be supported by all CLI commands. It prints a
 	// longer help message that acts as a manual page for the command, listing
-	// all options and their functions.
+	// all options and their functions. This option short-circuits the command
+	// just like the --info option: if present, no other action will be taken,
+	// other than to print this message. We move the message text all the way
+	// to the left edge of the screen so it is easier to fill out and we can
+	// use the full eighty-character width.
+	if (print_help) {
+		cli_message(ch,
+"Usage:\n"
+"  template [--info] [--help]\n"
+"\n"
+"Summary:\n"
+"  Template desription.\n"
+"\n"
+"Options:\n"
+"  --info        Print a one-line summary of this command.\n"
+"  --help        Print this help text.\n"
+		);
+		return;
+	}
+
+	// This is where we put the dispatch commands.
+	cli_print(ch, "Template command executed.");
+
+    return;
+}
+
+/*
+	cli_help with no arguments prints to the specified channel a list of all
+	registered commands and their information strings. If we pass it "--info" it
+	prints its info string only. Otherwise, if we pass it "--help", it prints
+	its own help string.
+*/
+void cli_help(cli_chan_type *ch, char *args) {
+	bool print_info = false;
+	bool print_help = false;
+
+	char* tok = strtok(args, " \t");
+	
+	while (tok != NULL) {
+ 		if (strcmp(tok, "--info") == 0) {print_info = true;} 
+ 		else if (strcmp(tok, "--help") == 0) {print_help = true;} else {
+            cli_print(ch, "ERROR: Unrecognized option '%s' in %s.\n", tok, __func__);
+            return;
+        }
+        tok = strtok(NULL, " \t");
+    }
+    
+	if (print_info) {
+		cli_message(ch, "List all commands with descriptions.\n");
+		return;
+	}
+
 	if (print_help) {
 		cli_message(ch,
 "Usage:\n"
@@ -194,8 +241,6 @@ void cli_help(cli_chan_type *ch, char *args) {
 		return;
 	}
 
-	// No options were given, so perform the default function: print the full
-	// CLI command help list.
     cli_message(ch, "Available commands:\n");
     for (int i = 0; i < cli_num_commands; i++) {
         const char *name = cli_commands[i].name;
@@ -341,9 +386,8 @@ void cli_ip_config(cli_chan_type *ch, char *args) {
 "  ip-config [OPTIONS]\n"
 "\n"
 "Summary:\n"
-"  Change network configuration as specified by options, then display the network\n" 
-"  configuration. With no options, no changes will be made, but network information.\n"
-"  will still be displayed.\n"
+"  Change network configuration as specified by options. With no options, no changes\n"
+"  will be made. Instead, a network information table will be displayed.\n"
 "\n"
 "Options:\n"
 "  --ip <addr>           Set IP address to new string 'x.x.x.x'.\n"
@@ -351,7 +395,6 @@ void cli_ip_config(cli_chan_type *ch, char *args) {
 "  --mask <addr>         Set network mask to new string 'x.x.x.x'.\n"
 "  --telnet-port <port>  Set the port used for the Telnet server.\n"
 "  --lwdaq-port <port>   Set the port used for the LWDAQ server.\n"
-"\n"
 "  --info                Display a one-line summary of this command. When specified,\n"
 "                        no configuration changes are made.\n"
 "  --help                Display detailed help for this command. When specified, no\n"
@@ -371,11 +414,11 @@ void cli_ip_config(cli_chan_type *ch, char *args) {
 			cli_print(ch,
 				"ERROR: Failed to update IP interface in %s.\n", __func__);
 		}
+	} else {	
+		server_info(ch->tx_buff);
+		cli_print(ch, "%s\n", ch->tx_buff);
 	}
 	
-	server_info(ch->tx_buff);
-	cli_print(ch, "%s\n", ch->tx_buff);
-
     return;
 }
 
@@ -625,6 +668,120 @@ void cli_eem_config(cli_chan_type *ch, char *args) {
 }
 
 /*
+	cli_mpcie reads and writes form the MPCIE bus.
+*/
+void cli_mpcie(cli_chan_type *ch, char *args) {
+	bool print_info = false;
+	bool print_help = false;
+	bool decimal_format = false;
+	bool write_access = false;
+	bool addr_received = false;
+	uint8_t addr = 0;
+	uint8_t val = 0;
+	uint8_t data[64];
+	uint8_t data_len = 0;
+	uint8_t read_len = 1;
+	
+	char* tok = strtok(args, " \t");
+	while (tok != NULL) {
+ 		if (strcmp(tok, "--info") == 0) {
+ 			print_info = true;
+ 		} else if (strcmp(tok, "--help") == 0) {
+ 			print_help = true;
+ 		} else if (strcmp(tok, "--decimal") == 0) {
+ 			decimal_format = true;
+ 		} else if (strcmp(tok, "read") == 0 || strcmp(tok, "write") == 0) {
+			if (strcmp(tok, "write") == 0) write_access = true;
+ 			tok = strtok(NULL, " \t");
+ 			if (!parse_uint8(tok, &addr)) {
+ 				cli_print(ch, "ERROR: Invalid address '%s' in %s.\r\n", tok, __func__);
+				return;
+			} 
+			addr_received = true;
+ 		} else if (parse_uint8(tok, &val) && addr_received) {
+ 			if (write_access) {
+ 				data[data_len] = val;
+ 				data_len++;
+ 				if (data_len > 64) {
+ 					cli_print(ch, "ERROR: More than 64 data bytes in %s.\n", __func__);
+            		return;
+ 				}
+ 			} else {
+ 				read_len = val;
+ 			}
+ 		} else {
+            cli_print(ch, "ERROR: Unrecognized option '%s' in %s.\n", tok, __func__);
+            return;
+        }
+        tok = strtok(NULL, " \t");
+    }
+    
+	if (print_info) {
+		cli_message(ch, "Read and write from the eight-bit MPCIE bus.\n");
+		return;
+	}
+
+	if (print_help) {
+		cli_message(ch,
+"Usage:\n"
+"  mpcie [read] <addr> [length] [--decimal] [--info] [--help]\n"
+"  mpcie write <addr> [--info] [--help] <value> [value...]\n"
+"\n"
+"Summary:\n"
+"  Reads to and reads from the MPCIE eight-bit bus. For both actions, we must specify.\n"
+"  an address. This we can do either in hexadecimal with a '0x' prefix, or in decimal\n"
+"  with no prefix. In a read access, the number of bytes read defaults to one, but we\n"
+"  can read multiple bytes. The command will list the bytes separated by spaces, and\n"
+"  in hexadecimal format by default, although we can ask for decimal with an option.\n"
+"  The write command does not accept a length. Instead, it writes as many bytes as we\n"
+"  provide in a space-delimited string containing either hexadecimal or decimal values.\n"
+"  Even if we ask for decimal display, the addresses at the start of each line of\n"
+"  bytes displayed will be in hexadecimal with a '0x' prefix.\n"
+"\n"
+"Verbs:\n"
+"  read       Read and display bytes from the MPCIE bus.\n"
+"  write      Write bytes to the MPCIE bus.\n"
+"\n"
+"Selectors:\n"
+"  length     The number of bytes to read and display.\n"
+"\n"
+"Options:\n"
+"  --decimal  Display bytes read as positive decimal values, addresses still in hex.\n"
+"  --info     Display a one-line summary. When specified, no bus access is performed.\n"
+"  --help     Display this help text. When specified, no bus access is performed.\n"
+		);
+		return;
+	}
+
+	if (!write_access) {
+		while (read_len > 0) {
+			uint8_t line_len = (read_len > 16) ? 16 : read_len;
+			cli_print(ch, "0x%02X: ", addr);
+			for (uint8_t i = 0; i < line_len; i++) {
+				val = mpcie_byte_read(addr);
+				if (!decimal_format) {
+					cli_print(ch, "%02X", val);
+				} else {
+					cli_print(ch, "%3u", val);
+				}
+				if (i + 1 < line_len)
+				cli_print(ch, " ");
+				addr++;
+			}
+			cli_print(ch, "\n");
+			read_len -= line_len;
+		}	
+	} else {
+		for (uint8_t i = 0; i < data_len; i++) {
+			mpcie_byte_write(addr, data[i]);
+			addr++;
+		}
+	}
+
+    return;
+}
+
+/*
 	cli_initialize initializes the command-line interpreter by registering some
 	commands we find useful. We can add more commands at any time with the
 	cli_cmd_register routine.
@@ -635,6 +792,7 @@ void cli_initialize(void) {
 	cli_cmd_register("eem-config",cli_eem_config);
 	cli_cmd_register("ip-config",cli_ip_config);
 	cli_cmd_register("pic-info",cli_pic_info);
+	cli_cmd_register("mpcie",cli_mpcie);
 }
 
 /*
@@ -670,91 +828,64 @@ void cli_server(cli_chan_type *ch) {
 	// put at the end of the command name or argument list.
     static char cmd[CLI_CMD_SIZE];
     static char args[CLI_ARGS_SIZE];
-	
 
-	// Read all available bytes into the channel's receive buffer. We execute
-	// backspace and delete immediately we see them. If echo is enabled, we echo
-	// all characters, with backspace and delete being echoed as "backspace
-	// space backspace" in order to remove the most-recently echoed character
-	// from view.
-    while (ch->rx_len < CLI_RX_SIZE - 1) {
+	// Read bytes into the channel's receive buffer until we see an end of line.
+	// We execute backspace and delete immediately we see them. If echo is
+	// enabled, we echo all characters, with backspace and delete being echoed
+	// as "backspace space backspace" in order to remove the most-recently
+	// echoed character from view. We handle CR, LF, and CRLF with the
+	// assumption that we will never get LFCR, or if we do: we will handle it as
+	// two line breaks. When we see CR, we set our ignore_lf flag. We will now
+	// try to read the next character from the channel. If no character is
+	// waiting, we assume no LF is coming, and we proceed to process the line we
+	// have. If a LF is waiting, we discard it and process our line.
+	bool ignore_lf = false;
+	bool process_command = false;    
+    while (!process_command || ignore_lf) {
     	int c = ch->getchar(ch->context);
     	if (c < 0) {
+    		ignore_lf = false;
     		break;
+    	} else if (c == '\r') {
+			process_command = true;
+			ignore_lf = true;
+		} else if (c == '\n') {
+			if (!ignore_lf) {
+				process_command = true;
+			} else {
+				ignore_lf = false;
+			}
 		} else if (c == '\b' || c == 0x7F) {
 			if (ch->rx_len > 0) {
 				ch->rx_len--;
-				ch->rx_buff[ch->rx_len] = '\0';
+				if (ch->echo) cli_message(ch, "\b \b");
 			}
-			if (ch->echo) {
-				cli_message(ch->context, "\nBACKSPACE");
-			}
-		} else {
-			ch->rx_buff[ch->rx_len] = (char) c;
+		} else if (c >= 32 && c <= 126) {
+			ch->rx_buff[ch->rx_len] = c;
 			ch->rx_len++;
 			ch->rx_buff[ch->rx_len] = '\0';
-			if (ch->echo) ch->putchar(ch->context, c);
+			if (ch->echo) cli_print(ch, "%c", c);
 		}
-    }
+		if (ch->rx_len >= CLI_RX_SIZE - 1) {
+			cli_print(ch,"ERROR: Receive buffer overflow in %s.\n", ch->name);
+			ch->rx_len = 0;
+			ch->rx_buff[0] = '\0';
+			return;			
+		}
+	}
+ 
+ 	// If we are not going to process a command, return
+	if (!process_command) return;
+	
+	// If we are echoing characters, print a newline to terminate the command line.
+	if (ch->echo) cli_message(ch, "\n");
 
-	// If we have no characters at all, return now.
-	if (ch->rx_len == 0) return;
-
-	// If the buffer has overflowed, reset it and report an error.
-	if (ch->rx_len >= CLI_RX_SIZE) {
-		cli_print(ch,"ERROR: Receive buffer overflow, "
-			"discarding all characters in %s.\n", ch->name);
-		ch->rx_len = 0;
-		ch->rx_buff[0] = '\0';
+	// If we have no characters at all, print the prompt and return.
+	if (ch->rx_len == 0) {
+		cli_message(ch, prompt);
 		return;
 	}
 	
-	// Look for a newline in the characters we have available. If we find one,
-	// record its location. If we don't find one, return.
-    uint32_t i;
-    for (i = 0; i < ch->rx_len; i++) {
-        if (ch->rx_buff[i] == '\n' || ch->rx_buff[i] == '\r') break;
-    }
-    if (i == ch->rx_len) return;
-
-	// Figure out how many newline characters there are: we might have CR, or
-	// LF, or a combined CRLF. We even account for the non-standard LFCR
-	// sequence.
-    uint32_t eol = i;
-    uint32_t consume = 1;
-    if (ch->rx_buff[eol] == '\r' 
-    		&& eol < ch->rx_len - 1 
-    		&& ch->rx_buff[eol+1] == '\n') {
-        consume = 2;
-    } else if (ch->rx_buff[eol] == '\n' 
-    		&& eol < ch->rx_len - 1 
-    		&& ch->rx_buff[eol+1] == '\r') {
-        consume = 2;
-    }
-    
-    // Overwrite the first newline character with a null to make a null-terminated
-    // line string.
-    ch->rx_buff[eol] = '\0';
-
-	// Now we normalize the line by executing backspace and delete characters. We
-	// make sure we treat characters we read from the receive buffer as unsigned
-	// values so that we can compare them to ASCII decimal values. Each time we read
-	// a printable character, we add it to the normalized string. Backspaces and
-	// deletes should have been implemented and eliminated from the string by now,
-	// but we look out for them anyway. We add a new null terminator at the end.
-    char *src = ch->rx_buff;
-    char *dst = ch->rx_buff;
-    while (*src != '\0') {
-		unsigned char c = (unsigned char)* src++;
-		if (c == '\b' || c == 0x7F) {
-			if (dst > ch->rx_buff) dst--;
-			continue;
-		}
-		if (c < 32 || c == 127) continue;
-		*dst++ = (char) c;
-    }
-    *dst = '\0';
-
     // Skip over any leading spaces or tabs in the input line.
 	uint32_t p = 0;
 	while (ch->rx_buff[p] == ' ' || ch->rx_buff[p] == '\t') p++;
@@ -799,16 +930,13 @@ void cli_server(cli_chan_type *ch) {
 		p++;
 	}
 	args[l] = '\0';
+
+	// Move the receive buffer pointer back to the beginning of the buffer and
+	// load a null there as well.
+	ch->rx_len = 0;
+	ch->rx_buff[0] = '\0';
 	
-	// Shift any remaining characters all the way to the start of the receive
-	// buffer. We will deal with them the next time we call this routine.
-	uint32_t shift = eol + consume;
-	uint32_t remain = ch->rx_len - shift;
-	if (remain > 0) memmove(ch->rx_buff, &ch->rx_buff[shift], remain);
-	ch->rx_len = remain;
-	ch->rx_buff[ch->rx_len] = '\0';
-	
-	// If the command name is an empty string, print the prompt.
+	// If the command name is an empty string, print the prompt and return.
 	if (strlen(cmd) == 0) {
 	    cli_message(ch, prompt);
 		return;
@@ -829,7 +957,8 @@ void cli_server(cli_chan_type *ch) {
     // not return an error or success code.
 	proc(ch, args);
 
-    // Print the prompt.
+    // Print the prompt and we are done.
     cli_message(ch, prompt);
+    return;
 }
 
