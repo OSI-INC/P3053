@@ -62,18 +62,24 @@
 #define STREAM_WRITE	12
 #define REBOOT			13
 
-// Other constants.
+/*
+	Miscellaneous constants.
+*/
 #define LWDAQ_CONFIG_LENGTH 1023
 #define LWDAQ_DEBUG 0
 
-// The LWDAQ server record.
+/*
+	The LWDAQ server record. We must assign the port pointer before trying to
+	start the LWDAQ server.
+*/
 #define DEFAULT_LWDAQ_PORT 90
 tcpip_server_type lwdaq_server = {
-    .socket   = INVALID_SOCKET,
-    .state    = S_WAIT_STACK,
-    .port     = DEFAULT_LWDAQ_PORT,
     .protocol = "LWDAQ",
-    .ip_addr = { .Val = 0 }
+    .socket = INVALID_SOCKET,
+    .state = S_WAIT_STACK,
+    .port_ptr = NULL,
+    .bound_port = 0,
+    .bound_ip_addr = { .Val = 0 }
 };
 	
 /*

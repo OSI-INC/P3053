@@ -47,8 +47,8 @@
 /*
 	We store the configuration of our server in a EEM configuration record.
 */
-#define SERVER_CONFIG_STR_SIZE 31
-typedef char eem_config_str[SERVER_CONFIG_STR_SIZE];
+#define EEM_CONFIG_STR_SIZE 31
+typedef char eem_config_str[EEM_CONFIG_STR_SIZE];
 typedef struct {
 	eem_config_str magic_str;
     eem_config_str password_str;
@@ -58,8 +58,8 @@ typedef struct {
 	eem_config_str nm_str;
     eem_config_str time_str;
     eem_config_str device_str;
-    uint32_t lwdaq_port;
-	uint32_t telnet_port;
+    uint16_t lwdaq_port;
+	uint16_t telnet_port;
     uint32_t security_level;
     uint32_t tcp_timeout;
 } eem_config_type;
@@ -181,23 +181,31 @@ typedef enum {
 
 /*
 	The tcpip_server_type structure provides a complete description of one of
-	our TCP/IP servers. The structure includes the server state, a handle to the
-	socket, which is either invalid, listening or connected, the port number the
-	server should listen on, and the name of the protocol it serves. The IP
-	address to which the socket is bound we save in its own field, which we
-	check every time we call the server maintenance routine, tcpip_server, to
-	see if it is the same as the current IP address. When we chanage the IP
-	address, we must close the server sockets and re-open them again so they
-	will be bound to the new IP address. The only feature of the server that is
-	not encoded in this structure is the protocol tast procedure, which we pass
-	into the server routine as a separate argument.
+	our TCP/IP servers. The protocol string holds the name of the protocol. The
+	socket field holds a TCP socket index. The server state is an enumerated
+	type defined above. The port pointer should point to a field in a
+	configuration record that holds the port that should be used for this
+	server. We recommend creating dedicated port fields for each server in the
+	active EEM configuration record, and setting the port pointer to point to
+	the corresponding field in the configuration record. The bound port and
+	bound IP address fields hold the port and IP address to which the server is
+	currently bound. The server checks to see if the bound IP address and port
+	number differ from the current IP address asserted by the TCP/IP stack or
+	the port number pointed to by the port pointer, and if either differ, the
+	server will restart. When we chanage the IP address or port number at which
+	we want the server to listen, we must close the server sockets and re-open
+	them again so they will be bound to the new IP address and port number. The
+	only feature of the server that is not encoded in this structure is the
+	protocol task procedure, which we pass into the server routine as a separate
+	argument.
 */
 typedef struct {
+	const char* protocol;
 	TCP_SOCKET socket;
  	tcpip_server_state_type state;
-	int port;
-	const char* protocol;
-	IPV4_ADDR ip_addr;
+	uint16_t* port_ptr;
+	uint16_t bound_port;
+	IPV4_ADDR bound_ip_addr;
 } tcpip_server_type;
 
 /*
@@ -210,7 +218,7 @@ int server_mac_str(char* out);
 int server_ip_str(char* out);
 int server_nm_str(char* out);
 int server_gw_str(char* out);
-int server_name_str(char* out);
+int server_interface_str(char* out);
 bool server_linked(void);
 int server_info(char* out);
 

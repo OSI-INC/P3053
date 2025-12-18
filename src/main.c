@@ -80,17 +80,17 @@
 
 /*
 	Declare the constants and structures that configure our Telnet server. The
-	Telnet server we assume will be available to any implementation of the
-	A3053, provided that the VERBOSE_CONSOLE macro is defined, which is our way
-	of enabling debugging features.
+	Telnet server, which should be made available in all debug builds. We must
+	assign the port pointer before trying to start the Telnet server.
 */
 #define DEFAULT_TELNET_PORT 23
 tcpip_server_type telnet_server = {
-    .socket   = INVALID_SOCKET,
-    .state    = S_WAIT_STACK,
-    .port     = DEFAULT_TELNET_PORT,
     .protocol = "Telnet",
-    .ip_addr = { .Val = 0 }
+    .socket = INVALID_SOCKET,
+    .state = S_WAIT_STACK,
+    .port_ptr = NULL,
+    .bound_port = 0,
+    .bound_ip_addr = { .Val = 0 }
 };
 #ifdef VERBOSE_CONSOLE
 static const bool telnet_enable = true;
@@ -272,8 +272,8 @@ int main (void) {
 	/* 
 		Set the LWDAQ and Telnet server ports.
 	*/
-	lwdaq_server.port = eem_config_active.lwdaq_port;	
-	telnet_server.port = eem_config_active.telnet_port;
+	lwdaq_server.port_ptr = &eem_config_active.lwdaq_port;	
+	telnet_server.port_ptr = &eem_config_active.telnet_port;
 
    	/*
    		This loop should never terminate. We perform maintenance tasks one

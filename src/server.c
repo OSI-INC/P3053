@@ -530,11 +530,11 @@ int server_gw_str(char* out) {
 }
 
 /*
-	server_name_str writes the server interface name to a buffer as a printable
-	string. The routine does not check the size of the destination string
-	buffer, but it does return the number of characters it wrote.
+	server_interface_str writes the server interface name to a buffer as a
+	printable string. The routine does not check the size of the destination
+	string buffer, but it does return the number of characters it wrote.
 */
-int server_name_str(char* out) {
+int server_interface_str(char* out) {
 	TCPIP_NET_HANDLE net_hdl;
 	const char* name;
 
@@ -564,7 +564,7 @@ bool server_linked(void) {
 int server_info(char* out) {
 	int len = 0;
 	len += sprintf(out+len,     "Interface : ");
-	len += server_name_str(out+len);
+	len += server_interface_str(out+len);
 	len += sprintf(out+len, "\nIP        : ");
 	len += server_ip_str(out+len);
 	len += sprintf(out+len, "\nMask      : ");
@@ -584,24 +584,39 @@ int server_info(char* out) {
 
 
 /*
-	tcpip_server_check_ip_change checks to see if the network interface's IP address
-	has been changed since a server started listening for connections, or started
-	serving a connection. It compares the ip address saved in the server record
-	with the current IP address. If they differ, it closes the existing listening
-	or connected socket, marks the socket as invalid, calls the TCP/IP maintenance
-	routine a few times to make sure the new IP address propagates through the
-	stack, and returns true. Otherwise it returns false.
+	tcpip_server_restart checks to see if the network interface's IP address or
+	assigned TCP port has been changed since a server started listening for
+	connections, or started serving a connection. It compares the IP address and
+	port saved in the server record with the current IP address asserted by the
+	TCP/IP stack. It compares the TCP port pointed to by the server record's
+	port pointer to the one saved in the server record. The port pointed to
+	should be the one assigned to the server in the EEM active configuration. If
+	either differ, it closes the existing listening or connected socket, marks
+	the socket as invalid, calls the TCP/IP maintenance routine a few times to
+	make sure the new IP address propagates through the stack, and returns true.
+	Otherwise it returns false.
 */
-bool tcpip_server_check_ip_change(tcpip_server_type* server) {
+bool tcpip_server_restart(tcpip_server_type* server) {
 	TCPIP_NET_HANDLE net_hdl;
 	IPV4_ADDR current_ip;
+	bool restart = false;
 
 	net_hdl = TCPIP_STACK_IndexToNet(0);
 	current_ip.Val = TCPIP_STACK_NetAddress(net_hdl);
 
-	if (current_ip.Val != server->ip_addr.Val) {
+	if (current_ip.Val != server->bound_ip_addr.Val) {
 		console_print("IP address change detected, restarting %s server.\n",
 			server->protocol);
+		restart = true;
+	}
+	
+	if (*server->port_ptr != server->bound_port) {
+		console_print("TCP port change detected, restarting %s server.\n",
+			server->protocol);
+		restart = true;
+	}
+	
+	if (restart) {
 		if (server->socket != INVALID_SOCKET) {
 			TCPIP_TCP_Close(server->socket);
 			server->socket = INVALID_SOCKET;
@@ -722,14 +737,14 @@ void tcpip_server(tcpip_server_type* server, tcpip_tasks_type tasks) {
 		case S_WAIT_IP: {
 			net_hdl = TCPIP_STACK_IndexToNet(0);
 			if (TCPIP_STACK_NetIsReady(net_hdl)) {
-				server->ip_addr.Val = TCPIP_STACK_NetAddress(net_hdl);
+				server->bound_ip_addr.Val = TCPIP_STACK_NetAddress(net_hdl);
 				console_print(
 					"%s server assigned IP address %d.%d.%d.%d in %s.\n", 
 					server->protocol,
-					server->ip_addr.v[0], 
-					server->ip_addr.v[1], 
-					server->ip_addr.v[2], 
-					server->ip_addr.v[3],
+					server->bound_ip_addr.v[0], 
+					server->bound_ip_addr.v[1], 
+					server->bound_ip_addr.v[2], 
+					server->bound_ip_addr.v[3],
 					__func__);
 				if (!ping_sent) {
 					ping_gateway();
@@ -741,27 +756,30 @@ void tcpip_server(tcpip_server_type* server, tcpip_tasks_type tasks) {
 		break;
 
 		case S_OPEN_SERVER: {
-			server->socket = TCPIP_TCP_ServerOpen(IP_ADDRESS_TYPE_IPV4, server->port, 0);
+			server->socket = TCPIP_TCP_ServerOpen(
+				IP_ADDRESS_TYPE_IPV4, 
+				*server->port_ptr, 0);
+			server->bound_port = *server->port_ptr;
 			if (server->socket == INVALID_SOCKET) {
 				if (debug) console_print(
 					"Failed to open %s server on %d.%d.%d.%d:%d in %s.\n",
 					server->protocol, 
-					server->ip_addr.v[0], 
-					server->ip_addr.v[1], 
-					server->ip_addr.v[2], 
-					server->ip_addr.v[3],
-					server->port, 
+					server->bound_ip_addr.v[0], 
+					server->bound_ip_addr.v[1], 
+					server->bound_ip_addr.v[2], 
+					server->bound_ip_addr.v[3],
+					server->bound_port, 
 					__func__);
 				server->state = S_ERROR;
 			} else {
 				if (debug) console_print(
 					"Listening for %s connection on %d.%d.%d.%d:%d in %s.\n",
 					server->protocol, 
-					server->ip_addr.v[0], 
-					server->ip_addr.v[1], 
-					server->ip_addr.v[2], 
-					server->ip_addr.v[3],
-					server->port, 
+					server->bound_ip_addr.v[0], 
+					server->bound_ip_addr.v[1], 
+					server->bound_ip_addr.v[2], 
+					server->bound_ip_addr.v[3],
+					server->bound_port, 
 					__func__);
 				server->state = S_LISTENING;
 			}
@@ -769,7 +787,7 @@ void tcpip_server(tcpip_server_type* server, tcpip_tasks_type tasks) {
 		break;
 
 		case S_LISTENING: {
-			if (tcpip_server_check_ip_change(server)) {
+			if (tcpip_server_restart(server)) {
 				server->state = S_WAIT_IP;
 			} else if (TCPIP_TCP_IsConnected(server->socket)) {
 				if (TCPIP_TCP_SocketInfoGet(server->socket, &sock_info)) {
@@ -796,7 +814,7 @@ void tcpip_server(tcpip_server_type* server, tcpip_tasks_type tasks) {
 		break;
 
 		case S_SERVING: {
-			if (tcpip_server_check_ip_change(server)) {
+			if (tcpip_server_restart(server)) {
 				server->state = S_WAIT_IP;
 			} else if (!TCPIP_TCP_IsConnected(server->socket) ||
 					TCPIP_TCP_WasDisconnected(server->socket)) {
