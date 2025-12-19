@@ -210,6 +210,7 @@ typedef struct {
 	char* ip_str;
 	char bound_ip_str[EEM_CONFIG_STR_SIZE];
 	uint32_t last_tick;
+	bool logged_in;
 } tcpip_server_type;
 
 /*

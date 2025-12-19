@@ -718,8 +718,7 @@ void tcpip_server(tcpip_server_type* server, tcpip_tasks_type tasks) {
 			if (tcpip_status < 0) {   
 				if (print_init_wait) {
 					console_print(
-						"TCP/IP stack initialization failed in %s.\n",
-						__func__);
+						"ERROR: TCP/IP stack initialization failed in %s.\n", __func__);
 				}
 				server->state = S_ERROR;
 			} else if (tcpip_status == SYS_STATUS_READY) {
@@ -727,11 +726,10 @@ void tcpip_server(tcpip_server_type* server, tcpip_tasks_type tasks) {
 				interface_name = TCPIP_STACK_NetNameGet(net_hdl);
 				host_name = TCPIP_STACK_NetBIOSName(net_hdl);
 				console_print(
-					"%s server, interface %s, host %s initialized in %s.\n",
+					"%s server: interface %s on host %s initialized.\n",
 					server->protocol,
 					interface_name,
-					string_trim(host_name),
-					__func__);
+					string_trim(host_name));
 				server->state = S_WAIT_IP;
 			} else if (print_init_wait) {
 				console_print("Waiting for TCP/IP stack in %s.\n", __func__);
@@ -744,8 +742,8 @@ void tcpip_server(tcpip_server_type* server, tcpip_tasks_type tasks) {
 			net_hdl = TCPIP_STACK_IndexToNet(0);
 			if (TCPIP_STACK_NetIsReady(net_hdl)) {
 				server_ip_str(server->bound_ip_str);
-				console_print("%s server assigned IP address %s in %s.\n", 
-					server->protocol, server->bound_ip_str, __func__);
+				console_print("%s server assigned IP address %s.\n", 
+					server->protocol, server->bound_ip_str);
 				if (!ping_sent) {
 					ping_gateway();
 					ping_sent = true;
@@ -761,14 +759,14 @@ void tcpip_server(tcpip_server_type* server, tcpip_tasks_type tasks) {
 				*server->port_ptr, 0);
 			server->bound_port = *server->port_ptr;
 			if (server->socket == INVALID_SOCKET) {
-				if (debug) console_print("Failed to open %s server on %s:%d in %s.\n",
+				console_print("%s server failed to open server on %s:%d.\n",
 					server->protocol, server->bound_ip_str,
-					server->bound_port, __func__);
+					server->bound_port);
 				server->state = S_ERROR;
 			} else {
-				if (debug) console_print("Listening for %s connection on %s:%d in %s.\n",
+				console_print("%s server listening for connection on %s:%d.\n",
 					server->protocol, server->bound_ip_str,
-					server->bound_port, __func__);
+					server->bound_port);
 				server->state = S_LISTENING;
 			}
 		}
@@ -781,21 +779,18 @@ void tcpip_server(tcpip_server_type* server, tcpip_tasks_type tasks) {
 				if (TCPIP_TCP_SocketInfoGet(server->socket, &sock_info)) {
 					IPV4_ADDR ip = sock_info.remoteIPaddress.v4Add;
 					server->last_tick = SYS_TMR_TickCountGet();
-					if (debug) console_print(
-						"%s connection from %u.%u.%u.%u in %s.\n",
-						server->protocol, ip.v[0], ip.v[1], ip.v[2], ip.v[3], __func__);
+					console_print("%s server connection from %u.%u.%u.%u.\n",
+						server->protocol, ip.v[0], ip.v[1], ip.v[2], ip.v[3]);
 				} else {
-					if (debug) console_print(
-						"%s connection from unknown peer in %s.\n",
-						server->protocol, __func__);
+					console_print("%s server connection from unknown peer.\n",
+						server->protocol);
 				}
 				status = tasks(server);
 				if (status >= 0) {
 					server->state = S_SERVING;
 				} else {
-					if (debug) console_print(
-						"%s socket closed by server in %s.\n",
-						server->protocol, __func__);			
+					console_print("%s server socket closed by server.\n",
+						server->protocol);			
 					server->state = S_CLOSE;
 				}
 			}
@@ -807,8 +802,8 @@ void tcpip_server(tcpip_server_type* server, tcpip_tasks_type tasks) {
 				server->state = S_WAIT_IP;
 			} else if (!TCPIP_TCP_IsConnected(server->socket) ||
 					TCPIP_TCP_WasDisconnected(server->socket)) {
-				if (debug) console_print("%s socket closed by client in %s.\n",
-					server->protocol, __func__);
+				console_print("%s server socket closed by client.\n",
+					server->protocol);
 				server->state = S_CLOSE;
 			} else {
 				if (TCPIP_TCP_GetIsReady(server->socket) > 0) {
@@ -817,16 +812,15 @@ void tcpip_server(tcpip_server_type* server, tcpip_tasks_type tasks) {
 				if (eem_config_active.tcp_timeout > 0) {
 					if (SYS_TMR_TickCountGet() - server->last_tick 
 						>  (eem_config_active.tcp_timeout * 1000u)) {
-						if (debug) console_print(
-							"%s server timeout, closing socket in %s.\n",
-							server->protocol, __func__);			
+						console_print("%s server timeout, closing socket.\n",
+							server->protocol);			
 						server->state = S_CLOSE;
 					}
 				}
 				status = tasks(server);
 				if (status < 0) {
-					if (debug) console_print("%s socket closed by server in %s.\n",
-						server->protocol, __func__);			
+					console_print("%s server socket closed by server.\n",
+						server->protocol);			
 					server->state = S_CLOSE;
 				}
 			}

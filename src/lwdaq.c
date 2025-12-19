@@ -80,7 +80,8 @@ tcpip_server_type lwdaq_server = {
     .port_ptr = NULL,
     .bound_port = 0,
     .ip_str = NULL,
-    .bound_ip_str = "0.0.0.0"
+    .bound_ip_str = "0.0.0.0",
+    .logged_in = false
 };
 	
 /*
@@ -250,23 +251,33 @@ int lwdaq_config_from_str(eem_config_type *config_ptr, const char *str) {
 	}
 	return num_copied;
 }
+
 /*
-	lwdaq_handle_message handles an incoming LWDAQ message. We pass the routine
-	a socket handle, which allows it to respond to the command when a response
-	is required. We pass the LWDAQ message identifier, the length of the message
-	content, and a pointer to the content buffer.
+	lwdaq_handle_message executes a LWDAQ message a LWDAQ server has received
+	from a client. It does not read from the server socket. Instead, it accepts
+	a complete and accurate message identifier, message length, and content byte
+	array as inputs. The routine can and will write to the server socket in
+	response to the instruction contained in the message. We pass into the
+	routine a server record, which contains a TCP socket handle and a logged-in
+	flag that the message handler uses to determine whether or not it should
+	permit access to the LWDAQ instructions. 
 */
-int lwdaq_handle_message(TCP_SOCKET s, uint32_t id, uint32_t len, uint8_t* content) {
+int lwdaq_handle_message(tcpip_server_type* server,
+		uint32_t id, uint32_t len, uint8_t* content) {
 	uint8_t register_addr = 0;
 	uint8_t value = 0;
 	uint32_t tx_len = 0;
 	static uint8_t tx_buff[TCP_TX_BUFF_SIZE];
-	uint32_t i = 0;
-	static int logged_in = 0;
-	static char password[32] = "LWDAQ";
 	static char config_str[LWDAQ_CONFIG_LENGTH];
 	static eem_config_type config;
 
+	if (eem_config_active.security_level >= 2 && !server->logged_in && id != LOGIN) {
+		console_print(
+			"REJECTED: Immediate login required by security level %d in %s.\n",
+			eem_config_active.security_level, __func__);
+		return -1;
+	}
+		
 	switch (id) {
 		case BYTE_WRITE: {
 			register_addr = content[3];
@@ -280,7 +291,7 @@ int lwdaq_handle_message(TCP_SOCKET s, uint32_t id, uint32_t len, uint8_t* conte
 		case BYTE_READ: {
 			register_addr = content[3];
 			value = mpcie_byte_read(register_addr);
-			lwdaq_byte_return(s, value);
+			lwdaq_byte_return(server->socket, value);
 			if (debug) console_print("BYTE_READ from %d of %d in %s.\n",
 				register_addr, value, __func__);
 		}
@@ -292,14 +303,14 @@ int lwdaq_handle_message(TCP_SOCKET s, uint32_t id, uint32_t len, uint8_t* conte
 			if (debug) console_print("BYTE_POLL of %d for %d in %s.\n",
 				register_addr, value, __func__);
 			while (mpcie_byte_read(register_addr) != value) {
-				if (tcpip_socket_tick(&s)<0) return -1;
+				if (tcpip_socket_tick(&server->socket)<0) return -1;
 			}
 		}
 		break;
 
 		case VERSION_READ: {
 			if (debug) console_print("VERSION_READ in %s.\n", __func__);
-			lwdaq_integer_return(s, RELAY_VERSION);
+			lwdaq_integer_return(server->socket, RELAY_VERSION);
 		}
 		break;
 		
@@ -308,21 +319,21 @@ int lwdaq_handle_message(TCP_SOCKET s, uint32_t id, uint32_t len, uint8_t* conte
 			tx_len = reverse_load_u32(&content[4]);
 			if (debug) console_print("STREAM_READ from %d of %d bytes in %s.\n",
 				register_addr, tx_len, __func__);
-			lwdaq_header(s, DATA_RETURN, tx_len);
+			lwdaq_header(server->socket, DATA_RETURN, tx_len);
 			if (tx_len > 0) {
-				i = 0;
+				int i = 0;
 				for (int j = 0; j < tx_len; j++) {
 					mpcie_byte_write(62, 0);
 					while (mpcie_byte_read(62) == 0) {
-						if (tcpip_socket_tick(&s)<0) return -1;
+						if (tcpip_socket_tick(&server->socket)<0) return -1;
 					}
 					tx_buff[i] = mpcie_byte_read(register_addr);
 					i++;
 					if ((i == sizeof(tx_buff)) || (j == tx_len - 1)) {
-						tcp_writeall(&s, tx_buff, i);
-						if (tcpip_socket_tick(&s) < 0) {
-							if (debug) console_print(
-								"Failed to write %d bytes in %s.\n", i, __func__);
+						tcp_writeall(&server->socket, tx_buff, i);
+						if (tcpip_socket_tick(&server->socket) < 0) {
+							console_print(
+								"ERROR: Failed to write %d bytes in %s.\n", i, __func__);
 							return -1;
 						}
 						if (debug && LWDAQ_DEBUG) console_print(
@@ -331,38 +342,36 @@ int lwdaq_handle_message(TCP_SOCKET s, uint32_t id, uint32_t len, uint8_t* conte
 					}
 				}
 			}
-			lwdaq_footer(s);
+			lwdaq_footer(server->socket);
 			if (debug) console_print("STREAM_READ complete in %s.\n", __func__);
 		}
 		break;
 
 		case LOGIN: {
+			content[len] = '\0';
 			if (debug) console_print("LOGIN in %s.\n", __func__);
-			if (len<1) {
-				logged_in=0;
-				if (debug) console_print("Failed with empty password in %s.\n");
-			}
-			if (!strcmp(password,(char*) content)) {
-				logged_in=1;
-				if (debug) console_print("Logged in with password: %s.\n", content);
+			if (!strcmp(eem_config_active.password_str, (char*) content)) {
+				server->logged_in = true;
+				if (debug) console_print("Logged in with password '%s'.\n", content);
 			} else {
-			  logged_in=0;
-				if (debug) console_print("Failed with password: %s.\n", content);
+			  server->logged_in = false;
+				console_print("REJECTED: Login attempt with password '%s'.\n", content);
 			}
-			lwdaq_byte_return(s, logged_in);
+			lwdaq_byte_return(server->socket, server->logged_in);
 		}
 		break;
 
 		case CONFIG_READ:{
 			if (debug) console_print("CONFIG_READ in %s.\n", __func__);
-			if ((logged_in==1) || (eem_config_active.security_level==0)) {
+			if (server->logged_in || eem_config_active.security_level == 0) {
 				lwdaq_str_from_config(config_str, &eem_config_active);
-			  	lwdaq_data_return(s, (uint8_t*) config_str, strlen(config_str));
+			  	lwdaq_data_return(server->socket,
+			  		(uint8_t*) config_str, strlen(config_str));
 				if (debug) console_print(
 					"Transmitted configuration of %d characters.\n",
 					strlen(config_str));
 			} else {
-				if (debug) console_print("Rejected: not logged in.\n");
+				console_print("REJECTED: Not logged in.\n");
 				return -1;
 			}
 		}
@@ -370,7 +379,7 @@ int lwdaq_handle_message(TCP_SOCKET s, uint32_t id, uint32_t len, uint8_t* conte
 
 		case CONFIG_WRITE:{
 			if (debug) console_print("CONFIG_WRITE in %s.\n",__func__);
-			if ((logged_in==1) || (eem_config_active.security_level==0)) {
+			if (server->logged_in || eem_config_active.security_level == 0) {
 				if (len<LWDAQ_CONFIG_LENGTH) {
 					if (debug) console_print("Accepted: config %d characters.\n",len);
 					content[len]=0x00;
@@ -380,11 +389,11 @@ int lwdaq_handle_message(TCP_SOCKET s, uint32_t id, uint32_t len, uint8_t* conte
 					eem_config_write(&config);
 					if (debug) console_print("Wrote new configuration to flash.\n",len);
 				} else {
-					if (debug) console_print("Rejected: %d characters too long.\n",len);
+					console_print("REJECTED: Configuration string too long.\n",len);
 					return -1;
 				}
 			} else {
-				if (debug) console_print("Rejected: not logged in.\n");
+				console_print("REJECTED: Not logged in.\n");
 				return -1;
 			}
 		}
@@ -393,33 +402,39 @@ int lwdaq_handle_message(TCP_SOCKET s, uint32_t id, uint32_t len, uint8_t* conte
 		case MAC_READ:{
 			if (debug) console_print("MAC_READ in %s.\n", __func__);
 			server_mac(tx_buff);
-			lwdaq_data_return(s, tx_buff, strlen((char*) tx_buff));
+			lwdaq_data_return(server->socket, tx_buff, strlen((char*) tx_buff));
 		}
 		break;
 
 		case ECHO: {
 			if (debug) console_print("ECHO of %u bytes in %s.\n", len, __func__);
-			lwdaq_data_return(s, content, len);
-			content[len] = 0x00;
+			lwdaq_data_return(server->socket, content, len);
+			content[len] = '\0';
 			if (debug) console_print("%s\n", content);
 		}
 		break;
 
 		case REBOOT: {
 			if (debug) console_print("REBOOT in %s.\n", __func__);
-			tx_buff[0] = CLOSE_CODE;
-			tcp_writeall(&s, tx_buff, 1);
-			int counter = 1e6;
-			while (counter > 0) {
-				tcpip_tick();
-				counter--;
+			if (server->logged_in || eem_config_active.security_level == 0) {
+				tx_buff[0] = CLOSE_CODE;
+				tcp_writeall(&server->socket, tx_buff, 1);
+				int counter = 1e6;
+				while (counter > 0) {
+					tcpip_tick();
+					counter--;
+				}
+				pic_reset();
+			} else {
+				if (debug) console_print("REJECTED: not logged in.\n");
+				return -1;
 			}
-			pic_reset();
 		}
 		break;
 
 		default: {
-			if (debug) console_print("Unrecognised message in %s.\n", __func__);
+			if (debug) console_print("ERROR: Unrecognised message in %s.\n", __func__);
+			return -1;
 		}
 		break;
 	}
@@ -485,6 +500,7 @@ int lwdaq_tasks(tcpip_server_type* server) {
 	*/
 	if (server->state == S_LISTENING) {
 		rx_available = 0;
+		server->logged_in = false;
 		if (debug) console_print("Initialized %s connection in %s.\n",
 			server->protocol, __func__);
 		return 0;
@@ -542,20 +558,19 @@ int lwdaq_tasks(tcpip_server_type* server) {
 	}
 	
 	/*
-		We appear to have a valid and complete LWDAQ message, so pass it to the
-		message handler. We point the message handler to the tenth byte in our
-		buffer, which is byte nine, and corresponds to the first byte of the
-		message content. If the message handler returns an error, we exit with
-		the same error code.
+		We appear to have a complete LWDAQ message, so pass it to the message
+		handler. We point the message handler to the tenth byte in our buffer,
+		which is byte nine, and corresponds to the first byte of the message
+		content. If the message handler returns an error, we exit with the same
+		error code.
 	*/
-	status = lwdaq_handle_message(server->socket, id, len, &rx_buffer[9]);
+	status = lwdaq_handle_message(server, id, len, &rx_buffer[9]);
 	if (status<0) return status;
 	
 	/*
-		Because we always read from our socket as many bytes as it has to give,
-		we can read more than one message into our receive buffer at a time. If
-		we have received bytes following the message we just handled, copy all
-		the bytes to the front of the buffer, so we can begin our message
+		We always read from our socket as many bytes as it has to give. If we
+		have received bytes following the message we just handled, copy all the
+		bytes to the front of the buffer, so we can begin our message
 		accumulation process again.
 	*/
 	if (rx_available>len+FRAME_SIZE) {
@@ -573,8 +588,7 @@ int lwdaq_tasks(tcpip_server_type* server) {
 		"rx_available=%u in %s.\n", rx_available, __func__);
 		
 	/*
-		Return the number of bytes available. This will certainly be zero or greater,
-		so not an error.
+		Return the number of bytes available. This will certainly be zero or greater.
 	*/
 	return rx_available;
 }
