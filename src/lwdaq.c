@@ -277,7 +277,7 @@ int lwdaq_handle_message(tcpip_server_type* server,
 			eem_config_active.security_level, __func__);
 		return -1;
 	}
-		
+
 	switch (id) {
 		case BYTE_WRITE: {
 			register_addr = content[3];
@@ -438,7 +438,6 @@ int lwdaq_handle_message(tcpip_server_type* server,
 		}
 		break;
 	}
-	
 	return 0;
 }
 
@@ -487,16 +486,14 @@ int lwdaq_handle_message(tcpip_server_type* server,
 int lwdaq_tasks(tcpip_server_type* server) {
 	static uint8_t rx_buffer[TCP_RX_BUFF_SIZE];
 	static uint32_t rx_available = 0;
-	uint32_t id, len, rx_ready;
+	uint32_t id, len, rx_ready, rx_space, rx_received;
 	int status;
 
 	/*
 		When the server is listening for a new connection, and it receives a
 		connection, it calls the task routine. So when we check for the server
 		being in its listening state, we are checking to see if a new socket has
-		just been opened. We reset our input buffer. As some point, we would
-		like to introduce an idle timer her as well, so we can close the sockeet
-		when it is idle for too long. Here we would start the timer.
+		just been opened. We reset our input buffer.
 	*/
 	if (server->state == S_LISTENING) {
 		rx_available = 0;
@@ -513,9 +510,11 @@ int lwdaq_tasks(tcpip_server_type* server) {
 		available for us to read from the socket and add to our buffer.
 	*/
 	rx_ready = tcp_readcount(&server->socket);
+	rx_space = TCP_RX_BUFF_SIZE - rx_available;
+	if (rx_ready > rx_space) rx_ready = rx_space;
 	if (rx_ready>0) {
-		tcp_read(&server->socket, &rx_buffer[rx_available], rx_ready);	
-		rx_available = rx_available+rx_ready;
+		rx_received = tcp_read(&server->socket, &rx_buffer[rx_available], rx_ready);	
+		rx_available = rx_available + rx_received;
 	}
 	if (rx_available == 0) return 0;
 	
@@ -524,7 +523,7 @@ int lwdaq_tasks(tcpip_server_type* server) {
 		message. We need at least nine bytes: the start code, the four-byte
 		message identifier, and the four-byte length.
 	*/
-	if (debug && LWDAQ_DEBUG) console_print("rx_ready=%u rx_available=%u in %s.\n",
+	if (LWDAQ_DEBUG) console_print("rx_ready=%u rx_available=%u in %s.\n",
 		rx_ready, rx_available, __func__);
 	if (rx_buffer[0] != START_CODE) {
 		if (rx_buffer[0] == CLOSE_CODE) {
@@ -541,10 +540,9 @@ int lwdaq_tasks(tcpip_server_type* server) {
 		we have these, we can see if we have the content bytes in our buffer already. 
 		If not, we return the number of byts available and do nothing more.
 	*/
-	id = reverse_load_u32(&rx_buffer[1]);
-	len = reverse_load_u32(&rx_buffer[5]);
-	if (debug && LWDAQ_DEBUG) console_print(
-		"id=%u len=%u in %s.\n", id, len, __func__);
+	id = reverse_load_u32(&rx_buffer[ID_OFFSET]);
+	len = reverse_load_u32(&rx_buffer[CLEN_OFFSET]);
+	if (LWDAQ_DEBUG) console_print("id=%u len=%u in %s.\n", id, len, __func__);
 	if (rx_available<len+FRAME_SIZE) return rx_available;
 	
 	/*
@@ -564,7 +562,7 @@ int lwdaq_tasks(tcpip_server_type* server) {
 		content. If the message handler returns an error, we exit with the same
 		error code.
 	*/
-	status = lwdaq_handle_message(server, id, len, &rx_buffer[9]);
+	status = lwdaq_handle_message(server, id, len, &rx_buffer[CONTENT_OFFSET]);
 	if (status<0) return status;
 	
 	/*
@@ -573,19 +571,17 @@ int lwdaq_tasks(tcpip_server_type* server) {
 		bytes to the front of the buffer, so we can begin our message
 		accumulation process again.
 	*/
-	if (rx_available>len+FRAME_SIZE) {
-		if (debug && LWDAQ_DEBUG) console_print(
-			"Copying %u to %u from %u in %s.\n",
-			rx_available-len-FRAME_SIZE, 0, len+FRAME_SIZE, __func__);
+	if (rx_available > len + FRAME_SIZE) {
+		if (LWDAQ_DEBUG) console_print("Copying %u to %u from %u in %s.\n",
+			rx_available - len - FRAME_SIZE, 0, len + FRAME_SIZE, __func__);
 		memmove(&rx_buffer[0], 
 			&rx_buffer[len+FRAME_SIZE], 
-			rx_available-len-FRAME_SIZE);
-		rx_available = rx_available-len-FRAME_SIZE;
+			rx_available - len - FRAME_SIZE);
+		rx_available = rx_available - len - FRAME_SIZE;
 	} else {
 		rx_available = 0;
 	}
-	if (debug && LWDAQ_DEBUG) console_print(
-		"rx_available=%u in %s.\n", rx_available, __func__);
+	if (LWDAQ_DEBUG) console_print("rx_available=%u in %s.\n", rx_available, __func__);
 		
 	/*
 		Return the number of bytes available. This will certainly be zero or greater.

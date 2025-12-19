@@ -726,7 +726,7 @@ void tcpip_server(tcpip_server_type* server, tcpip_tasks_type tasks) {
 				interface_name = TCPIP_STACK_NetNameGet(net_hdl);
 				host_name = TCPIP_STACK_NetBIOSName(net_hdl);
 				console_print(
-					"%s server: interface %s on host %s initialized.\n",
+					"%s server waiting for IP address, interface %s, host %s.\n",
 					server->protocol,
 					interface_name,
 					string_trim(host_name));
@@ -789,7 +789,7 @@ void tcpip_server(tcpip_server_type* server, tcpip_tasks_type tasks) {
 				if (status >= 0) {
 					server->state = S_SERVING;
 				} else {
-					console_print("%s server socket closed by server.\n",
+					console_print("%s server socket closed.\n",
 						server->protocol);			
 					server->state = S_CLOSE;
 				}
@@ -802,16 +802,15 @@ void tcpip_server(tcpip_server_type* server, tcpip_tasks_type tasks) {
 				server->state = S_WAIT_IP;
 			} else if (!TCPIP_TCP_IsConnected(server->socket) ||
 					TCPIP_TCP_WasDisconnected(server->socket)) {
-				console_print("%s server socket closed by client.\n",
+				console_print("%s server socket closed.\n",
 					server->protocol);
 				server->state = S_CLOSE;
 			} else {
-				if (TCPIP_TCP_GetIsReady(server->socket) > 0) {
-					server->last_tick = SYS_TMR_TickCountGet();
-				}
 				if (eem_config_active.tcp_timeout > 0) {
-					if (SYS_TMR_TickCountGet() - server->last_tick 
-						>  (eem_config_active.tcp_timeout * 1000u)) {
+					if (TCPIP_TCP_GetIsReady(server->socket) > 0) {
+						server->last_tick = SYS_TMR_TickCountGet();
+					} else if (SYS_TMR_TickCountGet() - server->last_tick 
+							>  (eem_config_active.tcp_timeout * 1000u)) {
 						console_print("%s server timeout, closing socket.\n",
 							server->protocol);			
 						server->state = S_CLOSE;
@@ -819,7 +818,7 @@ void tcpip_server(tcpip_server_type* server, tcpip_tasks_type tasks) {
 				}
 				status = tasks(server);
 				if (status < 0) {
-					console_print("%s server socket closed by server.\n",
+					console_print("%s server socket closed.\n",
 						server->protocol);			
 					server->state = S_CLOSE;
 				}
