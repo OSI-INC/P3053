@@ -311,9 +311,7 @@ int main (void) {
 		tcpip_tick();
 		cli_server(&console_chan);
 		tcpip_server(&lwdaq_server, lwdaq_tasks);
-		if (telnet_enable) {
-			tcpip_server(&telnet_server, telnet_tasks);
-		}
+		if (telnet_enable) tcpip_server(&telnet_server, telnet_tasks);
 		lamp_signal(5e5);
 	}
 	

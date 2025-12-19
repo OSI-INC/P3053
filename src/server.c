@@ -711,6 +711,8 @@ void tcpip_server(tcpip_server_type* server, tcpip_tasks_type tasks) {
 	int status;
 	static bool print_init_wait = true;
 	static bool ping_sent = false;
+	
+	tcpip_tick();
 
 	switch (server->state) {
 		case S_WAIT_STACK: {

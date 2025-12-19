@@ -516,7 +516,15 @@ int lwdaq_tasks(tcpip_server_type* server) {
 		rx_received = tcp_read(&server->socket, &rx_buffer[rx_available], rx_ready);	
 		rx_available = rx_available + rx_received;
 	}
-	if (rx_available == 0) return 0;
+	
+	/*
+		If we have nothing available, we are going to return, but first: call 
+		tcpip_tick.
+	*/
+	if (rx_available == 0) {
+		tcpip_tick();
+		return 0;
+	}
 	
 	/*
 		We have at least one byte, so we will check to see if we have a complete
