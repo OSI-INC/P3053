@@ -457,7 +457,7 @@ void cli_reset(cli_chan_type *ch, char *args) {
 	cli_message(ch, "Resetting the EEM...\n");
 	int counter = 1e6;
 	while (counter > 0) {
-		tcpip_tick();
+		tcp_tick();
 		counter--;
 	}
 	pic_reset();

@@ -47,6 +47,7 @@ eem_config_type eem_config_active;
 */
 const eem_config_type eem_config_factory = {
 	.magic_str = CONFIG_FLASH_MAGIC,
+	.security_level = 0,
 	.password_str = "LWDAQ",
 	.operator_str = "unassigned",
 	.ip_str = "10.0.0.37",
@@ -56,8 +57,9 @@ const eem_config_type eem_config_factory = {
 	.device_str = "A3053A",
 	.lwdaq_port = 90,
 	.telnet_port = 23,
-	.security_level = 0,
-	.tcp_timeout = 0
+	.lwdaq_timeout = 10,
+	.telnet_timeout = 300,
+	.tcp_tick_ms = 2
 };
 
 /*
@@ -104,17 +106,19 @@ int eem_config_read(eem_config_type* config_ptr) {
 */
 int server_str_from_config(char* str, const eem_config_type* config_ptr) {
 	int len = 0;
+	len += sprintf(str+len, "security_level: %u\n", config_ptr->security_level);
+	len += sprintf(str+len, "password_str: %s\n", config_ptr->password_str);
+	len += sprintf(str+len, "operator_str: %s\n", config_ptr->operator_str);
+	len += sprintf(str+len, "time_str: %s\n", config_ptr->time_str);
 	len += sprintf(str+len, "ip_str: %s\n", config_ptr->ip_str);
 	len += sprintf(str+len, "gw_str: %s\n", config_ptr->gw_str);
 	len += sprintf(str+len, "nm_str: %s\n", config_ptr->nm_str);
-	len += sprintf(str+len, "operator_str: %s\n", config_ptr->operator_str);
-	len += sprintf(str+len, "time_str: %s\n", config_ptr->time_str);
-	len += sprintf(str+len, "password_str: %s\n", config_ptr->password_str);
 	len += sprintf(str+len, "device_str: %s\n", config_ptr->device_str);
 	len += sprintf(str+len, "lwdaq_port: %u\n", config_ptr->lwdaq_port);
 	len += sprintf(str+len, "telnet_port: %u\n", config_ptr->telnet_port);
-	len += sprintf(str+len, "security_level: %u\n", config_ptr->security_level);
-	len += sprintf(str+len, "tcp_timeout: %u", config_ptr->tcp_timeout);
+	len += sprintf(str+len, "lwdaq_timeout: %u\n", config_ptr->lwdaq_timeout);
+	len += sprintf(str+len, "telnet_timeout: %u\n", config_ptr->telnet_timeout);
+	len += sprintf(str+len, "tcp_tick_ms: %u", config_ptr->tcp_tick_ms);
 	return len;
 }
 
@@ -152,7 +156,22 @@ int eem_config_from_str(eem_config_type *config_ptr, const char *str) {
 		size_t name_len = colon - line_start;
 		size_t value_len = line_end - value;
 	
-		if (strncmp(line_start, "ip_str", name_len) == 0) {
+		if (strncmp(line_start, "security_level", name_len) == 0) {
+			config_ptr->security_level = (uint32_t) strtoul(value, NULL, 10);
+			num_copied++;
+		} else if (strncmp(line_start, "password_str", name_len) == 0) {
+			snprintf(config_ptr->password_str, sizeof(config_ptr->password_str),
+				"%.*s", (int)value_len, value);
+			num_copied++;
+		} else if (strncmp(line_start, "operator_str", name_len) == 0) {
+			snprintf(config_ptr->operator_str, sizeof(config_ptr->operator_str),
+				"%.*s", (int) value_len, value);
+			num_copied++;
+		} else if (strncmp(line_start, "time_str", name_len) == 0) {
+			snprintf(config_ptr->time_str, sizeof(config_ptr->time_str),
+				"%.*s", (int) value_len, value);
+			num_copied++;
+		} else if (strncmp(line_start, "ip_str", name_len) == 0) {
 			snprintf(config_ptr->ip_str, sizeof(config_ptr->ip_str),
 				"%.*s", (int)value_len, value);
 			num_copied++;
@@ -164,18 +183,6 @@ int eem_config_from_str(eem_config_type *config_ptr, const char *str) {
 			snprintf(config_ptr->nm_str, sizeof(config_ptr->nm_str),
 				"%.*s", (int) value_len, value);
 			num_copied++;
-		} else if (strncmp(line_start, "operator_str", name_len) == 0) {
-			snprintf(config_ptr->operator_str, sizeof(config_ptr->operator_str),
-				"%.*s", (int) value_len, value);
-			num_copied++;
-		} else if (strncmp(line_start, "time_str", name_len) == 0) {
-			snprintf(config_ptr->time_str, sizeof(config_ptr->time_str),
-				"%.*s", (int) value_len, value);
-			num_copied++;
-		} else if (strncmp(line_start, "password_str", name_len) == 0) {
-			snprintf(config_ptr->password_str, sizeof(config_ptr->password_str),
-				"%.*s", (int)value_len, value);
-			num_copied++;
 		} else if (strncmp(line_start, "device_str", name_len) == 0) {
 			snprintf(config_ptr->password_str, sizeof(config_ptr->device_str),
 				"%.*s", (int)value_len, value);
@@ -186,11 +193,14 @@ int eem_config_from_str(eem_config_type *config_ptr, const char *str) {
 		} else if (strncmp(line_start, "telnet_port", name_len) == 0) {
 			config_ptr->telnet_port = (uint32_t) strtoul(value, NULL, 10);
 			num_copied++;
-		} else if (strncmp(line_start, "security_level", name_len) == 0) {
-			config_ptr->security_level = (uint32_t) strtoul(value, NULL, 10);
+		} else if (strncmp(line_start, "lwdaq_timeout", name_len) == 0) {
+			config_ptr->lwdaq_timeout = (uint32_t) strtoul(value, NULL, 10);
 			num_copied++;
-		} else if (strncmp(line_start, "tcp_timeout", name_len) == 0) {
-			config_ptr->tcp_timeout = (uint32_t) strtoul(value, NULL, 10);
+		} else if (strncmp(line_start, "telnet_timeout", name_len) == 0) {
+			config_ptr->telnet_timeout = (uint32_t) strtoul(value, NULL, 10);
+			num_copied++;
+		} else if (strncmp(line_start, "tcp_tick_ms", name_len) == 0) {
+			config_ptr->tcp_tick_ms = (uint32_t) strtoul(value, NULL, 10);
 			num_copied++;
 		}
 		
@@ -204,40 +214,60 @@ int eem_config_from_str(eem_config_type *config_ptr, const char *str) {
 }
 
 /*
-	tcpip_tick maintains the TCP/IP stack without checking the status of any
-	particular socket. It returns no value. It refers to the global sysObj
-	structure declared in definitions.h of our Harmony library. 
+	tcp_tick maintains the TCP/IP stack and the Ethernet physical interface
+	driver. The TCP/IP stack maintenance TPIP_STACK_Task routine and the MIIM
+	driver routines must be called often enough to sustain communication, but
+	not so often that repeated calls cause the network to freeze. The tcp_tick
+	routine keeps a timer and calls the maintenance routines at regular
+	intervals. The period with which it calls the routines is given by the
+	tcp_tick_ms field in the active EEM configuration. After calling the
+	maintenance routines, tcp_tick returns a 1. If is is waiting, it returns a
+	zero. 
 */
-void tcpip_tick(void) {
-	DRV_MIIM_OBJECT_BASE_Default.DRV_MIIM_Tasks(sysObj.drvMiim_0);
-	TCPIP_STACK_Task(sysObj.tcpip);
-}
-
-/*
-	tcpip_socket_tick maintains the TCP/IP stack and checks to see if a particular
-	socket is still open. This routine must be called by any protocol task
-	whenever it enters a loop waiting for some other process to complete. We say
-	the protocol task is "blocking". When this routine returns a negative value,
-	the protocol task must stop blocking and return control to the tcpip_server
-	routine that manages the protocol connections. The protocol task must pass
-	back a negative value so that the tcpip_server can close the listening
-	socket and open a new one. The routine takes as its argument a TCP/IP socket
-	handle and returns a negative value when the socket has been closed or has
-	been determined by the stack to be disconnected.
-*/
-int tcpip_socket_tick(void* context) {
-	TCP_SOCKET sock = *(TCP_SOCKET *) context;
-	tcpip_tick();
-	if (!TCPIP_TCP_IsConnected(sock) || TCPIP_TCP_WasDisconnected(sock)) {
-		return -1;
+int tcp_tick(void) {
+	static uint32_t last_tick = 0;
+	uint32_t tick_count = SYS_TMR_TickCountGet();
+	
+	if (tick_count - last_tick >= eem_config_active.tcp_tick_ms) {		
+		DRV_MIIM_OBJECT_BASE_Default.DRV_MIIM_Tasks(sysObj.drvMiim_0);
+		TCPIP_STACK_Task(sysObj.tcpip);
+		last_tick = tick_count;
+		return 1;
 	} else {
 		return 0;
 	}
 }
 
 /*
-	tcp_readcount returns the number of bytes that are ready to be read out of
-	a TCP socket. It is a wrapper for a Harmony routine. It converts sixteen-bit
+	tcp_sock_tick maintains the TCP/IP stack and checks to see if a particular
+	socket is still open. It calls tcp_tick and checks its socket only if
+	tcp_tick has called the network maintenance routines, which it will do every
+	tcp_tick_ms. Any protocol task that enters a loop waiting for some other
+	process to complete (a blocking process) must call this procedure. When this
+	routine returns a negative value, the protocol task must stop blocking and
+	return control to the tcpip_server routine that manages the protocol
+	connections. The protocol task must pass back a negative value so that the
+	tcpip_server can close the listening socket and open a new one. The routine
+	takes as its argument a TCP/IP socket handle and returns a negative value
+	when the socket has been closed or has been determined by the stack to be
+	disconnected. It returns zero if it did not check anything.
+*/
+int tcp_sock_tick(void* context) {
+	TCP_SOCKET sock = *(TCP_SOCKET *) context;
+	if (tcp_tick()) {
+		if (!TCPIP_TCP_IsConnected(sock) || TCPIP_TCP_WasDisconnected(sock)) {
+			return -1;
+		} else {
+			return 1;
+		}
+	} else {
+		return 0;
+	}
+}
+
+/*
+	tcp_readcount returns the number of bytes that are ready to be read out of a
+	TCP socket. It is a wrapper for a Harmony routine. It converts sixteen-bit
 	integers to thirty-two bit integers for our thirty-two bit processor. Its
 	name is in our opinion more suitable.	
 */ 
@@ -306,7 +336,7 @@ int tcp_putchar(void* context, char c) {
 	TCP_SOCKET sock= *(TCP_SOCKET *) context;
 	if (sock == INVALID_SOCKET) return -2;
 	while (TCPIP_TCP_PutIsReady(sock) == 0) {
-		if (tcpip_socket_tick(context) < 0) return -2;
+		if (tcp_sock_tick(context) < 0) return -2;
 	}
 	if (TCPIP_TCP_ArrayPut(sock, (uint8_t *)&c, 1) == 1) return 1;
 	return 0;
@@ -327,7 +357,7 @@ int tcp_flush(void* context) {
 	tcp_writeall attempts to write all requested bytes by repeatedly writing as
 	many bytes as possible to the outgoing buffer, flushing the socket, and
 	writing more bytes to the buffer until all bytes are sent. While it is
-	waiting for bytes to be transmitted, it calls tcpip_socket_tick, and if this
+	waiting for bytes to be transmitted, it calls tcp_sock_tick, and if this
 	routine returns an error, the write routine must abort and itself return an
 	error. If it does not return an error, it returns the number of bytes
 	written, which must be the number specified.
@@ -339,7 +369,7 @@ int tcp_writeall(void* context, const uint8_t *buf, uint16_t len) {
 		written = tcp_write(context, buf+total, len-total);
 		total = total + written;
 		if (total < len) {
-			if (tcpip_socket_tick(context) < 0) {return -1;}
+			if (tcp_sock_tick(context) < 0) {return -1;}
 		}
 	}
 	tcp_flush(context);
@@ -627,9 +657,9 @@ bool tcpip_server_restart(tcpip_server_type* server) {
 			TCPIP_TCP_Close(server->socket);
 			server->socket = INVALID_SOCKET;
 		}
-		tcpip_tick();
-		tcpip_tick();
-		tcpip_tick();
+		tcp_tick();
+		tcp_tick();
+		tcp_tick();
 		return true;
 	} else {
 		return false;
@@ -647,7 +677,7 @@ bool tcpip_server_restart(tcpip_server_type* server) {
 
 	The tcpip_server is a state machine that does not block its calling
 	procedure, excepting when the protocol task provided to it causes a block.
-	The task procedure is permitted to block, but it must call tcpip_socket_tick
+	The task procedure is permitted to block, but it must call tcp_sock_tick
 	while it is blocking, so as to maintain the TCP/IP stack, and to detect
 	closure of the socket by the client. If the client closes the socket, the
 	protocol task must abort and return a negative value. The tcpip_server will
@@ -712,8 +742,6 @@ void tcpip_server(tcpip_server_type* server, tcpip_tasks_type tasks) {
 	static bool print_init_wait = true;
 	static bool ping_sent = false;
 	
-	tcpip_tick();
-
 	switch (server->state) {
 		case S_WAIT_STACK: {
 			tcpip_status = TCPIP_STACK_Status(sysObj.tcpip);
@@ -808,11 +836,11 @@ void tcpip_server(tcpip_server_type* server, tcpip_tasks_type tasks) {
 					server->protocol);
 				server->state = S_CLOSE;
 			} else {
-				if (eem_config_active.tcp_timeout > 0) {
+				if (server->tcp_timeout > 0) {
 					if (TCPIP_TCP_GetIsReady(server->socket) > 0) {
 						server->last_tick = SYS_TMR_TickCountGet();
 					} else if (SYS_TMR_TickCountGet() - server->last_tick 
-							>  (eem_config_active.tcp_timeout * 1000u)) {
+							>  (server->tcp_timeout * 1000u)) {
 						console_print("%s server timeout, closing socket.\n",
 							server->protocol);			
 						server->state = S_CLOSE;

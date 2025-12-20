@@ -51,6 +51,7 @@
 typedef char eem_config_str[EEM_CONFIG_STR_SIZE];
 typedef struct {
 	eem_config_str magic_str;
+    uint32_t security_level;
     eem_config_str password_str;
     eem_config_str operator_str;
 	eem_config_str ip_str;
@@ -60,8 +61,9 @@ typedef struct {
     eem_config_str device_str;
     uint16_t lwdaq_port;
 	uint16_t telnet_port;
-    uint32_t security_level;
-    uint32_t tcp_timeout;
+    uint32_t lwdaq_timeout;
+    uint32_t telnet_timeout;
+    uint32_t tcp_tick_ms;
 } eem_config_type;
 
 /*
@@ -137,14 +139,11 @@ int eem_config_from_str(eem_config_type* config_ptr, const char* str);
 #define TCP_RX_BUFF_SIZE 4096
 
 /*
-	Two procedures that maintain the TCP/IP stack, including the Ethernet
-	physical interface driver. The first, tcpip_tick, takes no arguments and
-	returns no value. This procedure can be called anywhere without specifying a
-	socket. The second takes a TCP/IP socket as its argument and returns a
-	negative value if and only if the socket is closed or disconnected.
+	Two procedures that maintain the TCP/IP stack and Ethernet
+	physical interface driver.
 */
-void tcpip_tick(void);
-int tcpip_socket_tick(void* context);
+int tcp_tick(void);
+int tcp_sock_tick(void* context);
 
 /*
 	Routines that read and write from sockets. These are wrappers for Harmony
@@ -209,6 +208,7 @@ typedef struct {
 	uint16_t bound_port;
 	char* ip_str;
 	char bound_ip_str[EEM_CONFIG_STR_SIZE];
+	uint32_t tcp_timeout;
 	uint32_t last_tick;
 	bool logged_in;
 } tcpip_server_type;
@@ -230,8 +230,8 @@ int server_info(char* out);
 /*
  	A tcpip_tasks_type is the type of procedure that will be called by our
  	generic TCP/IP server. It must take as argument a tcpip_server_info
- 	structure. If it blocks the server, it must call tcpip_socket_tick while it
- 	is blocking. If tcpip_socket_tick returns a negative value, the task must
+ 	structure. If it blocks the server, it must call tcp_sock_tick while it
+ 	is blocking. If tcp_sock_tick returns a negative value, the task must
  	abort and return a negative value itself.
 */
 typedef int (*tcpip_tasks_type)(tcpip_server_type* s);

@@ -69,8 +69,10 @@
 #define LWDAQ_DEBUG 0
 
 /*
-	The LWDAQ server record. We must assign the port pointer before trying to
-	start the LWDAQ server.
+	The LWDAQ server record. We must assign the port and IP string pointers
+	before trying to start the LWDAQ server. By default, we disable the timout
+	with value zero. We must set the timeout to a number of seconds before
+	starting our server if we want the server to close an idle socket.
 */
 #define DEFAULT_LWDAQ_PORT 90
 tcpip_server_type lwdaq_server = {
@@ -81,6 +83,8 @@ tcpip_server_type lwdaq_server = {
     .bound_port = 0,
     .ip_str = NULL,
     .bound_ip_str = "0.0.0.0",
+    .tcp_timeout = 0,
+    .last_tick = 0,
     .logged_in = false
 };
 	
@@ -167,7 +171,7 @@ int lwdaq_str_from_config(char* str, const eem_config_type* config_ptr) {
 	len += sprintf(str+len, "password: %s\n", config_ptr->password_str);
 	len += sprintf(str+len, "security_level: %u\n", config_ptr->security_level);
 	len += sprintf(str+len, "subnet_mask: %s\n", config_ptr->nm_str);
-	len += sprintf(str+len, "tcp_timeout: %u\n", config_ptr->tcp_timeout);
+	len += sprintf(str+len, "tcp_timeout: %u\n", config_ptr->lwdaq_timeout);
 	return len;
 }
 
@@ -239,7 +243,7 @@ int lwdaq_config_from_str(eem_config_type *config_ptr, const char *str) {
 			config_ptr->security_level = (uint32_t) strtoul(value, NULL, 10);
 			num_copied++;
 		} else if (strncmp(line_start, "tcp_timeout", name_len) == 0) {
-			config_ptr->tcp_timeout = (uint32_t) strtoul(value, NULL, 10);
+			config_ptr->lwdaq_timeout = (uint32_t) strtoul(value, NULL, 10);
 			num_copied++;
 		}
 		
@@ -303,7 +307,7 @@ int lwdaq_handle_message(tcpip_server_type* server,
 			if (debug) console_print("BYTE_POLL of %d for %d in %s.\n",
 				register_addr, value, __func__);
 			while (mpcie_byte_read(register_addr) != value) {
-				if (tcpip_socket_tick(&server->socket)<0) return -1;
+				if (tcp_sock_tick(&server->socket)<0) return -1;
 			}
 		}
 		break;
@@ -325,13 +329,13 @@ int lwdaq_handle_message(tcpip_server_type* server,
 				for (int j = 0; j < tx_len; j++) {
 					mpcie_byte_write(62, 0);
 					while (mpcie_byte_read(62) == 0) {
-						if (tcpip_socket_tick(&server->socket)<0) return -1;
+						if (tcp_sock_tick(&server->socket) < 0) return -1;
 					}
 					tx_buff[i] = mpcie_byte_read(register_addr);
 					i++;
 					if ((i == sizeof(tx_buff)) || (j == tx_len - 1)) {
 						tcp_writeall(&server->socket, tx_buff, i);
-						if (tcpip_socket_tick(&server->socket) < 0) {
+						if (tcp_sock_tick(&server->socket) < 0) {
 							console_print(
 								"ERROR: Failed to write %d bytes in %s.\n", i, __func__);
 							return -1;
@@ -421,7 +425,7 @@ int lwdaq_handle_message(tcpip_server_type* server,
 				tcp_writeall(&server->socket, tx_buff, 1);
 				int counter = 1e6;
 				while (counter > 0) {
-					tcpip_tick();
+					tcp_tick();
 					counter--;
 				}
 				pic_reset();
@@ -488,7 +492,7 @@ int lwdaq_tasks(tcpip_server_type* server) {
 	static uint32_t rx_available = 0;
 	uint32_t id, len, rx_ready, rx_space, rx_received;
 	int status;
-
+	
 	/*
 		When the server is listening for a new connection, and it receives a
 		connection, it calls the task routine. So when we check for the server
@@ -504,8 +508,8 @@ int lwdaq_tasks(tcpip_server_type* server) {
 	};
 
 	/*
-		If we get here, the server is handling an existing, open socket. Our input
-		buffer counter is persistent from one call to the next, so we know how many
+		The server is handling an existing, open socket. Our input buffer
+		counter is persistent from one call to the next, so we know how many
 		bytes we have in our buffer. We start by finding out how many bytes are
 		available for us to read from the socket and add to our buffer.
 	*/
@@ -518,13 +522,9 @@ int lwdaq_tasks(tcpip_server_type* server) {
 	}
 	
 	/*
-		If we have nothing available, we are going to return, but first: call 
-		tcpip_tick.
+		If we have nothing available, we are going to return.
 	*/
-	if (rx_available == 0) {
-		tcpip_tick();
-		return 0;
-	}
+	if (rx_available == 0) return 0;
 	
 	/*
 		We have at least one byte, so we will check to see if we have a complete
@@ -551,7 +551,16 @@ int lwdaq_tasks(tcpip_server_type* server) {
 	id = reverse_load_u32(&rx_buffer[ID_OFFSET]);
 	len = reverse_load_u32(&rx_buffer[CLEN_OFFSET]);
 	if (LWDAQ_DEBUG) console_print("id=%u len=%u in %s.\n", id, len, __func__);
-	if (rx_available<len+FRAME_SIZE) return rx_available;
+	
+	/*
+		We have the header, but we don't have all the content yet, so return.
+		The LWDAQ client is responsible for making sure that any incoming data
+		is broken into chunks smaller than our receive buffer. In the LWDAQ
+		client code, we assume the rx_buffer has size is equal to the
+		LWDAQ_Driver parameter server_buffer_size = 1400 bytes. In this server,
+		the buffer is can accommodate TCP_RX_BUFF_SIZE = 4096 bytes.
+	*/
+	if (rx_available < len + FRAME_SIZE) return rx_available;
 	
 	/*
 		We have all the content bytes we need, and a byte afterwards for the end
