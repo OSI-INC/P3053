@@ -17,6 +17,12 @@
 	this program.  If not, see <https://www.gnu.org/licenses/>.	
 */
 
+/*
+	The standard C headers we trust the compiler will know how to find. The
+	Microchip library headers are configuration.h and definitions.h. The
+	compiler must be told where to look for these two files. The remaining
+	interfaces are those that go with our EEM implementation files.
+*/
 #include <stdio.h>
 #include <stdint.h>
 #include <stddef.h>				  
@@ -30,10 +36,11 @@
 #include "tcpip/tcpip.h"
 #include "tcpip/src/tcpip_private.h"
 #include "tcpip/icmp.h"
+#include "utils.h"
+#include "config.h"
+#include "pic.h"
 #include "server.h"
 #include "console.h"
-#include "utils.h"
-#include "pic.h"
 
 /*
 	The active EEM configuration, a global variable. Intended to reflect the
@@ -217,10 +224,14 @@ int eem_config_from_str(eem_config_type *config_ptr, const char *str) {
 	tcp_tick maintains the TCP/IP stack and the Ethernet physical interface
 	driver. The TCP/IP stack maintenance TPIP_STACK_Task routine and the MIIM
 	driver routines must be called often enough to sustain communication, but
-	not so often that repeated calls cause the network to freeze. The tcp_tick
-	routine keeps a timer and calls the maintenance routines at regular
-	intervals. The period with which it calls the routines is given by the
-	tcp_tick_ms field in the active EEM configuration. After calling the
+	not so often that repeated calls cause the network to freeze. In one
+	iteration of our code, we found that calling the stack maintenance routine
+	repeatedly in a polling loop for forty milliseconds froze the entire EEM
+	roughly half the time. When we introduced the throttling of the calls with a
+	tick-count timer, the freeze never occurred in that same loop nor any other.
+	The tcp_tick routine keeps a timer and calls the maintenance routines at
+	regular intervals. The period with which it calls the routines is given by
+	the tcp_tick_ms field in the active EEM configuration. After calling the
 	maintenance routines, tcp_tick returns a 1. If is is waiting, it returns a
 	zero. 
 */
@@ -461,8 +472,6 @@ int server_set_ip(const char* ip_str, const char* gw_str, const char* nm_str) {
 		console_print("ERROR: Failed to set gateway in %s.\n", __func__);
 		return -1;
 	}
-	console_print("Set ip=%s, gw=%s, nm=%s in %s.\n", 
-		ip_str, gw_str, nm_str, __func__);
 	
 	strcpy(eem_config_active.ip_str, ip_str);
 	strcpy(eem_config_active.gw_str, gw_str);

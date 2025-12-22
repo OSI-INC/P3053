@@ -101,7 +101,7 @@ uint8_t cd_read_bus(void) {
 }
 
 /*
-App_Tasks, shown below, is the original TCP/IP echo server from the Harmony
+App_Tasks, shown below, is the original TCP/IP echo server from the Microchip
 example project. It contains a serious bug. Its management of the receive buffer
 violates the range of the receive buffer. Because the receive buffer resides in
 the stack, writing past the end of the buffer overwrites a location in the
@@ -117,7 +117,7 @@ not figure out why in the time they had available, and decided to restore the
 declaration to its development location and move on to their next programming
 project.
 
-WARNING: assume that all of the Harmony code is written in the same spirit. The
+WARNING: assume that all of the Microchip code is written in the same spirit. The
 code works within the bounds that it was tested, but any change that you make to
 it, however trivial, even in the ordering or location of variable declarations,
 can break the code.

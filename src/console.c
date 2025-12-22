@@ -17,6 +17,12 @@
 	this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+/*
+	The standard C headers we trust the compiler will know how to find. The
+	Microchip library headers are configuration.h and definitions.h. The
+	compiler must be told where to look for these two files. The remaining
+	interfaces are those that go with our EEM implementation files.
+*/
 #include <stdio.h>
 #include <stdint.h>
 #include <stddef.h>                  
@@ -28,6 +34,7 @@
 #include "configuration.h"
 #include "definitions.h"
 #include "utils.h"
+#include "config.h"
 #include "pic.h"
 #include "server.h"
 #include "console.h"
@@ -161,7 +168,7 @@ void console_dump_ascii(const char* s) {
 }
 
 /*
-	SYS_CONSOLE_Write is a routine used by the Harmony system processes. It
+	SYS_CONSOLE_Write is a routine used by the Microchip system processes. It
 	writes a raw byte array write to the console, with no regard to the contents
 	of the string, including no recognition of a null character as a terminator.
 	We pass it an index to select a console, which in our case we ignore. We
@@ -172,7 +179,7 @@ void SYS_CONSOLE_Write(int index, const void* buff, size_t size) {
 }
 
 /*
-	SYS_CONSOLE_Message is a routine used by Harmony system processes. It
+	SYS_CONSOLE_Message is a routine used by Microchip system processes. It
 	prints a literal string to the console. Its first argument is an index that
 	selects the console to be printed to, but we have only one console, so we
 	ignore the index. The next argument is a pointer to a null-terminated
@@ -184,7 +191,7 @@ void SYS_CONSOLE_Message(int index, const char* msg) {
 }
 
 /*
-	SYS_CONSOLE_Print is a routine used by the Harmony system processes. It
+	SYS_CONSOLE_Print is a routine used by the Microchip system processes. It
 	prints a string with formatted contents to the console. Its first argument
 	is an index that selects a console to be printed to, but we have only one
 	console, so we ignore the index. The next argument is a pointer to a
@@ -205,7 +212,7 @@ void SYS_CONSOLE_Print(int index, const char* fmt, ...) {
 }
 
 /*
-	SYS_CONSOLE_ReadCountGet is a routine used by the Harmony system processes.
+	SYS_CONSOLE_ReadCountGet is a routine used by the Microchip system processes.
 	It returns the number of bytes available for reading in the console receive
 	buffer. We pass it a console index, but here we ignore that index.
 */
@@ -215,13 +222,13 @@ int SYS_CONSOLE_ReadCountGet(int index) {
 }
 
 /*
-	SYS_CONSOLE_Read is a routine used by the Harmony system processes. It reads
+	SYS_CONSOLE_Read is a routine used by the Microchip system processes. It reads
 	up to size bytes from the console receive buffer. We pass the routine a
 	console index, a pointer to a buffer in memory, and the number of bytes to
 	be read. We ignore the console index. If there are fewer than size bytes
 	available, the routine returns all available bytes, but makes no effort to
 	indicate how many bytes were read. It does not add a null terminator. The
-	way Harmony uses this routine is to first use SYS_CONSOLE_ReadCountGet, so
+	way Microchip uses this routine is to first use SYS_CONSOLE_ReadCountGet, so
 	that it already knows how many bytes are available, and then it reads those
 	available bytes. The routine transfers the bytes from the console receive
 	buffer into the buffer.
@@ -238,17 +245,17 @@ void SYS_CONSOLE_Read(int index, void* buff, size_t size) {
 }
 
 /*
-	SYS_CONSOLE_Tasks is a routine used by the Harmony system processes. It is
+	SYS_CONSOLE_Tasks is a routine used by the Microchip system processes. It is
 	intended to perform a polling task. We are not going to do any polling for
-	the Harmony processes, so our implementation of the routine does nothing.
+	the Microchip processes, so our implementation of the routine does nothing.
 */
 void SYS_CONSOLE_Tasks(int index) {
 }
 
 /*
-	SYS_CONSOLE_Tasks is a routine used by the Harmony system processes. It is
+	SYS_CONSOLE_Tasks is a routine used by the Microchip system processes. It is
 	intended to perform polling tasks. We are not going to do any polling for
-	the Harmony processes, so our implementation of the routine does nothing.
+	the Microchip processes, so our implementation of the routine does nothing.
 */
 void SYS_CONSOLE_Task(int index) {
 }

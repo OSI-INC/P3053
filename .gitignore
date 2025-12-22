@@ -1,9 +1,5 @@
 /**/.DS_Store
-/build/release/src
-/build/release/P3053A.elf
-/build/release/P3053A.map
-/build/release/memoryfile.xml
-/build/debug/src
-/build/debug/P3053A.elf
-/build/debug/P3053A.map
-/build/debug/memoryfile.xml
+/build/src
+/build/P3053A.elf
+/build/P3053A.map
+/build/memoryfile.xml

@@ -1,7 +1,7 @@
 /*
 	utils.h -- Interface of the General-Purpose Utility library. These routines
-	do not use any Harmony or EEM-specific routines, only the standard run-time
-	library.
+	do not use any Microchip or EEM-specific functions, only the standard
+	C-Languate run-time library.
 
 	(C) 2025, Kevan Hashemi, Open Source Instruments Inc.
 

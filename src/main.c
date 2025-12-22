@@ -19,12 +19,13 @@
 
 	This is the main program of our P3053 repository, where "3053" is the Open
 	Source Instruments Inc. (OSI) assembly number for the Embedded Etherenet
-	Module. The repository contains hundreds files from from Microchip's Harmony
-	library. These are all stored in the /src/config directory. They provide the
-	driver for our Ethernet physical layer (LAN8720A), the TCP/IP stack,
-	utilities like "ping", and provide access to the PIC32MZ's interrupts,
-	configuration registers, flash memory, system timers, peripheral interfaces,
-	and peripheral pin selection (PPS).
+	Module. The repository contains hundreds files from from Microchip's
+	"Harmony3 Library", which we will refer to in our comments a as the
+	"Microchip Library". Our Microchip Library files are stored in
+	/src/microchip directory. They provide the driver for our Ethernet physical
+	layer (LAN8720A), the TCP/IP stack, utilities like "ping", and provide
+	access to the PIC32MZ's interrupts, configuration registers, flash memory,
+	system timers, peripheral interfaces, and peripheral pin selection (PPS).
 
 	The source code provided by OSI is in the /src directory. With server.c, we
 	providesa generic server state machine, which we use to provide LWDAQ and
@@ -60,12 +61,12 @@
 	the global "debug" flag, which is cleared for release and set for debug. We
 	use the debug flag to enable debug printouts embedded in the code.
 
-	The Harmony files in this repository retain their original Microchip
-	copyright statements without modification. The top-level files are provided
-	by Open Source Instruments Inc. (OSI). These we distribute under the GNU
-	General Public License (GPL). The GPL is far more restrictive than the
-	Microchip license. Anyone incorporating GPL files into their own work must
-	release the completed work under GPL as well.
+	The Microchip Harmony3 files in this repository retain their original
+	Microchip copyright statements without modification. The top-level files are
+	provided by Open Source Instruments Inc. (OSI). These we distribute under
+	the GNU General Public License (GPL). The GPL is far more restrictive than
+	the Microchip license. Anyone incorporating GPL files into their own work
+	must release the completed work under GPL as well.
 
 	Copyright (C) 2025, Kevan Hashemi, Open Source Instruments Inc.
 
@@ -83,6 +84,12 @@
 	this program. If not, see <https://www.gnu.org/licenses/>.
 */
 
+/*
+	The standard C headers we trust the compiler will know how to find. The
+	Microchip library headers are configuration.h and definitions.h. The
+	compiler must be told where to look for these two files. The remaining
+	interfaces are those that go with our EEM implementation files.
+*/
 #include <stdio.h>
 #include <stdint.h>
 #include <stddef.h>				  
@@ -92,6 +99,7 @@
 #include "configuration.h"
 #include "definitions.h"
 #include "utils.h"
+#include "config.h"
 #include "pic.h"
 #include "cli.h"
 #include "console.h"
@@ -103,9 +111,9 @@
 	Telnet server, which should be made available in all debug builds. We must
 	assign the port pointer and IP sstring pointers before trying to start the
 	Telnet server. If we want a timeout, we must set the timeout in seconds as
-	well.
+	well. Note that the Telnet server is enabled by the telnet_enable flag declared
+	in config.h.
 */
-#define TELNET_ENABLE true
 #define DEFAULT_TELNET_PORT 23
 tcpip_server_type telnet_server = {
     .protocol = "Telnet",
@@ -315,7 +323,7 @@ int main (void) {
 		tcp_tick();
 		cli_server(&console_chan);
 		tcpip_server(&lwdaq_server, lwdaq_tasks);
-		if (TELNET_ENABLE) tcpip_server(&telnet_server, telnet_tasks);
+		if (telnet_enable) tcpip_server(&telnet_server, telnet_tasks);
 		lamp_signal(5e5);
 	}
 	

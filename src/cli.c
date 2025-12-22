@@ -17,6 +17,12 @@
 	this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+/*
+	The standard C headers we trust the compiler will know how to find. The
+	Microchip library headers are configuration.h and definitions.h. The
+	compiler must be told where to look for these two files. The remaining
+	interfaces are those that go with our EEM implementation files.
+*/
 #include <stdio.h>
 #include <stdint.h>
 #include <stddef.h>                  
@@ -28,6 +34,7 @@
 #include "configuration.h"
 #include "definitions.h"
 #include "utils.h"
+#include "config.h"
 #include "server.h"
 #include "cli.h"
 #include "console.h"

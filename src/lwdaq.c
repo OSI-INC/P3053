@@ -17,7 +17,12 @@
 	this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-// Include files.
+/*
+	The standard C headers we trust the compiler will know how to find. The
+	Microchip library headers are configuration.h and definitions.h. The
+	compiler must be told where to look for these two files. The remaining
+	interfaces are those that go with our EEM implementation files.
+*/
 #include <stdio.h>
 #include <stdint.h>
 #include <stddef.h>				  
@@ -27,13 +32,11 @@
 #include "configuration.h"
 #include "definitions.h"
 #include "utils.h"
+#include "config.h"
 #include "pic.h"
 #include "server.h"
 #include "console.h"
 #include "lwdaq.h"
-
-// Software version number.
-#define RELAY_VERSION 32
 
 // LWDAQ messages
 #define START_CODE 0xA5 
@@ -307,7 +310,7 @@ int lwdaq_handle_message(tcpip_server_type* server,
 			if (debug) console_print("BYTE_POLL of %d for %d in %s.\n",
 				register_addr, value, __func__);
 			while (mpcie_byte_read(register_addr) != value) {
-				if (tcp_sock_tick(&server->socket)<0) return -1;
+				if (tcp_sock_tick(&server->socket) < 0) return -1;
 			}
 		}
 		break;

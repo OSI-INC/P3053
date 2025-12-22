@@ -1,6 +1,7 @@
 /*
 	stubs.h -- Interface to our Stubs Library. Contains routines that replace
-	routines in Harmony3 libraries we have removed from our repository.
+	routines in provided by Microchip library files we have removed from our
+	repository.
 
 	(C) 2025, Kevan Hashemi, Open Source Instruments Inc.
 
@@ -22,8 +23,9 @@
 #define STUBS_H
 
 /*
-	A random number generator for Harmony to use, replaces the routine of the
-	same name that was provided by their cryptography system, which we removed.
+	A random number generator for the Microchip library to use, replaces the
+	routine of the same name that was provided by their cryptography system,
+	which we removed.
 */
 uint32_t SYS_RANDOM_PseudoGet(void);
 

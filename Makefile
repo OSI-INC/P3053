@@ -1,34 +1,46 @@
 #
 # P3053A Makefile. 
 #
-# This makefile uses GNUMake to compile a hexadecimail programming file from all
-# the source files in the local src directory. The "release" target is the default
-# target, for which the the DEBUG macro will be undefined, and the products will
-# but assembled in a "build/release" directory. The "debug" target will be built in
-# the "build/debug" directory, and the DEBUG macro will be defined for all
-# sources. 
+# This makefile uses GNUMake to compile and link a hexadecimail programming file
+# for a PIC32MZ microcontroller. The makefile finds all source files in the /src
+# directory tree and compiles them into objects. It links them all together to
+# create a binary executable. It converts this executable into a hexadecimal
+# file for the Microship programmer.
 #
-# We developed this makefile for the PIC32MZ2048EFH100 device, Harmony TCP/IP
-# sources, and WOLFSSL sources. These we compile for our Embedded Ethernet
-# Module (A3053A) target. We trust that the same Makefult structure can be
-# adapted to other, similar embedded ethernet modules. The build uses the xc32
-# compiler, as well as a Microchip Device Package repository. Both must be
-# present on your system for the build to complete.
+# We do not use compiler flags to configure the type of build. We turn on and
+# off internal code features, such as debug-level console reporting and
+# provision of a Telnet command-line interface, using compiler macros in a
+# config.h file. After modifying config.h, we build again using "make", and the
+# build will take place in the build directory.
 #
-# Kevan Hashemi, Open Source Instruments Inc., 2025.
+# We developed this makefile for the PIC32MZ2048EFH100. These we compile for our
+# Embedded Ethernet Module (A3053) target. We trust that the same Makefult
+# structure can be adapted to other, similar embedded ethernet modules. The
+# build uses the xc32 compiler, as well as a Microchip Device Package
+# repository. Both must be present on your system for the build to complete.
 #
-
+# The makefile instructs the compiler to create dependency records for each
+# object, and the makefile includes these in the dependency checking it does for
+# each object it builds. In this way, the makefile will re-compile objects for
+# which one or more required headers have been modified.
 #
-# Detect the build mode so that we can set flags before we get to the
-# target definition. We will look in the MAKECMDGOALS reservbed variable
-# for certain targets that dictate the build mode.
+# [22-DEC-25] Kevan Hashemi.
 #
-ifeq (debug,$(findstring debug,$(MAKECMDGOALS)))
-MODE=debug
-else
-MODE=release
-endif
-$(info MODE=$(MODE))
+# Copyright (C) 2025, Kevan Hashemi, Open Source Instruments Inc.
+# 
+# This program is free software: you can redistribute it and/or modify it under
+# the terms of the GNU General Public License as published by the Free Software
+# Foundation, either version 3 of the License, or (at your option) any later
+# version.
+# 
+# This program is distributed in the hope that it will be useful, but WITHOUT
+# ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+# FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more
+# details.
+# 
+# You should have received a copy of the GNU General Public License along with
+# this program.  If not, see <https://www.gnu.org/licenses/>.
+#
 
 #
 # Define the exact processor, its family, the location of its device pack, and
@@ -65,7 +77,7 @@ MP_AR=$(MP_DIR)/xc32-ar
 # map file names.
 #
 TARGET=P3053A
-BUILD_DIR=build/$(MODE)
+BUILD_DIR=build
 $(info BUILD_DIR=$(BUILD_DIR))
 OUTPUT_FILE=$(BUILD_DIR)/$(TARGET).elf
 $(info OUTPUT_FILE=$(OUTPUT_FILE))
@@ -100,10 +112,10 @@ CFLAGS += -mprocessor=$(CPU) \
 	-O2 \
 	-I"src" \
 	-I"src/shim" \
-	-I"src/config" \
-	-I"src/config/library" \
-	-I"src/config/library/tcpip/src" \
-	-I"src/config/library/tcpip/src/common" \
+	-I"src/microchip" \
+	-I"src/microchip/library" \
+	-I"src/microchip/library/tcpip/src" \
+	-I"src/microchip/library/tcpip/src/common" \
 	-Wno-error \
 	-Wno-unused-function \
 	-Wall
@@ -119,13 +131,6 @@ LDFLAGS += -mprocessor=$(CPU) \
 	-Wl,-Map=$(MAP_FILE) \
 	-Wl,--memorysummary,$(BUILD_DIR)/memoryfile.xml \
 	-mdfp="$(DFP_DIR)"
-
-#
-# Add flags depending upon whether this is a debug or production build.
-#
-ifeq ($(MODE),debug)
-CFLAGS += -DVERBOSE_CONSOLE
-endif
 
 #
 # Recipe for compiling all C input files into objects, including creating dependency
@@ -155,18 +160,9 @@ $(OUTPUT_FILE): $(OBJECTFILES) $(CPULD) Makefile
 	$(MP_BIN2HEX) $(OUTPUT_FILE)
 
 #
-# The release target is the one in which diagnostic reporting and other debugging
-# features are turned off. The files will be written to a release directory, and
-# we will get a production version of the hex file to distribute.
+# The default target: build the hexadecimal programming file.
 #
-release: $(OUTPUT_FILE)
-
-#
-# The debug target is the same as the release target, except compiled with flags
-# that can turn on diagnostic reporting and debugging features that slow down the
-# process at run-time. The files will be written to a debug directory. 
-#
-debug: release
+build: $(OUTPUT_FILE)
 
 #
 # When we clean, we remove all files and directories in the object and
@@ -183,12 +179,9 @@ clean:
 #
 remove:
 	@printf "$(YELLOW)Removing output files$(RESET)\n"
-	rm -f build/release/$(TARGET).elf
-	rm -f build/release/$(TARGET).hex
-	rm -f build/release/$(TARGET).map
-	rm -f build/debug/$(TARGET).elf
-	rm -f build/debug/$(TARGET).hex
-	rm -f build/debug/$(TARGET).map
+	rm -f build/$(TARGET).elf
+	rm -f build/$(TARGET).hex
+	rm -f build/$(TARGET).map
 
 #
 # We have told the compiler to create a dependency makefiles for every object it

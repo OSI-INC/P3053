@@ -23,12 +23,12 @@
 	set. Our console library uses this flag to set the more succinct, global
 	"debug" flag, which we can use in our routines to make console reporting
 	contingent upon a debug build, as in "if (debug) console_message(string)".
-	The "debug" name does not appear to be used in any of our Harmony libraries.
+	The "debug" name does not appear to be used in any of our Microchip libraries.
 
 	In addition to its own printing routines, the console library loads a
-	modified version Harmony system console header file, and then provides
-	definitions for the Harmony SYS_CONSOLE family of read and write routines as
-	well. These routines are used by some Harmony libraries, and are expected by
+	modified version Microchip library's system console header file, and then provides
+	definitions for the Microchip SYS_CONSOLE family of read and write routines as
+	well. These routines are used by some Microchip libraries, and are expected by
 	others. In our EEM code, we see only the TCP/IP stack calling a console
 	print to declare that is it initializing and then running.
 
@@ -51,14 +51,8 @@
 #ifndef CONSOLE_H
 #define CONSOLE_H
 
-// Include the Harmony SYS_CONSOLE routine declarations. We will be supplying 
-#include "config/system/console/sys_console.h"
-
-#ifdef VERBOSE_CONSOLE
-static const bool debug = true;
-#else
-static const bool debug = false;
-#endif
+// Include the Microchip SYS_CONSOLE routine declarations. We will be supplying 
+#include "microchip/system/console/sys_console.h"
 
 /*
 	Procedures that read and write from the UART console. For now, we preserve

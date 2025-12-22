@@ -17,6 +17,9 @@
 	this program.  If not, see <https://www.gnu.org/licenses/>.	
 */
 
+/*
+	The standard C headers we trust the compiler will know how to find.
+*/
 #include <stdio.h>
 #include <stdint.h>
 #include <stddef.h>                  
