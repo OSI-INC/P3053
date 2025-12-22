@@ -219,5 +219,6 @@ void cli_print(cli_chan_type* ch, const char* fmt, ...);
 */
 void cli_cmd_template(cli_chan_type *ch, char *args);
 void cli_help(cli_chan_type *ch, char *args);
+void cli_eem_info(cli_chan_type *ch, char *args);
 
 #endif

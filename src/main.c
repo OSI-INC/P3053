@@ -119,10 +119,8 @@ tcpip_server_type telnet_server = {
     .protocol = "Telnet",
     .socket = INVALID_SOCKET,
     .state = S_WAIT_STACK,
-    .port_ptr = NULL,
-    .bound_port = 0,
-    .ip_str = NULL,
-    .bound_ip_str = "0.0.0.0",
+    .port = DEFAULT_TELNET_PORT,
+    .ip_str = "0.0.0.0",
     .tcp_timeout = 0,
     .last_tick = 0,
     .logged_in = false
@@ -256,8 +254,7 @@ int main (void) {
 	cli_cmd_register("help",cli_help);
 	cli_cmd_register("reset",cli_reset);
 	cli_cmd_register("eem-config",cli_eem_config);
-	cli_cmd_register("ip-config",cli_ip_config);
-	cli_cmd_register("pic-info",cli_pic_info);
+	cli_cmd_register("eem-info",cli_eem_info);
 	cli_cmd_register("mpcie",cli_mpcie);
 	
 	/*
@@ -268,14 +265,17 @@ int main (void) {
 	/*
 		Check the configuration switch on the host board. If it is depressed,
 		the least significant bit of location forty will be zero. If depressed,
-		write the factory EEM configuration to flash, for factory reset. Read
-		the flash configuration int the active configuration.
+		write the factory EEM configuration to flash, for factory reset.
 	*/
 	uint8_t val = mpcie_byte_read(40);
    	if ((val & 0x01) == 0) {
    		console_message("FACTORY RESET: Configuration switch pressed on host board.\n");
     	eem_config_write(&eem_config_factory);
 	}
+	
+	/*
+		Read the flash configuration into the active configuration.
+	*/
 	eem_config_read(&eem_config_active);
 
    	/*
@@ -306,13 +306,11 @@ int main (void) {
 	cli_start(&console_chan);
 	
 	/* 
-		Set the source of the LWDAQ and Telnet server IP addresses and TCP ports.
+		Set the LWDAQ and Telnet server ports and timeouts.
 	*/
-	lwdaq_server.ip_str = &eem_config_active.ip_str[0];	
-	lwdaq_server.port_ptr = &eem_config_active.lwdaq_port;
+	lwdaq_server.port = eem_config_active.lwdaq_port;
 	lwdaq_server.tcp_timeout = eem_config_active.lwdaq_timeout;
-	telnet_server.ip_str = &eem_config_active.ip_str[0];
-	telnet_server.port_ptr = &eem_config_active.telnet_port;
+	telnet_server.port = eem_config_active.telnet_port;
 	telnet_server.tcp_timeout = eem_config_active.telnet_timeout;
 
    	/*

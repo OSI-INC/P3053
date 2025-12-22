@@ -35,6 +35,7 @@
 #include "definitions.h"
 #include "utils.h"
 #include "config.h"
+#include "pic.h"
 #include "server.h"
 #include "cli.h"
 #include "console.h"
@@ -423,5 +424,57 @@ void cli_help(cli_chan_type *ch, char *args) {
     return;
 }
 
+/*
+	cli_eem_info is a Command-Line Interpreter (CLI) procedure. It accepts the required
+	--info and --help arguments, but if we pass neither of these, it prints out a bunch
+	of information about the EEM, including the status of its network interface.
+*/
+void cli_eem_info(cli_chan_type *ch, char *args) {
+	bool print_info = false;
+	bool print_help = false;
+	char* tok = strtok(args, " \t");
+
+	while (tok != NULL) {
+ 		if (strcmp(tok, "--info") == 0) {
+ 			print_info = true;
+        } else if (strcmp(tok, "--help") == 0) {
+        	print_help = true;
+        } else {
+            cli_print(ch, "ERROR: Unrecognized option '%s' in %s.\n",
+            	tok, __func__);
+            return;
+        }
+        tok = strtok(NULL, " \t");
+    }
+    
+	if (print_info) {
+		cli_message(ch, "List PIC32MZ internal information.\n");
+		return;
+	}
+
+	if (print_help) {
+		cli_message(ch,
+"Usage:\n"
+"  pic-info [--info] [--help]\n"
+"\n"
+"Summary:\n"
+"  List various Embedded Ethernet Module (EEM) status and configuration values."
+"  Begins with network interface values read from the TCP/IP stack. Follows with\n"
+"  PIC32MZ timing configuration.\n"
+"\n"
+"Options:\n"
+"  --info        Print a one-line summary of this command.\n"
+"  --help        Print this help text.\n"
+		);
+		return;
+	}
+
+	server_info(ch->tx_buff);
+	cli_print(ch, "%s\n", ch->tx_buff);
+ 	pic_info(ch->tx_buff);
+	cli_print(ch, "%s\n", ch->tx_buff);
+
+    return;
+}
 
 

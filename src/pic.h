@@ -305,6 +305,5 @@ int uart2_flush(void *context);
 */
 void cli_reset(cli_chan_type *ch, char *args);
 void cli_mpcie(cli_chan_type *ch, char *args);
-void cli_pic_info(cli_chan_type *ch, char *args);
 
 #endif

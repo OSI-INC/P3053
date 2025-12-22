@@ -325,9 +325,9 @@ void pic_initialize(void) {
 */
 void pic_info(char* out) {
 	sprintf(out, 
-		"Tick Counter Frequency (kHz):   %.3f\n"
-		"System Counter Frequency (MHz): %.3f\n"
-		"Sytem Clock Frequency (MHz):    %.3f",
+		"Tick Counter %.3f (kHz)\n"
+		"Sys Counter  %.3f (MHz)\n"
+		"SysClock     %.3f (MHz)",
 		(double) SYS_TMR_TickCounterFrequencyGet() * 1e-3,
 		(double) SYS_TMR_SystemCountFrequencyGet() * 1e-6,
 		(double) SYS_TMR_SystemCountFrequencyGet() * 2e-6);
@@ -583,56 +583,6 @@ void cli_mpcie(cli_chan_type *ch, char *args) {
 			addr++;
 		}
 	}
-
-    return;
-}
-
-/*
-	cli_pic_info is a Command-Line Interpreter (CLI) procedure. With no
-	arguments prints PIC32MZ characteristics. It does not offer any way to
-	change those characteristics.
-*/
-void cli_pic_info(cli_chan_type *ch, char *args) {
-	bool print_info = false;
-	bool print_help = false;
-	char* tok = strtok(args, " \t");
-
-	while (tok != NULL) {
- 		if (strcmp(tok, "--info") == 0) {
- 			print_info = true;
-        } else if (strcmp(tok, "--help") == 0) {
-        	print_help = true;
-        } else {
-            cli_print(ch, "ERROR: Unrecognized option '%s' in %s.\n",
-            	tok, __func__);
-            return;
-        }
-        tok = strtok(NULL, " \t");
-    }
-    
-	if (print_info) {
-		cli_message(ch, "List PIC32MZ internal information.\n");
-		return;
-	}
-
-	if (print_help) {
-		cli_message(ch,
-"Usage:\n"
-"  pic-info [--info] [--help]\n"
-"\n"
-"Summary:\n"
-"  List internal PIC32MZ microcontroller configuration values. Provides no means to\n"
-"  hange any of these values.\n"
-"\n"
-"Options:\n"
-"  --info        Print a one-line summary of this command.\n"
-"  --help        Print this help text.\n"
-		);
-		return;
-	}
-
- 	pic_info(ch->tx_buff);
-	cli_print(ch, "%s\n", ch->tx_buff);
 
     return;
 }

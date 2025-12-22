@@ -44,6 +44,8 @@
 #ifndef SERVER_H
 #define SERVER_H
 
+#include "config.h"
+
 /*
 	We store the configuration of our server in a EEM configuration record.
 */
@@ -79,34 +81,55 @@ typedef struct {
 
 /*
 	The factory EEM configuration is the one we use when we have not yet written
-	a configuration to flash memory. Its contents are defined in the server
-	implementation file.
+	a configuration to flash memory. 
 */
-extern const eem_config_type eem_config_factory;
+static const eem_config_type eem_config_factory = {
+	.magic_str = CONFIG_FLASH_MAGIC,
+	.security_level = 0,
+	.password_str = "LWDAQ",
+	.operator_str = "unassigned",
+	.ip_str = "10.0.0.37",
+	.gw_str = "10.0.0.1",
+	.nm_str = "255.255.255.0",
+	.time_str = "00000000000000",
+	.device_str = PLATFORM_VARIANT,
+	.lwdaq_port = 90,
+	.telnet_port = 23,
+	.lwdaq_timeout = 10,
+	.telnet_timeout = 300,
+	.tcp_tick_ms = 2
+};
 
 /*
-	The active Embedded Ethernet Module (EEM) configuration is intended to
-	reflect the current state of the server. The accuracy of the record depends
-	upon the cooperation of the procedures that modify the server state. The
-	server_set_ip procedure, for example, changes the server IP address, gateway
-	address and network mask, and reboots all servers on the EEM. This routine
-	updates the active EEM configuration record when it is done, otherwise the
-	active configuration would be inaccurate. As a rule of thumb: any change to
-	the IP or TCP configuration should be followed by a re-start of all serers
-	and an update of the active configuration. On start-up, the EEM reads a
-	complete configuration record from flash memory into the active
-	configuration, and then applies all fields to the newly-started server.
+	The active Embedded Ethernet Module (EEM) configuration is the current
+	configuration of the server. No procedure is permitted to modify the active
+	configuration, even though it is possible with our library routines to
+	update the IP address, the EEM rules prohibit live modification of the
+	network interface after start-up. On start-up, the EEM reads the flash
+	configuration record into the active configuration record and applies all
+	its fields to the newly-started server.
 */
 extern eem_config_type eem_config_active;
 
 /*
-	We want to be able to update the Embedded Ethernet Module (EEM)
-	configuration and have the server remember the configuration through reset
-	and power cycles. We can place all necessary configuration information in a
-	EEM configuration record, and these records have fixed length, even though
-	they consist of strings. We store the configuration record in flash memory
-	as a table of null-terminated strings. We read them in the same way, by
-	copying directly into a EEM configuration record.
+	We want to be able to modify the Embedded Ethernet Module (EEM) network
+	interface, and various other configuration parameters, and have these
+	parameters persist from one power cycle to the next. To achieve this end, we
+	store the configuration in flash memory. On start-up, we load the
+	configuration into our active configuration record and we use the active
+	configuration record to configure the server. If the configuration switch on
+	the host board is pressed, however, the EEM performs a factory reset by
+	writing its factory configuration record to flash memory before it reads the
+	flash memory configuration into the active configuration record. By this
+	means, the EEM provides both persistent configuration and restorable
+	configuration. The EEM configuration rules are simple: we are not permitted
+	to modify the EEM network settings while the EEM is running. Instead, if we
+	want to change the network settings, we write the values we want to flash
+	memory, then reboot the EEM to apply these values. This rule simplifies our
+	configuration implementation and debugging. We apply network settings only
+	once: during start-up. We have a record of settings we can examine to see
+	what is going on, but we do not have to worry about keeping this record up
+	to date with the current EEM settings.
 
 	The PIC32MZ2048EFH's 2 MByte of flash memory appears twice in the CPU's
 	virtual address space. Once in the range 0x9D000000 to 0x9D0FFFFF, in which
@@ -204,10 +227,8 @@ typedef struct {
 	const char* protocol;
 	TCP_SOCKET socket;
  	tcpip_server_state_type state;
-	uint16_t* port_ptr;
-	uint16_t bound_port;
-	char* ip_str;
-	char bound_ip_str[EEM_CONFIG_STR_SIZE];
+	uint16_t port;
+	char ip_str[EEM_CONFIG_STR_SIZE];
 	uint32_t tcp_timeout;
 	uint32_t last_tick;
 	bool logged_in;
@@ -249,7 +270,6 @@ void tcpip_server(tcpip_server_type* s, tcpip_tasks_type tasks);
 	to add server functions.
 */
 #include "cli.h"
-void cli_ip_config(cli_chan_type *ch, char *args);
 void cli_eem_config(cli_chan_type *ch, char *args);
 
 #endif
