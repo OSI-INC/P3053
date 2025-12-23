@@ -1,5 +1,5 @@
 /*
-	config.h -- Embedded Ethernet Module Configuration File
+	config.h -- Embedded Ethernet Module Configuration File Interface
 
 	Allows us to configure the EEM software so that it will provide a particular
 	set of services for a particular target. We can enable or disable voluntary
@@ -12,9 +12,8 @@
 	checks at run-time to determine whether or not to make a debug print. This
 	class of configuration we call an "operation flag", and all such flags are
 	lower-case. In our hardware variant management, we use compiler macros to
-	create "compiler directive". The PLATFORM compiler macro when defined as
-	A3053A will select the A3053A pin assignments to be compiled for the bus
-	access routines. All compiler directives will be upper-case.
+	create "compiler directive". All these compiler macros will be upper-case
+	and begin with "EEM".
 	
 	(C) 2025, Kevan Hashemi, Open Source Instruments Inc.
 
@@ -35,11 +34,14 @@
 #ifndef CONFIG_H
 #define CONFIG_H
 
-static const bool debug = true;
-static const bool telnet_enable = true;
+#define EEM_DEBUG_DEFAULT false
+extern bool debug;
 
-#define PLATFORM_VARIANT "A3053A"
-#define RELAY_VARIANT "A3042"
-#define RELAY_VERSION 32
+#define EEM_TELNET_ENABLE_DEFAULT true
+extern bool telnet_enable;
+
+#define EEM_PLATFORM "A3053A"
+#define EEM_HOST "A3042"
+#define EEM_RELAY_VERSION 32
 
 #endif 

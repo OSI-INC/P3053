@@ -315,7 +315,7 @@ int lwdaq_handle_message(tcpip_server_type* server,
 
 		case VERSION_READ: {
 			if (debug) console_print("VERSION_READ in %s.\n", __func__);
-			lwdaq_integer_return(server->socket, RELAY_VERSION);
+			lwdaq_integer_return(server->socket, EEM_RELAY_VERSION);
 		}
 		break;
 		

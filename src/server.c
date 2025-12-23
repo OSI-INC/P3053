@@ -376,20 +376,20 @@ int tcp_writeall(void* context, const uint8_t *buf, uint16_t len) {
 	ping identifier we pass is arbitrary.
 */
 void ping_gateway(void) {
-	TCPIP_NET_HANDLE netH;
+	TCPIP_NET_HANDLE net_hdl;
 	IPV4_ADDR gwAddr;
 	TCPIP_ICMP_ECHO_REQUEST echoReq;
 	TCPIP_ICMP_REQUEST_HANDLE reqHandle;
 	ICMP_ECHO_RESULT res;
 
-	netH = TCPIP_STACK_IndexToNet(0);
-	gwAddr.Val = TCPIP_STACK_NetAddressGateway(netH);
+	net_hdl = TCPIP_STACK_IndexToNet(0);
+	gwAddr.Val = TCPIP_STACK_NetAddressGateway(net_hdl);
 	TCPIP_MAC_ADDR fakeMac = { .v = { 0x02, 0x00, 0x00, 0x00, 0x00, 0x01 } };
-	TCPIP_ARP_EntrySet(netH, &gwAddr, &fakeMac, true);
+	TCPIP_ARP_EntrySet(net_hdl, &gwAddr, &fakeMac, true);
 	console_print("Pinging %d.%d.%d.%d...",
 		gwAddr.v[0], gwAddr.v[1], gwAddr.v[2], gwAddr.v[3], __func__);
 	memset(&echoReq, 0, sizeof(echoReq));
-	echoReq.netH = netH;
+	echoReq.netH = net_hdl;
 	echoReq.targetAddr = gwAddr;
 	echoReq.sequenceNumber = 1;
 	echoReq.identifier = 0xBEEF;
@@ -572,13 +572,22 @@ int server_interface_str(char* out) {
 }
 
 /*
-	server_linked returns true iff the Ethernet interface has an active link
+	server_link_up returns true iff the Ethernet interface has an active link
 	to a peer, hub, or switch.
 */
-bool server_linked(void) {
+bool server_link_up(void) {
 	TCPIP_NET_HANDLE net_hdl;
 	net_hdl = TCPIP_STACK_IndexToNet(0);
 	return TCPIP_STACK_NetIsLinked(net_hdl);
+}
+
+/*
+	server_network_up returns true iff the TCP/IP interface is up and running.
+*/
+bool server_network_up(void) {
+	TCPIP_NET_HANDLE net_hdl;
+	net_hdl = TCPIP_STACK_IndexToNet(0);
+	return TCPIP_STACK_NetIsUp(net_hdl);
 }
 
 /*
@@ -601,7 +610,13 @@ int server_info(char* out) {
 	len += sprintf(out+len, "\nMAC          ");
 	len += server_mac_str(out+len);
 	len += sprintf(out+len, "\nLink         ");
-	if (server_linked()) {
+	if (server_link_up()) {
+		len += sprintf(out+len, "UP");
+	} else {
+		len += sprintf(out+len, "DOWN");
+	}
+	len += sprintf(out+len, "\nNetwork      ");
+	if (server_network_up()) {
 		len += sprintf(out+len, "UP");
 	} else {
 		len += sprintf(out+len, "DOWN");
@@ -730,7 +745,7 @@ void tcpip_server(tcpip_server_type* server, tcpip_tasks_type tasks) {
 			server->socket = TCPIP_TCP_ServerOpen(
 				IP_ADDRESS_TYPE_IPV4, server->port, 0);
 			if (server->socket == INVALID_SOCKET) {
-				console_print("%s server failed to open server on %s:%d.\n",
+				console_print("%s server failed to open socket on %s:%d.\n",
 					server->protocol, server->ip_str,
 					server->port);
 				server->state = S_ERROR;
@@ -801,6 +816,9 @@ void tcpip_server(tcpip_server_type* server, tcpip_tasks_type tasks) {
 		break;
 		
 		case S_ERROR: {
+			if (server_network_up()) {
+				server->state = S_WAIT_STACK;
+			}
 		}
 		break;
 		
@@ -853,55 +871,78 @@ void cli_eem_config(cli_chan_type *ch, char *args) {
     bool print_help = false;
 	IPV4_ADDR addr;
 	char* str;
-	eem_config_type config;
 	
+	eem_config_type config;
 	eem_config_read(&config);
+	const eem_config_type* config_ptr = NULL;
 	
 	char* tok = strtok(args, " \t");
 	while (tok != NULL) {
 		if (strcmp(tok, "--info") == 0) {
 			print_info = true;
-		} else if (strcmp(tok, "--help") == 0) {
+			break;
+		} 
+		
+		if (strcmp(tok, "--help") == 0) {
 			print_help = true;
-		} else if (strcmp(tok, "show") == 0 ||
-				(strcmp(tok, "set") == 0) ) {
+			break;
+		} 
+		
+		if (strcmp(tok, "show") == 0 || (strcmp(tok, "set") == 0) ) {
 			if (verb_received) {
-				cli_print(ch,"ERROR: Only one of 'show' or 'set' permitted in %s.\n",
+				cli_print(ch,"ERROR: Only one command verb permitted in %s.\n",
 					__func__);
 				return;			
 			}
-			update = false;
 			verb_received = true;
 			if (strcmp(tok, "show") == 0) {
 				source = strtok(NULL, " \t");
 				if (source == NULL) {
-					cli_print(ch,"ERROR: Must specify soure for '%s' in %s.\n",
-						tok,  __func__);
-					return;			
-				}
-				if (strcmp(source, "active") != 0 
-						&& strcmp(source, "flash") != 0
-						&& strcmp(source, "factory") != 0) {
+					config_ptr = &config;		
+				} else if (strcmp(source, "active") == 0) {
+					config_ptr = &eem_config_active;
+				} else if (strcmp(source, "flash") == 0) {
+					config_ptr = &config;
+				} else if (strcmp(source, "factory") == 0) {
+					config_ptr = &eem_config_factory;
+				} else {
 					cli_print(ch,"ERROR: Unknown '%s' configuration '%s' in %s.\n",
 						tok, source, __func__);
 					return;			
 				}
+				update = false;
+				break;
 			} else {
+				config_ptr = &config;
 				update = true;
+				tok = strtok(NULL, " \t");
+				continue;
 			}
-		} else if (strcmp(tok, "--replace") == 0) {
+		} 
+		
+		if (!verb_received) {
+			cli_print(ch, "ERROR: Must specify 'show' or 'set' in %s.\n", __func__);
+			return;
+		}
+				
+		if (strcmp(tok, "--replace") == 0) {
 			source = strtok(NULL, " \t");
 			if (source == NULL) {
 				cli_print(ch,"ERROR: Must specify soure for '%s' in %s.\n",
 					tok,  __func__);
 				return;			
 			}
-			if (strcmp(source, "active") != 0 && strcmp(source, "factory") != 0) {
-				cli_print(ch,"ERROR: Unknown '%s' configuration '%s' in %s.\n",
+			if (strcmp(source, "active") == 0) {
+				config_ptr = &eem_config_active;
+			} 
+			else if (strcmp(source, "factory") == 0) {
+				config_ptr = &eem_config_factory;
+			} 
+			else {
+				cli_print(ch,"ERROR: Invalid source '%s' for '%s' in %s.\n",
 					tok, source, __func__);
 				return;			
 			}
-			update = true;
 		} else if (strcmp(tok, "--ip") == 0 
 				|| strcmp(tok, "--gateway") == 0
 				|| strcmp(tok, "--mask") == 0)  {
@@ -910,15 +951,13 @@ void cli_eem_config(cli_chan_type *ch, char *args) {
 				cli_print(ch, "ERROR: Invalid IP address '%s' in %s.\n", str, __func__);
 				return;
 			}
-			if (strcmp(tok, "--ip") == 0) {
-				strcpy(config.ip_str, str);		
-			} else if (strcmp(tok, "--gateway") == 0) {
-				strcpy(config.gw_str, str);		
+			if (strcmp(tok, "--ip") == 0) {strcpy(config.ip_str, str);} 
+			else if (strcmp(tok, "--gateway") == 0) {
+				strcpy(config.gw_str, str);
 			} else {
-				strcpy(config.nm_str, str);		
+				strcpy(config.nm_str, str);
 			}
-			update = true;
-		}  else if (strcmp(tok, "--telnet-port") == 0 
+		} else if (strcmp(tok, "--telnet-port") == 0 
 				|| strcmp(tok, "--lwdaq-port") == 0) {
 			char* val = strtok(NULL, " \t");
 			if (!val) {
@@ -944,8 +983,7 @@ void cli_eem_config(cli_chan_type *ch, char *args) {
 			} else {
 				config.lwdaq_port = (uint32_t) p;
 			}
-			update = true;
-		}  else if (strcmp(tok, "--telnet-timeout") == 0 
+		} else if (strcmp(tok, "--telnet-timeout") == 0 
 				|| strcmp(tok, "--lwdaq-timeout") == 0) {
 			char* val = strtok(NULL, " \t");
 			if (!val) {
@@ -965,7 +1003,6 @@ void cli_eem_config(cli_chan_type *ch, char *args) {
 			} else {
 				config.lwdaq_timeout = (uint32_t) p;
 			}
-			update = true;
 		} else {
 			cli_print(ch, "ERROR: Unrecognized option '%s' in %s.\n",
 				tok, __func__);
@@ -1027,33 +1064,100 @@ void cli_eem_config(cli_chan_type *ch, char *args) {
 	}
 	
 	if (!verb_received) {
-		cli_print(ch, "ERROR: Must specify 'show' or 'set' operation in %s.\n", __func__);
-        return;
-    }
-	
-    if (!update) {
-    	if (strcmp(source, "active") == 0) {
-    		server_str_from_config(ch->tx_buff, &eem_config_active);
-		} else if (strcmp(source, "flash") == 0) {
-			server_str_from_config(ch->tx_buff, &config);
-		} else if (strcmp(source, "factory") == 0){
-			server_str_from_config(ch->tx_buff, &eem_config_factory);
-		} else {
-			cli_print(ch, "ERROR: Unknown target in %s.\n", __func__);
-			return;
-		}
+		cli_print(ch, "ERROR: No verb or option specified in %s.\n", __func__);
+		return;
+	}
+
+	if (!update) {
+		server_str_from_config(ch->tx_buff, config_ptr);
 		cli_print(ch, "%s\n", ch->tx_buff);
-    } else if (source == NULL) {
-    	eem_config_write(&config);
- 	} else if (strcmp(source, "active") == 0) {
- 		eem_config_write(&eem_config_active);
- 	} else {
-		eem_config_write(&eem_config_factory);
- 	}
+	} else {
+		eem_config_write(config_ptr);
+	}
 	
     return;
 }
 
+/*
+	cli_net_ctrl controls the network interface. It supports two commands at the
+	moment: up and down, as well as the standard --info and --help options.
+*/
+void cli_net_ctrl(cli_chan_type *ch, char *args) {
+	bool print_info = false;
+	bool print_help = false;
+	bool verb_received = false;
+	bool bring_up = true;
 
+	char* tok = strtok(args, " \t");
+	while (tok != NULL) {
+ 		if (strcmp(tok, "--info") == 0) {
+ 			print_info = true;
+ 		} else if (strcmp(tok, "--help") == 0) {
+ 			print_help = true;
+ 		} else if (strcmp(tok, "up") == 0 || strcmp(tok, "down") == 0) {
+ 			if (verb_received) {
+				cli_print(ch,"ERROR: Only one command verb permitted in %s.\n",
+					__func__);
+				return;			
+ 			}
+ 			if (strcmp(tok, "down") == 0) {
+ 				bring_up = false;
+ 			}
+ 			verb_received = true;
+ 		} else {
+            cli_print(ch, "ERROR: Unrecognized option '%s' in %s.\n", tok, __func__);
+            return;
+        }
+        tok = strtok(NULL, " \t");
+    }
+    
+	if (print_info) {
+		cli_message(ch, "Exercises control over the newtork interface.\n");
+		return;
+	}
+
+	if (print_help) {
+		cli_message(ch,
+"Usage:\n"
+"  net-ctrl <up|down> [--info] [--help]\n"
+"\n"
+"Summary:\n"
+"  Control the network interface: bring it up or take it down.\n"
+"\n"
+"Verbs:\n"
+"  up            Bring the network up: disable TCP/IP interface.\n"
+"  down          Take the network down: enable TCP/IP interface.\n"
+"\n"
+"Options:\n"
+"  --info        Print a one-line summary of this command.\n"
+"  --help        Print this help text.\n"
+		);
+		return;
+	}
+
+	if (!verb_received) {
+		cli_print(ch, "ERROR: No verb or option specified in %s.\n", __func__);
+		return;
+	}
+
+	TCPIP_NET_HANDLE net_hdl = TCPIP_STACK_IndexToNet(0);
+	if (bring_up) {
+		cli_print(ch, "Bringing network up... ");
+		if (!TCPIP_STACK_NetUp(net_hdl, NULL)) {
+			cli_print(ch, "Failed in %s.\n", __func__);
+		} else {
+			cli_print(ch, "Succeeded in %s.\n", __func__);
+		}
+	} else {
+		cli_print(ch, "Taking network down... ");
+		if (!TCPIP_STACK_NetDown(net_hdl)) {
+			cli_print(ch, "Failed in %s.\n", __func__);
+		} else {
+			cli_print(ch, "Succeeded in %s.\n", __func__);
+		}
+	}
+
+    return;
+}
 
 

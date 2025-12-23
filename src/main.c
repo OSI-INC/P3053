@@ -194,16 +194,17 @@ int telnet_tasks(tcpip_server_type* server) {
 }
 
 /*
-	lamp_signal uses an unsigned integer code, and an internal index, to apply
+	lamp_signal uses an unsigned integer period and an internal index to apply
 	signals to the green lamp (d2) and the red lamp (d5). The blue (d3) and
-	white (d4) lamps are used by the UART2 console, so will show if the console
-	is enabled, and if a USB-to-UART bridge is connected. We will use d3 as a
-	power indicator, turning it on for 10% of the time so quickly that it looks
-	constant and dim so long as the loop is executing quickly. We will use d5 as
-	a heartbeat, flashing it every one or two seconds in the main loop, and five
-	or ten times a second in the networks startup loop. Both these flashs will
-	be slowed down if the loop tasks start to take hundreds of milliseconds to
-	complete, and stop entirely if we get stuck somewhere or the EEM crashes.
+	white (d4) lamps are used by the UART2 console in the A3053A, so they will
+	show if the console is enabled and a USB-to-UART bridge is connected. We
+	will use d2 as a power indicator, turning it on for 10% of the time so
+	quickly that it looks constant when the EEM is idle, and will flicker when
+	the EEM is laboring. We will use d5 as a heartbeat, flashing briefly every
+	second in the main loop when the network is up and running. The time between
+	flashes will be longer when the EEM is laboring. But if the network is down,
+	d5 will turn on continuously. If the EEM crashes, the green and red lights
+	will be stuck on or off.
 */
 void lamp_signal(uint32_t period) {
 	static uint32_t i = 0;
@@ -217,7 +218,7 @@ void lamp_signal(uint32_t period) {
 		i++;
 		if (i % 100 == 0) pic_d2_off();
 		if (i % 1000 == 0) pic_d2_on();
-		if (i % 10000 == 0) pic_d5_off();
+		if (server_network_up() && i % 10000 == 0) pic_d5_off();
 		if (i == period) {
 			pic_d5_on();
 			i = 0;
@@ -256,6 +257,8 @@ int main (void) {
 	cli_cmd_register("eem-config",cli_eem_config);
 	cli_cmd_register("eem-info",cli_eem_info);
 	cli_cmd_register("mpcie",cli_mpcie);
+	cli_cmd_register("net-ctrl",cli_net_ctrl);
+	cli_cmd_register("debug-ctrl",cli_debug_ctrl);
 	
 	/*
 		Start up the lamp signaling.
@@ -314,8 +317,8 @@ int main (void) {
 	telnet_server.tcp_timeout = eem_config_active.telnet_timeout;
 
    	/*
-   		This loop should never terminate. We perform maintenance tasks one
-   		after another. The lamp signaling will show that the EEM is alive.
+   		Perform maintenance tasks one after another and repeat. The lamp
+   		signaling will show that the EEM is alive.
    	*/
 	while (true) {
 		tcp_tick();

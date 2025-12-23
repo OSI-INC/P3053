@@ -327,8 +327,11 @@ void cli_cmd_template(cli_chan_type *ch, char *args) {
 	// If tok is not null, we have found an argument. If the argument is valid,
 	// set a flag. If invalid, print an error message and return.
 	while (tok != NULL) {
- 		if (strcmp(tok, "--info") == 0) {print_info = true;} 
- 		else if (strcmp(tok, "--help") == 0) {print_help = true;} else {
+ 		if (strcmp(tok, "--info") == 0) {
+ 			print_info = true;
+ 		} else if (strcmp(tok, "--help") == 0) {
+ 			print_help = true;
+ 		} else {
             cli_print(ch, "ERROR: Unrecognized option '%s' in %s.\n", tok, __func__);
             return;
         }
@@ -458,9 +461,7 @@ void cli_eem_info(cli_chan_type *ch, char *args) {
 "  pic-info [--info] [--help]\n"
 "\n"
 "Summary:\n"
-"  List various Embedded Ethernet Module (EEM) status and configuration values."
-"  Begins with network interface values read from the TCP/IP stack. Follows with\n"
-"  PIC32MZ timing configuration.\n"
+"  Print a table of EEM status and configuration values.\n"
 "\n"
 "Options:\n"
 "  --info        Print a one-line summary of this command.\n"
@@ -473,6 +474,75 @@ void cli_eem_info(cli_chan_type *ch, char *args) {
 	cli_print(ch, "%s\n", ch->tx_buff);
  	pic_info(ch->tx_buff);
 	cli_print(ch, "%s\n", ch->tx_buff);
+
+    return;
+}
+
+/*
+	cli_debug_ctrl controls the debugging flag. We can turn debugging on or off by
+	setting or clearing the debug flag.
+*/
+void cli_debug_ctrl(cli_chan_type *ch, char *args) {
+	bool print_info = false;
+	bool print_help = false;
+	bool verb_received = false;
+	bool set_flag = true;
+
+	char* tok = strtok(args, " \t");
+	while (tok != NULL) {
+ 		if (strcmp(tok, "--info") == 0) {
+ 			print_info = true;
+ 		} else if (strcmp(tok, "--help") == 0) {
+ 			print_help = true;
+ 		} else if (strcmp(tok, "set") == 0 || strcmp(tok, "clear") == 0) {
+ 			if (verb_received) {
+				cli_print(ch,"ERROR: Only one command verb permitted in %s.\n",
+					__func__);
+				return;			
+ 			}
+ 			if (strcmp(tok, "clear") == 0) {
+ 				set_flag = false;
+ 			}
+ 			verb_received = true;
+ 		} else {
+            cli_print(ch, "ERROR: Unrecognized option '%s' in %s.\n", tok, __func__);
+            return;
+        }
+        tok = strtok(NULL, " \t");
+    }
+    
+	if (print_info) {
+		cli_message(ch, "Sets or clears the debug flag.\n");
+		return;
+	}
+
+	if (print_help) {
+		cli_message(ch,
+"Usage:\n"
+"  debug-ctrl <set|clear> [--info] [--help]\n"
+"\n"
+"Summary:\n"
+"  Sets or clears the debug flag that is used to enable console print commands\n"
+"  for debugging. The default state of this flag on reset is set by a constant in\n"
+"  the source code, but we can change the flag during run-time with this routine.\n"
+"\n"
+"Verbs:\n"
+"  set           Set the debug flag, debug prints enabled.\n"
+"  clear         Clear the debug flag, debug prints disabled.\n"
+"\n"
+"Options:\n"
+"  --info        Print a one-line summary of this command.\n"
+"  --help        Print this help text.\n"
+		);
+		return;
+	}
+
+	if (!verb_received) {
+		cli_print(ch, "ERROR: No verb or option specified in %s.\n", __func__);
+		return;
+	}
+
+	debug = set_flag;
 
     return;
 }

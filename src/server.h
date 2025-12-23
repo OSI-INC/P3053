@@ -92,7 +92,7 @@ static const eem_config_type eem_config_factory = {
 	.gw_str = "10.0.0.1",
 	.nm_str = "255.255.255.0",
 	.time_str = "00000000000000",
-	.device_str = PLATFORM_VARIANT,
+	.device_str = EEM_PLATFORM,
 	.lwdaq_port = 90,
 	.telnet_port = 23,
 	.lwdaq_timeout = 10,
@@ -245,7 +245,8 @@ int server_ip_str(char* out);
 int server_nm_str(char* out);
 int server_gw_str(char* out);
 int server_interface_str(char* out);
-bool server_linked(void);
+bool server_link_up(void);
+bool server_network_up(void);
 int server_info(char* out);
 
 /*
@@ -271,5 +272,6 @@ void tcpip_server(tcpip_server_type* s, tcpip_tasks_type tasks);
 */
 #include "cli.h"
 void cli_eem_config(cli_chan_type *ch, char *args);
+void cli_net_ctrl(cli_chan_type *ch, char *args);
 
 #endif
