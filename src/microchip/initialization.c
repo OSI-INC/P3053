@@ -281,9 +281,6 @@ static const SYS_TIME_INIT sysTimeInitData =
     .hwTimerIntNum = 0,
 };
 
-/*
-	Initialize the SYSTIME module. Needed for timing of initialization.
-*/
 void SYSTIME_Initialize (void)
 {
 	sysObj.sysTime = 
@@ -292,9 +289,6 @@ void SYSTIME_Initialize (void)
 			(SYS_MODULE_INIT *)&sysTimeInitData);
 }
 
-/*
-	Initialize the TCP/IP stack.
-*/
 void TCPIP_Initialize (void)
 {
 	sysObj.drvMiim_0 = 
@@ -303,7 +297,6 @@ void TCPIP_Initialize (void)
 			(const SYS_MODULE_INIT *) &drvMiimInitData_0); 
 	sysObj.tcpip = TCPIP_STACK_Init();
 	SYS_ASSERT(sysObj.tcpip != SYS_MODULE_OBJ_INVALID, "TCPIP_STACK_Init Failed" );
-//	CRYPT_WCCB_Initialize();
 	EVIC_Initialize();
 }
 

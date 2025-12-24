@@ -1141,19 +1141,22 @@ void cli_net_ctrl(cli_chan_type *ch, char *args) {
 	}
 
 	TCPIP_NET_HANDLE net_hdl = TCPIP_STACK_IndexToNet(0);
+	#define PHY_INDEX 0
 	if (bring_up) {
 		cli_print(ch, "Bringing network up... ");
-		if (!TCPIP_STACK_NetUp(net_hdl, NULL)) {
-			cli_print(ch, "Failed in %s.\n", __func__);
+		TCPIP_STACK_NetUp(net_hdl, NULL);
+		if (!server_network_up()) {
+			cli_print(ch, "Starting in %s.\n", __func__);
 		} else {
-			cli_print(ch, "Succeeded in %s.\n", __func__);
+			cli_print(ch, "Started in %s.\n", __func__);
 		}
 	} else {
 		cli_print(ch, "Taking network down... ");
-		if (!TCPIP_STACK_NetDown(net_hdl)) {
-			cli_print(ch, "Failed in %s.\n", __func__);
+		TCPIP_STACK_NetDown(net_hdl);
+		if (!server_network_up()) {
+			cli_print(ch, "Shut down in %s.\n", __func__);
 		} else {
-			cli_print(ch, "Succeeded in %s.\n", __func__);
+			cli_print(ch, "Shutting down in %s.\n", __func__);
 		}
 	}
 
