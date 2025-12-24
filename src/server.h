@@ -272,6 +272,5 @@ void tcpip_server(tcpip_server_type* s, tcpip_tasks_type tasks);
 */
 #include "cli.h"
 void cli_eem_config(cli_chan_type *ch, char *args);
-void cli_net_ctrl(cli_chan_type *ch, char *args);
 
 #endif

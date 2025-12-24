@@ -257,7 +257,6 @@ int main (void) {
 	cli_cmd_register("eem-config",cli_eem_config);
 	cli_cmd_register("eem-info",cli_eem_info);
 	cli_cmd_register("mpcie",cli_mpcie);
-	cli_cmd_register("net-ctrl",cli_net_ctrl);
 	cli_cmd_register("debug-ctrl",cli_debug_ctrl);
 	
 	/*
