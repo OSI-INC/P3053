@@ -47,24 +47,63 @@
 #include "config.h"
 
 /*
-	We store the configuration of our server in a EEM configuration record.
+	We store the configuration of our server in a EEM configuration record. We describe
+	each field with comments in the type definition below.
 */
 #define EEM_CONFIG_STR_SIZE 31
 typedef char eem_config_str[EEM_CONFIG_STR_SIZE];
 typedef struct {
-	eem_config_str magic_str;
-    uint32_t security_level;
-    eem_config_str password_str;
-    eem_config_str operator_str;
+
+	// When we read a configuration from flash memory, we compare the magic string
+	// to the flash magic string declared below. If they match, we assume the 
+	// configuration record in flash is one written by the EEM, not one created
+	// at random or accident. We always write the magic string to flash when we
+	// save a configuration.
+	eem_config_str flash_magic;
+	
+	// The security level tells the EEM how picky it should be about servicing
+	// connections. Both the Telnet and LWDAQ servers respect the security level
+	// restrictions. At level zero, the EEM accepts all connections on its
+	// active server ports. At level one, the EEM will not allow the client to
+	// read or modify any EEM configuration. At level two, the EEM will insist
+	// that the client log in with a password before attempting to execute any
+	// command other than a log-in commmand. If a TCP client tries and fails to
+	// submit the correct password, using some kind of login command, the EEM
+	// should close the client socket.
+    uint32_t seclevel;
+    
+    // The password that must be used with security levels one and two.
+    eem_config_str password;
+    
+    // An identifier for the entity or person who configured the EEM.
+    eem_config_str person;
+    
+    // The IP address, gateway address, and network masks, all as strings in the
+    // format "x.x.x.x".
 	eem_config_str ip_str;
 	eem_config_str gw_str;
 	eem_config_str nm_str;
-    eem_config_str time_str;
-    eem_config_str device_str;
+	
+	// A time string in the format "YYYYMMDDHHMMSS".
+    eem_config_str timestamp;
+    
+    // The serial number of the device in which the EEM is deployed.
+    eem_config_str device;
+    
+    // Server port numbers for the LWDAQ and Telnet servers. Setting the server
+    // port to zero disables the server.
     uint16_t lwdaq_port;
 	uint16_t telnet_port;
+
+    // Timeouts in seconds for the LWDAQ and Telnet sockets. If no characters
+    // are received from the socket within the specified number of seconds, the
+    // socket will close.
     uint32_t lwdaq_timeout;
     uint32_t telnet_timeout;
+    
+    // The period with which our tcp_tick routine calls the TCP/IP and PHY
+    // driver maintenance routines. Units are milliseconds, and the value must
+    // be one or greater. If zero, the stack can freeze up.
     uint32_t tcp_tick_ms;
 } eem_config_type;
 
@@ -81,18 +120,22 @@ typedef struct {
 
 /*
 	The factory EEM configuration is the one we use when we have not yet written
-	a configuration to flash memory. 
+	a configuration to flash memory, or during a factory reset with the
+	configuration button on the motherboard depressed. The factory reset
+	security level must be zero or else we will find ourselves unable to read
+	the configuration file to find out what the password is, and then be unable
+	to log in.
 */
 static const eem_config_type eem_config_factory = {
-	.magic_str = CONFIG_FLASH_MAGIC,
-	.security_level = 0,
-	.password_str = "LWDAQ",
-	.operator_str = "unassigned",
+	.flash_magic = CONFIG_FLASH_MAGIC,
+	.seclevel = 0,
+	.password = "LWDAQ",
+	.person = "unassigned",
 	.ip_str = "10.0.0.37",
 	.gw_str = "10.0.0.1",
 	.nm_str = "255.255.255.0",
-	.time_str = "00000000000000",
-	.device_str = EEM_PLATFORM,
+	.timestamp = "00000000000000",
+	.device = EEM_PLATFORM,
 	.lwdaq_port = 90,
 	.telnet_port = 23,
 	.lwdaq_timeout = 10,
@@ -118,7 +161,7 @@ extern eem_config_type eem_config_active;
 	store the configuration in flash memory. On start-up, we load the
 	configuration into our active configuration record and we use the active
 	configuration record to configure the server. If the configuration switch on
-	the host board is pressed, however, the EEM performs a factory reset by
+	the motherboard is pressed, however, the EEM performs a factory reset by
 	writing its factory configuration record to flash memory before it reads the
 	flash memory configuration into the active configuration record. By this
 	means, the EEM provides both persistent configuration and restorable
@@ -198,7 +241,8 @@ typedef enum {
     S_CONNECTED,
     S_SERVING,
     S_CLOSE,
-    S_ERROR
+    S_ERROR,
+    S_DISABLED
 } tcpip_server_state_type;
 
 /*
@@ -271,6 +315,6 @@ void tcpip_server(tcpip_server_type* s, tcpip_tasks_type tasks);
 	to add server functions.
 */
 #include "cli.h"
-void cli_eem_config(cli_chan_type *ch, char *args);
+void cli_config(cli_chan_type *ch, char *args);
 
 #endif

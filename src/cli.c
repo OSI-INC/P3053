@@ -161,9 +161,14 @@ static cli_cmd_proc cli_cmd_find(const char *name) {
 	does not return an error code. The channel server, if one exists, must check
 	the channel health before or after calling the server. To start up the
 	server, we fill in a channel descriptor with the three functions that permit
-	reading and writing from an active and open channel, and call cli_start.
-	After that, we call cli_server in our main loop to maintain the CLI on the
-	channel.
+	reading and writing from an active and open channel. We set the channel
+	status field to either LOGIN_NONE or LOGIN_PASS. We enable or disable
+	character echo with the echo field. After that, we call cli_server in our
+	main loop to maintain the CLI on the channel. The server has one hard-coded
+	command it recognises: the login command, named CLI_LOGIN_CMD. If the active
+	EEM configuration's security level field is 2 or greater, and the channel
+	status is not equal to LOGIN_PASS, the server will discard the command and
+	return with status CLI_FAULT.
 */
 void cli_server(cli_chan_type *ch) {
 	const char* prompt = "EEM$ ";
@@ -289,6 +294,18 @@ void cli_server(cli_chan_type *ch) {
 		return;
 	}
 
+	// If the active EEM configuration security level is greater than one, and
+	// the name of the command we are about to execute is not CLI_LOGIN_CMD, we
+	// return and error and set the channel status to CLI_FALUT.
+	if (eem_config_active.seclevel > 1 
+			&& ch->status != CLI_LOGIN_PASS
+			&& strcmp(cmd, CLI_LOGIN_CMD) != 0) {
+		cli_print(ch,"ERROR: Access denied, login required in %s.\n", ch->name);
+		ch->status = CLI_FAULT;
+	    cli_message(ch, prompt);
+		return;
+	}
+	
     // See if we can find a command procedure with a name that matches our
     // command name. If not, print an error and return.
     cli_cmd_proc proc = NULL;
@@ -428,11 +445,10 @@ void cli_help(cli_chan_type *ch, char *args) {
 }
 
 /*
-	cli_eem_info is a Command-Line Interpreter (CLI) procedure. It accepts the required
-	--info and --help arguments, but if we pass neither of these, it prints out a bunch
-	of information about the EEM, including the status of its network interface.
+	cli_status accepts the required --info and --help arguments, but if we pass
+	neither of these, it prints out a bunch of status information.
 */
-void cli_eem_info(cli_chan_type *ch, char *args) {
+void cli_status(cli_chan_type *ch, char *args) {
 	bool print_info = false;
 	bool print_help = false;
 	char* tok = strtok(args, " \t");
@@ -458,10 +474,12 @@ void cli_eem_info(cli_chan_type *ch, char *args) {
 	if (print_help) {
 		cli_message(ch,
 "Usage:\n"
-"  pic-info [--info] [--help]\n"
+"  status [--info] [--help]\n"
 "\n"
 "Summary:\n"
-"  Print a table of EEM status and configuration values.\n"
+"  Print a table of status information. This includes network status, software tick\n"
+"  frequency, microprocessor clock frequency, and the login status of the command\n"
+"  line interpreter channel.\n"
 "\n"
 "Options:\n"
 "  --info        Print a one-line summary of this command.\n"
@@ -474,15 +492,42 @@ void cli_eem_info(cli_chan_type *ch, char *args) {
 	cli_print(ch, "%s\n", ch->tx_buff);
  	pic_info(ch->tx_buff);
 	cli_print(ch, "%s\n", ch->tx_buff);
+	switch (ch->status) {
+		case CLI_LOGIN_NONE: 
+			strcpy(ch->tx_buff, "LOGIN_NONE"); 
+			break;
+			
+		case CLI_LOGIN_PASS:
+			strcpy(ch->tx_buff, "LOGIN_PASS"); 
+			break;
+			
+		case CLI_LOGIN_FAIL: 
+			strcpy(ch->tx_buff, "LOGIN_FAIL"); 
+			break;
+			
+		case CLI_FAULT: 
+			strcpy(ch->tx_buff, "FAULT"); 
+			break;
+			
+		case CLI_CLOSE: 
+			strcpy(ch->tx_buff, "CLOSE"); 
+			break;
+			
+		default: 
+			strcpy(ch->tx_buff, "UNKNOWN"); 
+			break;
+	}
+	cli_print(ch, "Chan Status  %s\n", ch->tx_buff);
+	cli_print(ch, "Sec Level    %d\n", eem_config_active.seclevel);
 
     return;
 }
 
 /*
-	cli_debug_ctrl controls the debugging flag. We can turn debugging on or off by
+	cli_debug controls the debugging flag. We can turn debugging on or off by
 	setting or clearing the debug flag.
 */
-void cli_debug_ctrl(cli_chan_type *ch, char *args) {
+void cli_debug(cli_chan_type *ch, char *args) {
 	bool print_info = false;
 	bool print_help = false;
 	bool verb_received = false;
@@ -519,7 +564,7 @@ void cli_debug_ctrl(cli_chan_type *ch, char *args) {
 	if (print_help) {
 		cli_message(ch,
 "Usage:\n"
-"  debug-ctrl <set|clear> [--info] [--help]\n"
+"  debug <set|clear> [--info] [--help]\n"
 "\n"
 "Summary:\n"
 "  Sets or clears the debug flag that is used to enable console print commands\n"
@@ -543,6 +588,75 @@ void cli_debug_ctrl(cli_chan_type *ch, char *args) {
 	}
 
 	debug = set_flag;
+
+    return;
+}
+
+/*
+	cli_login allows the user to attempt to log in to the EEM by sending the
+	password. If the password matches the one in the active configuration, this
+	routine sets the channel's logged in flag true. Otherwise it sets the logged
+	in flag false. We must register this command under the name CLI_LOGIN_CMD.
+*/
+void cli_login(cli_chan_type *ch, char *args) {
+	bool print_info = false;
+	bool print_help = false;
+	bool password_match = false;
+
+	char* tok = strtok(args, " \t");
+	while (tok != NULL) {
+ 		if (strcmp(tok, "--info") == 0) {
+ 			print_info = true;
+ 		} else if (strcmp(tok, "--help") == 0) {
+ 			print_help = true;
+ 		} else if (strcmp(tok, eem_config_active.password) == 0) {
+			password_match = true;
+			break;
+        } else {
+        	password_match = false;
+        	break;
+        }
+        tok = strtok(NULL, " \t");
+    }
+    
+	if (print_info) {
+		cli_message(ch, "Sets login flag if password correct.\n");
+		return;
+	}
+
+	if (print_help) {
+		cli_message(ch,
+"Usage:\n");
+		cli_print(ch,
+"  %s [password] [--info] [--help]\n", CLI_LOGIN_CMD);
+		cli_message(ch,
+"\n"
+"Summary:\n"
+"  Accepts a password string, which it compares to the password in the EEM's active\n"
+"  configuration. If they match, the command sets this channels status to logged-in,\n"
+"  and displays the current security level. If the security level is 0, loggin in\n"
+"  makes no difference. At level 1, we must log in to display or modify EEM config-\n"
+"  uration ields. At level 2, we must log in before we do anything other than log in.\n"
+"  If the password does not match, login sets the channel status to a login failure\n"
+"  code. Depending upon how the communication channel is set up, this code may cause\n"
+"  immediate closure of the channel.\n"
+"\n"
+"Options:\n"
+"  --info        Print a one-line summary of this command.\n"
+"  --help        Print this help text.\n"
+		);
+		return;
+	}
+
+	if (password_match) {
+		cli_print(ch, "Login succeeded, security level %d in %s.\n",
+			eem_config_active.seclevel, __func__);
+		ch->status = CLI_LOGIN_PASS;
+	} else {
+		cli_print(ch, "Login failed, security level %d in %s.\n",
+			eem_config_active.seclevel, __func__);
+		ch->status = CLI_LOGIN_FAIL;
+	}
 
     return;
 }

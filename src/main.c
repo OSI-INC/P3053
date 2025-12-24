@@ -3,19 +3,20 @@
 
 	The EEM is a programmable TCP/IP server built on a Mini Peripheral
 	Connection Interface Express (mPCIe) card. The EEM plugs into an mPCIe
-	socket on its host board. The EEM uses a PIC32MZ2048EFH microcontroller and
-	LAN8720A Ethernet physical layer to provide computing, memory, and
-	networking. The host provides the EEM with 3.3-V power and an RJ-45 socket
-	with internal magnetics for the EEM's 100-Base-T network interface. The host
-	provides a pin header of some sorth through which we can program the EEM's
-	microcontroller with the code compiled from this repository. The host can
-	also provide three pins for the EEM's UART console interface. The mPCIe pins
-	on the EEM provide all eighteen connections needed for an eight-bit parallel
-	bus: eight data lines, eight address lines, one data strobe, and one write
-	line. This data bus is the means by which the EEM communicates with the
-	host. In all our EEM applications, the EEM is the master of this bus, and it
-	uses the bus to configure and control the host. We use the EEM to provide
-	TCP/IP access to a host board.
+	socket on its motherboard. The EEM uses a PIC32MZ2048EFH microcontroller
+	and LAN8720A Ethernet physical layer to provide computing, memory, and
+	networking. The motherboard provides the EEM with 3.3-V power and an RJ-45
+	socket with internal magnetics for the EEM's 100-Base-T network interface.
+	The motherboard provides a pin header of some sorth through which we can
+	program the EEM's microcontroller with the code compiled from this
+	repository. The motherboard can also provide three pins for the EEM's UART
+	console interface. The mPCIe pins on the EEM provide all eighteen
+	connections needed for an eight-bit parallel bus: eight data lines, eight
+	address lines, one data strobe, and one write line. This data bus is the
+	means by which the EEM communicates with the motherboard. In all our EEM
+	applications, the EEM is the master of this bus, and it uses the bus to
+	configure and control the motherboard. We use the EEM to provide TCP/IP
+	access to a motherboard.
 
 	This is the main program of our P3053 repository, where "3053" is the Open
 	Source Instruments Inc. (OSI) assembly number for the Embedded Etherenet
@@ -107,12 +108,10 @@
 #include "lwdaq.h"
 
 /*
-	Declare the constants and structures that configure our Telnet server. The
-	Telnet server, which should be made available in all debug builds. We must
-	assign the port pointer and IP sstring pointers before trying to start the
-	Telnet server. If we want a timeout, we must set the timeout in seconds as
-	well. Note that the Telnet server is enabled by the telnet_enable flag declared
-	in config.h.
+	Declare the constants and structures that configure our Telnet server. If we
+	want a timeout, we must set the timeout in seconds as well. We disable the
+	Telnet server by setting the telnet_port field of the flash EEM
+	configuration to zero.
 */
 #define DEFAULT_TELNET_PORT 23
 tcpip_server_type telnet_server = {
@@ -177,6 +176,7 @@ int telnet_tasks(tcpip_server_type* server) {
 		 
 	if (server->state == S_LISTENING) {
 		server->logged_in = false;
+		telnet_chan.status = CLI_LOGIN_NONE;
    		telnet_chan.getchar = telnet_getchar;
 		telnet_chan.putchar = tcp_putchar;
 		telnet_chan.flush = tcp_flush;
@@ -190,7 +190,19 @@ int telnet_tasks(tcpip_server_type* server) {
 	};
 
 	cli_server(&telnet_chan);
-	return 0;
+	switch (telnet_chan.status) {
+		case CLI_LOGIN_NONE: 
+			server->logged_in = false;
+			return 0;
+		
+		case CLI_LOGIN_PASS:
+			server->logged_in = true;
+			return 0;
+			
+		default:
+			server->logged_in = false;
+			return -1;
+	} 
 }
 
 /*
@@ -252,12 +264,13 @@ int main (void) {
 		Register commands in the Command-Line Interpreter (CLI). This is the only 
 		initialization the CLI requires.
 	*/
+	cli_cmd_register("config",cli_config);
+	cli_cmd_register("debug",cli_debug);
 	cli_cmd_register("help",cli_help);
-	cli_cmd_register("reset",cli_reset);
-	cli_cmd_register("eem-config",cli_eem_config);
-	cli_cmd_register("eem-info",cli_eem_info);
+	cli_cmd_register(CLI_LOGIN_CMD,cli_login);
 	cli_cmd_register("mpcie",cli_mpcie);
-	cli_cmd_register("debug-ctrl",cli_debug_ctrl);
+	cli_cmd_register("reset",cli_reset);
+	cli_cmd_register("status",cli_status);
 	
 	/*
 		Start up the lamp signaling.
@@ -265,13 +278,13 @@ int main (void) {
 	lamp_signal(0);
 	
 	/*
-		Check the configuration switch on the host board. If it is depressed,
+		Check the configuration switch on the motherboard. If it is depressed,
 		the least significant bit of location forty will be zero. If depressed,
 		write the factory EEM configuration to flash, for factory reset.
 	*/
 	uint8_t val = mpcie_byte_read(40);
    	if ((val & 0x01) == 0) {
-   		console_message("FACTORY RESET: Configuration switch pressed on host board.\n");
+   		console_message("FACTORY RESET: Configuration switch pressed on motherboard.\n");
     	eem_config_write(&eem_config_factory);
 	}
 	
@@ -295,8 +308,13 @@ int main (void) {
    		eem_config_active.nm_str);
  
  	/*
- 		Start up a Command-Line Interpreter (CLI) for the console interface,
- 		which runs on UART2 in this version of the EEM.
+		Start up a Command-Line Interpreter (CLI) for the console interface,
+		which runs on UART2 in this version of the EEM. We start with the
+		console interface status set to 1, so that it is regarded as logged in,
+		and can always read and modify the EEM configuration regardless of the
+		EEM security level, unless it deliberately fails to log itself in using
+		the CLI login command, in which case its state will go to
+		CLI_LOGIN_FAIL.
  	*/
  	static cli_chan_type console_chan;
 	console_chan.getchar = uart2_getchar;
@@ -305,6 +323,7 @@ int main (void) {
 	console_chan.context  = NULL;
 	console_chan.echo = true;
 	console_chan.name = "CLI-Console";
+	console_chan.status = CLI_LOGIN_PASS;
 	cli_start(&console_chan);
 	
 	/* 

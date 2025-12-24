@@ -44,7 +44,7 @@ static inline void pic_d5_toggle(void) {GPIO_PortToggle(GPIO_PORT_A, 0x00000004)
 
 /*
 	We define masks for the MPCIE eight-bit parallel bus. This is the bus by
-	which the EEM controls the host board. The EEM is master of this bus. The
+	which the EEM controls the motherboard. The EEM is master of this bus. The
 	bus consists of the Control Address Bus (CA0-CA7), the Control Data Bus
 	(DC0-CD7), Data Strobe (/DS) and Control Write (/CW). We define procedures
 	to access the MPCIE parallel bus. All procedures are declared here as static
@@ -88,7 +88,7 @@ static inline void mpcie_cw_assert(void) {
 
 /*
 	mpcie_cw_unassert drives /CW high to indicate a MPCIE bus read cycle. When
-	we unassert CW, the host board can drive the controller data bus lines.
+	we unassert CW, the motherboard can drive the controller data bus lines.
 */
 static inline void mpcie_cw_unassert(void) {
 	LATDSET = MPCIE_CW_RD5;

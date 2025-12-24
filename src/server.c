@@ -73,8 +73,8 @@ int eem_config_read(eem_config_type* config_ptr) {
 		(uint8_t*) config_ptr,
 		EEM_CONFIG_ADDR, 
 		sizeof(eem_config_type));
-	config_ptr->magic_str[sizeof(config_ptr->magic_str)-1] = '\0';
-	if (strcmp(config_ptr->magic_str, CONFIG_FLASH_MAGIC) != 0) {
+	config_ptr->flash_magic[sizeof(config_ptr->flash_magic)-1] = '\0';
+	if (strcmp(config_ptr->flash_magic, CONFIG_FLASH_MAGIC) != 0) {
 		*config_ptr = eem_config_factory;
 		return 0;
 	} else {
@@ -92,14 +92,14 @@ int eem_config_read(eem_config_type* config_ptr) {
 */
 int server_str_from_config(char* str, const eem_config_type* config_ptr) {
 	int len = 0;
-	len += sprintf(str+len, "security_level: %u\n", config_ptr->security_level);
-	len += sprintf(str+len, "password_str: %s\n", config_ptr->password_str);
-	len += sprintf(str+len, "operator_str: %s\n", config_ptr->operator_str);
-	len += sprintf(str+len, "time_str: %s\n", config_ptr->time_str);
+	len += sprintf(str+len, "seclevel: %u\n", config_ptr->seclevel);
+	len += sprintf(str+len, "password: %s\n", config_ptr->password);
+	len += sprintf(str+len, "person: %s\n", config_ptr->person);
+	len += sprintf(str+len, "timestamp: %s\n", config_ptr->timestamp);
 	len += sprintf(str+len, "ip_str: %s\n", config_ptr->ip_str);
 	len += sprintf(str+len, "gw_str: %s\n", config_ptr->gw_str);
 	len += sprintf(str+len, "nm_str: %s\n", config_ptr->nm_str);
-	len += sprintf(str+len, "device_str: %s\n", config_ptr->device_str);
+	len += sprintf(str+len, "device: %s\n", config_ptr->device);
 	len += sprintf(str+len, "lwdaq_port: %u\n", config_ptr->lwdaq_port);
 	len += sprintf(str+len, "telnet_port: %u\n", config_ptr->telnet_port);
 	len += sprintf(str+len, "lwdaq_timeout: %u\n", config_ptr->lwdaq_timeout);
@@ -142,19 +142,19 @@ int eem_config_from_str(eem_config_type *config_ptr, const char *str) {
 		size_t name_len = colon - line_start;
 		size_t value_len = line_end - value;
 	
-		if (strncmp(line_start, "security_level", name_len) == 0) {
-			config_ptr->security_level = (uint32_t) strtoul(value, NULL, 10);
+		if (strncmp(line_start, "seclevel", name_len) == 0) {
+			config_ptr->seclevel = (uint32_t) strtoul(value, NULL, 10);
 			num_copied++;
-		} else if (strncmp(line_start, "password_str", name_len) == 0) {
-			snprintf(config_ptr->password_str, sizeof(config_ptr->password_str),
+		} else if (strncmp(line_start, "password", name_len) == 0) {
+			snprintf(config_ptr->password, sizeof(config_ptr->password),
 				"%.*s", (int)value_len, value);
 			num_copied++;
-		} else if (strncmp(line_start, "operator_str", name_len) == 0) {
-			snprintf(config_ptr->operator_str, sizeof(config_ptr->operator_str),
+		} else if (strncmp(line_start, "person", name_len) == 0) {
+			snprintf(config_ptr->person, sizeof(config_ptr->person),
 				"%.*s", (int) value_len, value);
 			num_copied++;
-		} else if (strncmp(line_start, "time_str", name_len) == 0) {
-			snprintf(config_ptr->time_str, sizeof(config_ptr->time_str),
+		} else if (strncmp(line_start, "timestamp", name_len) == 0) {
+			snprintf(config_ptr->timestamp, sizeof(config_ptr->timestamp),
 				"%.*s", (int) value_len, value);
 			num_copied++;
 		} else if (strncmp(line_start, "ip_str", name_len) == 0) {
@@ -169,8 +169,8 @@ int eem_config_from_str(eem_config_type *config_ptr, const char *str) {
 			snprintf(config_ptr->nm_str, sizeof(config_ptr->nm_str),
 				"%.*s", (int) value_len, value);
 			num_copied++;
-		} else if (strncmp(line_start, "device_str", name_len) == 0) {
-			snprintf(config_ptr->password_str, sizeof(config_ptr->device_str),
+		} else if (strncmp(line_start, "device", name_len) == 0) {
+			snprintf(config_ptr->device, sizeof(config_ptr->device),
 				"%.*s", (int)value_len, value);
 			num_copied++;
 		} else if (strncmp(line_start, "lwdaq_port", name_len) == 0) {
@@ -685,8 +685,7 @@ int server_info(char* out) {
 	changes its state. In debug mode, the server will issue a heartbeat report
 	of its error state to the console.
 
-	In the default state, the server remains stuck, and issues a debug heartbeat
-	report of its sitting in an unknown state.
+	In the default state, the server remains stuck. 
 */
 void tcpip_server(tcpip_server_type* server, tcpip_tasks_type tasks) {
 	#define HEARTBEAT_PERIOD 50000000
@@ -699,6 +698,10 @@ void tcpip_server(tcpip_server_type* server, tcpip_tasks_type tasks) {
 	int status;
 	static bool print_init_wait = true;
 	static bool ping_sent = false;
+	
+	if (server->port == 0) {
+		server->state = S_DISABLED;
+	}
 	
 	switch (server->state) {
 		case S_WAIT_STACK: {
@@ -822,48 +825,63 @@ void tcpip_server(tcpip_server_type* server, tcpip_tasks_type tasks) {
 		}
 		break;
 		
+		case S_DISABLED: {
+			static bool flag = true;
+			if (flag) {
+				console_print("%s server disabled.\n", server->protocol);
+				flag = false;		
+			}
+		}
+		break;
+		
 		default: {
-			if (rand() % HEARTBEAT_PERIOD == 0) {
-				if (debug) console_print("Unknown state %u for % server in %s.\n",
-					server->protocol, server->state, __func__);
-			}		
+			static bool flag = true;
+			if (flag) {
+				console_print("%s server in unknown state.\n", server->protocol);
+				flag = false;		
+			}
 		}
 		break;
 	}
 }
 
 /*
-	cli_eem_config is a CLI command procedure that displays Embedded Ethernet
-	Module (EEM) configuration records and allows us to modify the fields of the
-	flash memory configuration record. When we call the procedure from the CLI,
-	we specify "show" or "set". For "show", we name a target "active", "flash",
-	or "factory". For "set", the target is always the flash memory
-	configuration. We can pass options that contain the name of one of the
-	records in the EEM configuration, as well as a value for that record. We
-	might pass "--ip_str", for example, followed by a string like "192.168.1.10"
-	for the IP address we want the EEM to use when it next starts up. We can
-	also pass the "--replace" option and specify either "active" or "factory".
-	The routine will overwrite the entire flash memory configuration with the
-	active or factory configurations respectively.
+	cli_config is a CLI command procedure that displays Embedded Ethernet Module
+	(EEM) configuration records and allows us to modify the fields of the flash
+	memory configuration record. When we call the procedure from the CLI, we
+	specify "show" or "set". For "show", we name a target "active", "flash", or
+	"factory". For "set", the target is always the flash memory configuration.
+	We can pass options that contain the name of one of the records in the EEM
+	configuration, as well as a value for that record. We might pass "--ip_str",
+	for example, followed by a string like "192.168.1.10" for the IP address we
+	want the EEM to use when it next starts up. We can also pass the "--replace"
+	option and specify either "active" or "factory". The routine will overwrite
+	the entire flash memory configuration with the active or factory
+	configurations respectively.
 
-	The factory configuration is hard-coded. The active configuration is the
+	The factory EEM configuration is hard-coded. The active configuration is the
 	configuration that was applied after the most recent system reset. We are
 	not permitted to modify the active configuration. To change the
 	configuration of the EEM, we write to the configuration record stored in
 	flash memory. We might want to write the factory configuration to flash so
-	as to perform a factory reset when we do not have access to the host board
+	as to perform a factory reset when we do not have access to the motherboard
 	configuration switch. We might want to write the active configuration to
 	flash in order to undo changes to the flash configuration we made earlier
 	with this routines.
 
 	The next time the EEM boots up, it will load the flash configuration as its
 	active configuration. The flash configuration we write now will be loaded
-	after reset later, so long as the configuration switch on the host board is
-	not depressed during the reset. If this switch is depressed, the EEM will
+	after reset later, so long as the configuration switch on the motherboard
+	is not depressed during the reset. If this switch is depressed, the EEM will
 	first over-write the flash configuration with the factory configuration and
 	the factory configuration is the one that will be applied after reset.
+	
+	The cli_config command respects the security level field of the active EEM
+	configuration. If the security level is 1 or higher, cli_config will insist
+	that the client be logged in before performing any function other than
+	showing help or info.	
 */
-void cli_eem_config(cli_chan_type *ch, char *args) {
+void cli_config(cli_chan_type *ch, char *args) {
 	char* source = NULL;
     bool update = false;
     bool verb_received = false;
@@ -943,16 +961,17 @@ void cli_eem_config(cli_chan_type *ch, char *args) {
 					tok, source, __func__);
 				return;			
 			}
-		} else if (strcmp(tok, "--ip") == 0 
-				|| strcmp(tok, "--gateway") == 0
-				|| strcmp(tok, "--mask") == 0)  {
+		} else if (strcmp(tok, "--ip_str") == 0 
+				|| strcmp(tok, "--gw_str") == 0
+				|| strcmp(tok, "--nm_str") == 0)  {
 			str = strtok(NULL, " \t");
 			if (!TCPIP_Helper_StringToIPAddress(str, &addr)) {
 				cli_print(ch, "ERROR: Invalid IP address '%s' in %s.\n", str, __func__);
 				return;
 			}
-			if (strcmp(tok, "--ip") == 0) {strcpy(config.ip_str, str);} 
-			else if (strcmp(tok, "--gateway") == 0) {
+			if (strcmp(tok, "--ip_str") == 0) {
+				strcpy(config.ip_str, str);
+			} else if (strcmp(tok, "--gw_str") == 0) {
 				strcpy(config.gw_str, str);
 			} else {
 				strcpy(config.nm_str, str);
@@ -972,7 +991,7 @@ void cli_eem_config(cli_chan_type *ch, char *args) {
 					"ERROR: Value '%s' invalid for %s in %s.\n", val, tok, __func__);
 				return;
 			}
-			if (p == 0 || p > 65535) {
+			if (p > 65535) {
 				cli_print(ch,
 					"ERROR: Value '%lu' out of range (1-65535) for %s in %s.\n", 
 					p, tok, __func__);
@@ -1003,6 +1022,68 @@ void cli_eem_config(cli_chan_type *ch, char *args) {
 			} else {
 				config.lwdaq_timeout = (uint32_t) p;
 			}
+		} else if (strcmp(tok, "--password") == 0) {
+			str = strtok(NULL, " \t");
+			if (!str) {
+    			cli_print(ch, 
+    				"ERROR: Option '%s' requires value in %s.\n", tok, __func__);
+        		return;
+			}			
+			strcpy(config.password, str);
+		} else if (strcmp(tok, "--person") == 0) {
+			str = strtok(NULL, " \t");
+			if (!str) {
+    			cli_print(ch, 
+    				"ERROR: Option '%s' requires value in %s.\n", tok, __func__);
+        		return;
+			}			
+			strcpy(config.person, str);
+		} else if (strcmp(tok, "--timestamp") == 0) {
+			str = strtok(NULL, " \t");
+			if (!str) {
+    			cli_print(ch, 
+    				"ERROR: Option '%s' requires value in %s.\n", tok, __func__);
+        		return;
+			}			
+			strcpy(config.timestamp, str);
+		} else if (strcmp(tok, "--device") == 0) {
+			str = strtok(NULL, " \t");
+			if (!str) {
+    			cli_print(ch, 
+    				"ERROR: Option '%s' requires value in %s.\n", tok, __func__);
+        		return;
+			}			
+			strcpy(config.device, str);
+		} else if (strcmp(tok, "--tcp_tick_ms") == 0) {
+			char* val = strtok(NULL, " \t");
+			if (!val) {
+    			cli_print(ch, 
+    				"ERROR: Option '%s' requires value in %s.\n", tok, __func__);
+        		return;
+			}
+			char *end;
+    		unsigned long p = strtoul(val, &end, 10);
+			if (*end != '\0' || p < 1) {
+				cli_print(ch,
+					"ERROR: Value '%s' invalid for %s in %s.\n", val, tok, __func__);
+				return;
+			}
+			config.telnet_timeout = (uint32_t) p;
+		} else if (strcmp(tok, "--seclevel") == 0) {
+			char* val = strtok(NULL, " \t");
+			if (!val) {
+    			cli_print(ch, 
+    				"ERROR: Option '%s' requires value in %s.\n", tok, __func__);
+        		return;
+			}
+			char *end;
+    		unsigned long p = strtoul(val, &end, 10);
+			if (*end != '\0' || p < 0 || p > 2) {
+				cli_print(ch,
+					"ERROR: Value '%s' invalid for %s in %s.\n", val, tok, __func__);
+				return;
+			}
+			config.seclevel = (uint32_t) p;
 		} else {
 			cli_print(ch, "ERROR: Unrecognized option '%s' in %s.\n",
 				tok, __func__);
@@ -1019,9 +1100,9 @@ void cli_eem_config(cli_chan_type *ch, char *args) {
 	if (print_help) {
 		cli_message(ch,
 "Usage:\n"
-"  eem-config [--info|--help]\n"
-"  eem-config show <active|flash|factory>\n"
-"  eem-config set --option <value> [OPTIONS]\n"
+"  config [--info|--help]\n"
+"  config show <active|flash|factory>\n"
+"  config set --option <value> [OPTIONS]\n"
 "\n"
 "Description:\n"
 "  Display or modify Embedded Ethernet Module (EEM) configuration records. The\n"
@@ -1033,11 +1114,20 @@ void cli_eem_config(cli_chan_type *ch, char *args) {
 "  'factory' configurations. The other options select a single field in the EEM\n"
 "  flash configuration record, and apply a new value to that field. We can specify\n"
 "  as many fields as we like in a single command line. During a normal start-up, in\n"
-"  wich the configuration switch on the host is not depressed, the EEM loads the\n"
-"  flash configuration directly into the active configuration and implements the\n"
+"  wich the configuration switch on the motherboard is not depressed, the EEM loads\n"
+"  the flash configuration directly into the active configuration and implements the\n"
 "  active configuraiton. By this means we provide both persistent EEM configuration\n"
 "  through reset and power cycles, and also the means to restore the EEM to a known\n"
 "  state.\n"
+"\n"
+"  The config command respects the active EEM configuration's security level. If the\n"
+"  security level is one or greater, and the command is invoked for anything more\n"
+"  than --info or --help, the command will return an error message. Provided we\n"
+"  have access to the config command, we can set the security level that will be\n"
+"  applied after the next reset, and the password required to log in as well. There\n"
+"  must be no white spaces in the password. With the telnet-port and lwdaq-port\n"
+"  options we can either change the port the corresponding server listens on, or\n"
+"  if we set the port to zero, we will disable the server entirely after reset.\n"
 "\n"
 "Verbs:\n"
 "  show                  Display active, flash, or factory configuration.\n"
@@ -1050,13 +1140,19 @@ void cli_eem_config(cli_chan_type *ch, char *args) {
 "\n"
 "Options:\n"
 "  --replace <config>    Over-write flash with active or factory configuration.\n"
-"  --ip <addr>           Set flash IP address to 'x.x.x.x'.\n"
-"  --gateway <addr>      Set flash gateway address to new string 'x.x.x.x'.\n"
-"  --mask <addr>         Set flash network mask to new string 'x.x.x.x'.\n"
-"  --telnet-port <port>  Set flash Telnet sesrver port.\n"
-"  --lwdaq-port <port>   Set flash LWDAQ server port.\n"
+"  --seclevel <0|1|2>    Set security level to value 0-2.\n"
+"  --password <str>      Set password to string containing no whitespace.\n"
+"  --person <str>        Set operator name to string containing no whitespace.\n"
+"  --ip_str <str>        Set flash IP address to 'x.x.x.x'.\n"
+"  --gw_str <str>        Set flash gateway address to new string 'x.x.x.x'.\n"
+"  --nm_str <str>        Set flash network mask to new string 'x.x.x.x'.\n"
+"  --timestamp <str>     Set timestamp to string containing no white space.\n"
+"  --device <str>        Set device name to string containing no white space.\n"
+"  --telnet-port <port>  Set flash Telnet sesver port, 0 to disable.\n"
+"  --lwdaq-port <port>   Set flash LWDAQ server port, 0 to disable.\n"
 "  --telnet-timeout <s>  Set flash Telnet server timeout in seconds.\n"
 "  --lwdaq-timeout <s>   Set flash LWDAQ server timeout in seconds.\n"
+"  --tcp_tick_ms <ms>    Set tcp tick execution period in milliseconds.\n"
 "  --info                Summary of this command, no changes made.\n"
 "  --help                Detailed help for this command, no changes made.\n"
 		);
@@ -1065,6 +1161,12 @@ void cli_eem_config(cli_chan_type *ch, char *args) {
 	
 	if (!verb_received) {
 		cli_print(ch, "ERROR: No verb or option specified in %s.\n", __func__);
+		return;
+	}
+
+	if (eem_config_active.seclevel > 0 && ch->status != CLI_LOGIN_PASS) {
+		cli_print(ch, "ERROR: Access denied, login required in %s.\n", __func__);
+		ch->status = CLI_FAULT;
 		return;
 	}
 

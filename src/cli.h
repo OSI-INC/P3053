@@ -128,6 +128,29 @@ typedef int (*cli_putchar_func)(void *context, char c);
 typedef int (*cli_flush_func)(void *context);
 
 /*
+ 	The cli_chan_status_type structure defines the status codes for CLI channels.
+*/
+typedef enum {
+    CLI_LOGIN_NONE,
+    CLI_LOGIN_PASS,
+    CLI_LOGIN_FAIL,
+    CLI_FAULT,
+    CLI_CLOSE
+} cli_chan_status_type;
+
+/*
+	The one hard-coded command name the CLI recognises, although it does not
+	implement the command itself unless the command under that name is
+	registered with the CLI. This is a login command: it must accept a password
+	and compare the passowrd to the active EEM configuration password, and
+	thereafter set the channel status code accordingly. By means of this command
+	and the security level, the CLI can prevent unauthorized access to its
+	commands, and the server managing the CLI channel can close the channel,
+	which is our preferred way of dealing with unauthorized access.
+*/
+#define CLI_LOGIN_CMD "login"
+
+/*
 	The cli_chan_type holds all the information our comman-line interpreter
 	(CLI) needs to manage comminication over a particular channel. We call it a
 	"channel descriptor". Before we start a CLI, we prepare a channel descriptor
@@ -142,7 +165,8 @@ typedef int (*cli_flush_func)(void *context);
 	complete, and to carry multiple commands through multiple calls to the CLI
 	server. A transmit buffer is not strictly necessary for the operation of the
 	CLI, but we include one because it acts as a shared workspace for CLI
-	commands, where they can build output strings.
+	commands, where they can build output strings. The status field holds a status
+	code, as defined with our cli_chan_status_type.
 */
 #define CLI_RX_SIZE 2048
 #define CLI_TX_SIZE 2048
@@ -156,6 +180,7 @@ typedef struct {
     uint32_t rx_len;
     char tx_buff[CLI_TX_SIZE];
     char* name;
+    cli_chan_status_type status;
 } cli_chan_type;
 
 /*
@@ -217,9 +242,9 @@ void cli_print(cli_chan_type* ch, const char* fmt, ...);
 /*
 	Build in and example CLI command procedures.
 */
-void cli_cmd_template(cli_chan_type *ch, char *args);
 void cli_help(cli_chan_type *ch, char *args);
-void cli_eem_info(cli_chan_type *ch, char *args);
-void cli_debug_ctrl(cli_chan_type *ch, char *args);
+void cli_status(cli_chan_type *ch, char *args);
+void cli_debug(cli_chan_type *ch, char *args);
+void cli_login(cli_chan_type *ch, char *args);
 
 #endif

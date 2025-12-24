@@ -86,7 +86,6 @@ tcpip_server_type lwdaq_server = {
     .ip_str = "0.0.0.0",
     .tcp_timeout = 0,
     .last_tick = 0,
-    .logged_in = false
 };
 	
 /*
@@ -163,14 +162,14 @@ int lwdaq_data_return(TCP_SOCKET s, uint8_t* block, uint32_t len) {
 int lwdaq_str_from_config(char* str, const eem_config_type* config_ptr) {
 	int len = 0;
 	len += sprintf(str+len, "lwdaq_relay_configuration:\n");
-	len += sprintf(str+len, "configuration_time: %s\n", config_ptr->time_str);
-	len += sprintf(str+len, "driver_id: %s\n", config_ptr->device_str);
+	len += sprintf(str+len, "configuration_time: %s\n", config_ptr->timestamp);
+	len += sprintf(str+len, "driver_id: %s\n", config_ptr->device);
 	len += sprintf(str+len, "gateway_addr: %s\n", config_ptr->gw_str);
 	len += sprintf(str+len, "ip_addr: %s\n", config_ptr->ip_str);
 	len += sprintf(str+len, "ip_port: %u\n", config_ptr->lwdaq_port);
-	len += sprintf(str+len, "operator: %s\n", config_ptr->operator_str);
-	len += sprintf(str+len, "password: %s\n", config_ptr->password_str);
-	len += sprintf(str+len, "security_level: %u\n", config_ptr->security_level);
+	len += sprintf(str+len, "operator: %s\n", config_ptr->person);
+	len += sprintf(str+len, "password: %s\n", config_ptr->password);
+	len += sprintf(str+len, "security_level: %u\n", config_ptr->seclevel);
 	len += sprintf(str+len, "subnet_mask: %s\n", config_ptr->nm_str);
 	len += sprintf(str+len, "tcp_timeout: %u\n", config_ptr->lwdaq_timeout);
 	return len;
@@ -226,22 +225,22 @@ int lwdaq_config_from_str(eem_config_type *config_ptr, const char *str) {
 				"%.*s", (int) value_len, value);
 			num_copied++;
 		} else if (strncmp(line_start, "operator", name_len) == 0) {
-			snprintf(config_ptr->operator_str, sizeof(config_ptr->operator_str),
+			snprintf(config_ptr->person, sizeof(config_ptr->person),
 				"%.*s", (int) value_len, value);
 			num_copied++;
 		} else if (strncmp(line_start, "configuration_time", name_len) == 0) {
-			snprintf(config_ptr->time_str, sizeof(config_ptr->time_str),
+			snprintf(config_ptr->timestamp, sizeof(config_ptr->timestamp),
 				"%.*s", (int) value_len, value);
 			num_copied++;
 		} else if (strncmp(line_start, "password", name_len) == 0) {
-			snprintf(config_ptr->password_str, sizeof(config_ptr->password_str),
+			snprintf(config_ptr->password, sizeof(config_ptr->password),
 				"%.*s", (int)value_len, value);
 			num_copied++;
 		} else if (strncmp(line_start, "ip_port", name_len) == 0) {
 			config_ptr->lwdaq_port = (uint32_t) strtoul(value, NULL, 10);
 			num_copied++;
 		} else if (strncmp(line_start, "security_level", name_len) == 0) {
-			config_ptr->security_level = (uint32_t) strtoul(value, NULL, 10);
+			config_ptr->seclevel = (uint32_t) strtoul(value, NULL, 10);
 			num_copied++;
 		} else if (strncmp(line_start, "tcp_timeout", name_len) == 0) {
 			config_ptr->lwdaq_timeout = (uint32_t) strtoul(value, NULL, 10);
@@ -276,10 +275,10 @@ int lwdaq_handle_message(tcpip_server_type* server,
 	static char config_str[LWDAQ_CONFIG_LENGTH];
 	static eem_config_type config;
 
-	if (eem_config_active.security_level >= 2 && !server->logged_in && id != LOGIN) {
+	if (eem_config_active.seclevel >= 2 && !server->logged_in && id != LOGIN) {
 		console_print(
 			"REJECTED: Immediate login required by security level %d in %s.\n",
-			eem_config_active.security_level, __func__);
+			eem_config_active.seclevel, __func__);
 		return -1;
 	}
 
@@ -355,7 +354,7 @@ int lwdaq_handle_message(tcpip_server_type* server,
 		case LOGIN: {
 			content[len] = '\0';
 			if (debug) console_print("LOGIN in %s.\n", __func__);
-			if (!strcmp(eem_config_active.password_str, (char*) content)) {
+			if (!strcmp(eem_config_active.password, (char*) content)) {
 				server->logged_in = true;
 				if (debug) console_print("Logged in with password '%s'.\n", content);
 			} else {
@@ -368,7 +367,7 @@ int lwdaq_handle_message(tcpip_server_type* server,
 
 		case CONFIG_READ:{
 			if (debug) console_print("CONFIG_READ in %s.\n", __func__);
-			if (server->logged_in || eem_config_active.security_level == 0) {
+			if (server->logged_in || eem_config_active.seclevel == 0) {
 				lwdaq_str_from_config(config_str, &eem_config_active);
 			  	lwdaq_data_return(server->socket,
 			  		(uint8_t*) config_str, strlen(config_str));
@@ -384,7 +383,7 @@ int lwdaq_handle_message(tcpip_server_type* server,
 
 		case CONFIG_WRITE:{
 			if (debug) console_print("CONFIG_WRITE in %s.\n",__func__);
-			if (server->logged_in || eem_config_active.security_level == 0) {
+			if (server->logged_in || eem_config_active.seclevel == 0) {
 				if (len<LWDAQ_CONFIG_LENGTH) {
 					if (debug) console_print("Accepted: config %d characters.\n",len);
 					content[len]=0x00;
@@ -421,7 +420,7 @@ int lwdaq_handle_message(tcpip_server_type* server,
 
 		case REBOOT: {
 			if (debug) console_print("REBOOT in %s.\n", __func__);
-			if (server->logged_in || eem_config_active.security_level == 0) {
+			if (server->logged_in || eem_config_active.seclevel == 0) {
 				tx_buff[0] = CLOSE_CODE;
 				tcp_writeall(&server->socket, tx_buff, 1);
 				int counter = 1e6;
