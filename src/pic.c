@@ -327,7 +327,7 @@ void pic_info(char* out) {
 	sprintf(out, 
 		"Tick Counter %.3f (kHz)\n"
 		"Sys Counter  %.3f (MHz)\n"
-		"SysClock     %.3f (MHz)",
+		"Sys Clock    %.3f (MHz)",
 		(double) SYS_TMR_TickCounterFrequencyGet() * 1e-3,
 		(double) SYS_TMR_SystemCountFrequencyGet() * 1e-6,
 		(double) SYS_TMR_SystemCountFrequencyGet() * 2e-6);
@@ -480,107 +480,174 @@ void cli_mpcie(cli_chan_type *ch, char *args) {
 	bool print_info = false;
 	bool print_help = false;
 	bool decimal_format = false;
+	bool packed_format = false;
 	bool write_access = false;
-	bool addr_received = false;
+	bool verb_received = false;
+	bool stream_access = false;
 	uint8_t addr = 0;
 	uint8_t val = 0;
-	uint8_t data[64];
-	uint8_t data_len = 0;
-	uint8_t read_len = 1;
+	uint8_t data[CLI_MPCIE_MAX_DATA];
+	uint32_t data_len = 0;
+	uint32_t read_len = 1;
+	
 	
 	char* tok = strtok(args, " \t");
 	while (tok != NULL) {
  		if (strcmp(tok, "--info") == 0) {
  			print_info = true;
- 		} else if (strcmp(tok, "--help") == 0) {
+ 			break;
+ 		} 
+ 		
+ 		if (strcmp(tok, "--help") == 0) {
  			print_help = true;
- 		} else if (strcmp(tok, "--decimal") == 0) {
- 			decimal_format = true;
- 		} else if (strcmp(tok, "read") == 0 || strcmp(tok, "write") == 0) {
-			if (strcmp(tok, "write") == 0) write_access = true;
+ 			break;
+ 		} 
+ 		
+ 		if (strcmp(tok, "read") == 0 || strcmp(tok, "stream-read") == 0
+ 				  || strcmp(tok, "write") == 0 || strcmp(tok, "stream-write") == 0) {
+ 			verb_received = true;
+ 			if (strcmp(tok, "write") == 0 || strcmp(tok, "stream-write") == 0) {
+ 				write_access = true;
+ 			}
+ 			if (strcmp(tok, "stream-read") == 0 || strcmp(tok, "stream-write") == 0) {
+ 				stream_access = true;
+ 			}
  			tok = strtok(NULL, " \t");
  			if (!parse_uint8(tok, &addr)) {
  				cli_print(ch, "ERROR: Invalid address '%s' in %s.\r\n", tok, __func__);
 				return;
 			} 
-			addr_received = true;
- 		} else if (parse_uint8(tok, &val) && addr_received) {
- 			if (write_access) {
+        	tok = strtok(NULL, " \t");
+			continue;
+ 		} 
+ 		
+		if (!verb_received) {
+			cli_print(ch, "ERROR: Must specify bus access type in %s.\n", __func__);
+			return;
+		}
+		
+		if (strcmp(tok, "--packed") == 0) {
+ 			packed_format = true;
+ 		} else if (strcmp(tok, "--decimal") == 0) {
+ 			decimal_format = true;
+ 		} else if (parse_uint32(tok, &read_len)) {
+ 			if (write_access && parse_uint8(tok, &val)) {
  				data[data_len] = val;
  				data_len++;
- 				if (data_len > 64) {
- 					cli_print(ch, "ERROR: More than 64 data bytes in %s.\n", __func__);
+ 				if (data_len > CLI_MPCIE_MAX_DATA) {
+ 					cli_print(ch, "ERROR: Attempt to write >%u bytes in %s.\n",
+ 						CLI_MPCIE_MAX_DATA, __func__);
             		return;
  				}
+ 			} else if (write_access && !parse_uint8(tok, &val)) {
+				cli_print(ch, "ERROR: Address '%u' out of range in %s.\n", 
+					val, __func__);
+				return;
+			} else if (read_len > CLI_MPCIE_MAX_DATA) {
+				cli_print(ch, "ERROR: Attempt to read >%u bytes in %s.\n",
+					CLI_MPCIE_MAX_DATA, __func__);
+				return;
  			} else {
- 				read_len = val;
+ 				;
  			}
  		} else {
             cli_print(ch, "ERROR: Unrecognized option '%s' in %s.\n", tok, __func__);
             return;
         }
+        
         tok = strtok(NULL, " \t");
     }
     
 	if (print_info) {
-		cli_message(ch, "Read and write from the eight-bit MPCIE bus.\n");
+		cli_message(ch, "Read and write from the eight-bit mPCIe bus.\n");
 		return;
 	}
 
 	if (print_help) {
 		cli_message(ch,
 "Usage:\n"
-"  mpcie [read] <addr> [length] [--decimal] [--info] [--help]\n"
-"  mpcie write <addr> [--info] [--help] <value> [value...]\n"
-"\n"
+"  mpcie <read|stream-read> <addr> [length] [--decimal|--packed] [--info] [--help]\n"
+"  mpcie <write|stream-write> <addr> [--info] [--help] <value> [value...]\n"
+"  \n"
 "Summary:\n"
-"  Reads to and reads from the MPCIE eight-bit bus. For both actions, we must specify.\n"
-"  an address. This we can do either in hexadecimal with a '0x' prefix, or in decimal\n"
-"  with no prefix. In a read access, the number of bytes read defaults to one, but we\n"
-"  can read multiple bytes. The command will list the bytes separated by spaces, and\n"
-"  in hexadecimal format by default, although we can ask for decimal with an option.\n"
-"  The write command does not accept a length. Instead, it writes as many bytes as we\n"
-"  provide in a space-delimited string containing either hexadecimal or decimal values.\n"
-"  Even if we ask for decimal display, the addresses at the start of each line of\n"
-"  bytes displayed will be in hexadecimal with a '0x' prefix.\n"
-"\n"
+"  Writes to and reads from the mPCIe eight-bit bus. For both actions, we must\n"
+"  specify an eight-bit address 'addr' either as hexadecimal with a '0x' prefix or\n"
+"  as decimal with no prefix. The 'write' and 'stream-write' operations write as\n"
+"  many values as we pass on the command line. The 'write' operation starts writing\n"
+"  at location 'addr' and increments the location after each write. The\n"
+"  'stream-write' writes all bytes to the same locatin 'addr'. The command reads\n"
+"  bytes as a space-delimited string either in hexadecimal or decimal, just as for\n"
+"  the 'addr'. The 'read' operation reads 'length' bytes from consecutive\n"
+"  locations, starting at location 'addr'. The 'stream-read' operation reads\n"
+"  'length' bytes from the same location 'addr'. If we omit 'length', it defaults\n"
+"  to 1. By default, the returned bytes will be written as sixteen bytes to a line,\n"
+"  each byte two hexadecimal digits separated from its neighbors by a space, and\n"
+"  with each line of sixteen bytes starting with the mPCIe address of the first\n"
+"  byte, expressed in hexadecimal with a '0x' prefix. With the '--decimal' option,\n"
+"  the bytes read will be expressed as decimal values separated by spaces. With the\n"
+"  'compact' option, the bytes will be returned as a packed string of hexadecimal\n"
+"  bytes, each byte two digits only, with no separators, no newlines, and no\n"
+"  address markers.\n"
+"  \n"
 "Verbs:\n"
-"  read       Read and display bytes from the MPCIE bus.\n"
-"  write      Write bytes to the MPCIE bus.\n"
-"\n"
+"  read         Read multiple bytes from consecutive mPCIe locations.\n"
+"  stream-read  Read multiple bytes from the same mPCIe location.\n"
+"  write        Write multiple bytes to consecutive mPCIe locations.\n"
+"  stream-write Write multiple bytes to the same mPCIe location.\n"
+"  \n"
 "Selectors:\n"
-"  length     The number of bytes to read and display.\n"
-"\n"
+"  length       The number of bytes to read.\n"
+"  \n"
 "Options:\n"
-"  --decimal  Display bytes read as positive decimal values, addresses still in hex.\n"
-"  --info     Display a one-line summary. When specified, no bus access is performed.\n"
-"  --help     Display this help text. When specified, no bus access is performed.\n"
+"  --decimal    Display bytes read as positive decimal values.\n"
+"  --packed     Display bytes read as packed hexadecimal.\n"
+"  --info       Display a one-line summary of command, no bus access.\n"
+"  --help       Display this help text, no bus access.\n"
 		);
+		return;
+	}
+	
+	if (!verb_received) {
+		cli_print(ch, "ERROR: No verb or option specified in %s.\n", __func__);
+		return;
+	}
+
+	if (packed_format && decimal_format) {
+		cli_print(ch, 
+			"ERROR: Options '--packed' and '--decimal' incompatible in %s.\n", __func__);
 		return;
 	}
 
 	if (!write_access) {
-		while (read_len > 0) {
-			uint8_t line_len = (read_len > 16) ? 16 : read_len;
-			cli_print(ch, "0x%02X: ", addr);
-			for (uint8_t i = 0; i < line_len; i++) {
-				val = mpcie_byte_read(addr);
-				if (!decimal_format) {
-					cli_print(ch, "%02X", val);
-				} else {
-					cli_print(ch, "%3u", val);
+		if (!packed_format) {
+			while (read_len > 0) {
+				uint32_t line_len = (read_len > 16) ? 16 : read_len;
+				cli_print(ch, "0x%02X: ", addr);
+				for (uint32_t i = 0; i < line_len; i++) {
+					val = mpcie_byte_read(addr);
+					if (!decimal_format) {
+						cli_print(ch, "%02X", val);
+					} else {
+						cli_print(ch, "%3u", val);
+					}
+					if (i + 1 < line_len) cli_print(ch, " ");
+					if (!stream_access) addr++;
 				}
-				if (i + 1 < line_len)
-				cli_print(ch, " ");
-				addr++;
+				cli_print(ch, "\n");
+				read_len -= line_len;
+			}
+		} else {
+			for (uint32_t i = 0; i < read_len; i++) {
+				val = mpcie_byte_read(addr);
+				cli_print(ch, "%02X", val);
+				if (!stream_access) addr++;
 			}
 			cli_print(ch, "\n");
-			read_len -= line_len;
 		}	
 	} else {
-		for (uint8_t i = 0; i < data_len; i++) {
+		for (uint32_t i = 0; i < data_len; i++) {
 			mpcie_byte_write(addr, data[i]);
-			addr++;
+			if (!stream_access) addr++;
 		}
 	}
 

@@ -188,15 +188,37 @@ static inline uint8_t mpcie_data_get(void) {
 }
 
 /*
-	mpcie_byte_write writes a byte value to a location in mpcie address space. It
-	includes repeated calls to the data strobe assert routine in order to introduce
-	a delay sufficient for the controller to latch the data accurately.
+	mpcie_byte_write writes a byte value to a location in mpcie address space.
+	It includes repeated calls to the data strobe assert routine in order to
+	introduce a delay sufficient for the controller to latch the data
+	accurately.
 */
 static inline void mpcie_byte_write(uint8_t addr, uint8_t data) {
     mpcie_addr_set(addr);
     mpcie_cw_assert(); 
     mpcie_data_output();
     mpcie_data_set(data);
+    mpcie_ds_assert();
+    mpcie_ds_assert();
+    mpcie_ds_assert();
+    mpcie_ds_assert();
+    mpcie_ds_assert();
+    mpcie_ds_assert();
+    mpcie_ds_assert();
+    mpcie_ds_unassert();
+}
+
+/*
+	mpcie_byte_write_repeat writes to the same address that was previously
+	asserted on the mPCIe bus. It assumes the previous access was also a write
+	cycle. It is faster than the random-access write cycle bedause we do not
+	have to assert the address nor CW. We use this routine for stream writes to
+	the RAM Portal on LWDAQ controllers.
+*/
+static inline void mpcie_byte_write_repeat(uint8_t addr, uint8_t data) {
+    mpcie_data_set(data);
+    mpcie_ds_assert();
+    mpcie_ds_assert();
     mpcie_ds_assert();
     mpcie_ds_assert();
     mpcie_ds_assert();
@@ -224,18 +246,23 @@ static inline uint8_t mpcie_byte_read(uint8_t addr) {
     mpcie_ds_assert();
     mpcie_ds_assert();
     mpcie_ds_assert();
+    mpcie_ds_assert();
+    mpcie_ds_assert();
     value = mpcie_data_get();
     mpcie_ds_unassert();
     return value;
 }
 
 /*
-	mpcie_byte_read_repeat reads again from the same byte read in a previous
-	byte read or byte repeat read. This access is faster than the full byte read
-	because we do not have to set up the address nor unassert Control Write
-	(/CW). We use this routine in stream reads from the controller RAM Portal.
+	mpcie_byte_read_repeat reads again from the same byte address as in the
+	previous mPCIe access. This access repeat access is faster than the
+	random-access byte read because we do not have to set up the address nor
+	unassert Control Write (/CW) before beginning the read cycle. We use this
+	routine in stream reads from the RAM Portal on LWDAQ controllers.
 */
 static inline uint8_t mpcie_byte_read_repeat(void) {
+    mpcie_ds_assert();
+    mpcie_ds_assert();
     mpcie_ds_assert();
     mpcie_ds_assert();
     mpcie_ds_assert();
@@ -304,6 +331,7 @@ int uart2_flush(void *context);
 	cli_pic_info is a CLI interface for PIC details.
 */
 void cli_reset(cli_chan_type *ch, char *args);
+#define CLI_MPCIE_MAX_DATA 512
 void cli_mpcie(cli_chan_type *ch, char *args);
 
 #endif

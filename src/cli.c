@@ -108,7 +108,7 @@ void cli_start(cli_chan_type* ch) {
 	ch->rx_len = 0;
 	ch->rx_buff[0] = '\0';
 	cli_print(ch, "===========================================================\n");
-	cli_print(ch, "====  Embedded Ethernet Module Command-Line Interface =====\n");
+	cli_print(ch, "===  Embedded Ethernet Module Command-Line Interpreter ====\n");
 	cli_print(ch, "===========================================================\n");
 	cli_print(ch, "Command-line interpreter running, try 'help' for help.\n");
 }
@@ -171,8 +171,6 @@ static cli_cmd_proc cli_cmd_find(const char *name) {
 	return with status CLI_FAULT.
 */
 void cli_server(cli_chan_type *ch) {
-	const char* prompt = "EEM$ ";
-
 	// Static buffers are persistent, but we do not use them to carry
 	// information from one execution of this routine to the next. We merely
 	// avoiding re-allocating stack space for these buffers every time we call
@@ -232,11 +230,8 @@ void cli_server(cli_chan_type *ch) {
 	// If we are echoing characters, print a newline to terminate the command line.
 	if (ch->echo) cli_message(ch, "\n");
 
-	// If we have no characters at all, print the prompt and return.
-	if (ch->rx_len == 0) {
-		cli_message(ch, prompt);
-		return;
-	}
+	// If we have no characters at all, return.
+	if (ch->rx_len == 0) return;
 	
     // Skip over any leading spaces or tabs in the input line.
 	uint32_t p = 0;
@@ -288,11 +283,8 @@ void cli_server(cli_chan_type *ch) {
 	ch->rx_len = 0;
 	ch->rx_buff[0] = '\0';
 	
-	// If the command name is an empty string, print the prompt and return.
-	if (strlen(cmd) == 0) {
-	    cli_message(ch, prompt);
-		return;
-	}
+	// If the command name is an empty string, return.
+	if (strlen(cmd) == 0) return;
 
 	// If the active EEM configuration security level is greater than one, and
 	// the name of the command we are about to execute is not CLI_LOGIN_CMD, we
@@ -302,7 +294,6 @@ void cli_server(cli_chan_type *ch) {
 			&& strcmp(cmd, CLI_LOGIN_CMD) != 0) {
 		cli_print(ch,"ERROR: Access denied, login required in %s.\n", ch->name);
 		ch->status = CLI_FAULT;
-	    cli_message(ch, prompt);
 		return;
 	}
 	
@@ -312,7 +303,6 @@ void cli_server(cli_chan_type *ch) {
 	proc = cli_cmd_find(cmd);
     if (proc == NULL) {
         cli_print(ch, "ERROR: Unknown command '%s' in %s.\n", cmd, __func__);
-	    cli_message(ch, prompt);
         return;
     }
 
@@ -321,8 +311,9 @@ void cli_server(cli_chan_type *ch) {
     // not return an error or success code.
 	proc(ch, args);
 
-    // Print the prompt and we are done.
-    cli_message(ch, prompt);
+    // We are done. The cursor should be back at the beginning of a new line.
+    // We do not print a prompt because prompts make life automated use of the
+    // CLI more complicated.
     return;
 }
 
@@ -519,6 +510,11 @@ void cli_status(cli_chan_type *ch, char *args) {
 	}
 	cli_print(ch, "Chan Status  %s\n", ch->tx_buff);
 	cli_print(ch, "Sec Level    %d\n", eem_config_active.seclevel);
+	if (debug) {
+		cli_print(ch, "Debug Flag   TRUE\n");
+	} else {
+		cli_print(ch, "Debug Flag   FALSE\n");	
+	}
 
     return;
 }

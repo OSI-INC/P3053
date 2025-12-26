@@ -40,6 +40,8 @@ extern bool debug;
 #define EEM_TELNET_ENABLE_DEFAULT true
 extern bool telnet_enable;
 
+#define EEM_POWERUP_WAIT_MS 100
+
 #define EEM_PLATFORM "A3053A"
 #define EEM_HOST "A3042"
 #define EEM_RELAY_VERSION 32

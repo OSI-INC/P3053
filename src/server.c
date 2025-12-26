@@ -888,7 +888,6 @@ void cli_config(cli_chan_type *ch, char *args) {
     bool print_info = false;
     bool print_help = false;
 	IPV4_ADDR addr;
-	char* str;
 	
 	eem_config_type config;
 	eem_config_read(&config);
@@ -961,17 +960,17 @@ void cli_config(cli_chan_type *ch, char *args) {
 					tok, source, __func__);
 				return;			
 			}
-		} else if (strcmp(tok, "--ip_str") == 0 
-				|| strcmp(tok, "--gw_str") == 0
-				|| strcmp(tok, "--nm_str") == 0)  {
-			str = strtok(NULL, " \t");
+		} else if (strcmp(tok, "--ip-str") == 0 
+				|| strcmp(tok, "--gw-str") == 0
+				|| strcmp(tok, "--nm-str") == 0)  {
+			char* str = strtok(NULL, " \t\"\'");
 			if (!TCPIP_Helper_StringToIPAddress(str, &addr)) {
 				cli_print(ch, "ERROR: Invalid IP address '%s' in %s.\n", str, __func__);
 				return;
 			}
-			if (strcmp(tok, "--ip_str") == 0) {
+			if (strcmp(tok, "--ip-str") == 0) {
 				strcpy(config.ip_str, str);
-			} else if (strcmp(tok, "--gw_str") == 0) {
+			} else if (strcmp(tok, "--gw-str") == 0) {
 				strcpy(config.gw_str, str);
 			} else {
 				strcpy(config.nm_str, str);
@@ -1023,7 +1022,7 @@ void cli_config(cli_chan_type *ch, char *args) {
 				config.lwdaq_timeout = (uint32_t) p;
 			}
 		} else if (strcmp(tok, "--password") == 0) {
-			str = strtok(NULL, " \t");
+			char* str = strtok(NULL, " \t\"\'");
 			if (!str) {
     			cli_print(ch, 
     				"ERROR: Option '%s' requires value in %s.\n", tok, __func__);
@@ -1031,15 +1030,15 @@ void cli_config(cli_chan_type *ch, char *args) {
 			}			
 			strcpy(config.password, str);
 		} else if (strcmp(tok, "--person") == 0) {
-			str = strtok(NULL, " \t");
+			char* str = strtok(NULL, " \t\"\'");
 			if (!str) {
     			cli_print(ch, 
     				"ERROR: Option '%s' requires value in %s.\n", tok, __func__);
         		return;
 			}			
 			strcpy(config.person, str);
-		} else if (strcmp(tok, "--timestamp") == 0) {
-			str = strtok(NULL, " \t");
+		} else if (strcmp(tok, "--timestamp\"\'") == 0) {
+			char* str = strtok(NULL, " \t");
 			if (!str) {
     			cli_print(ch, 
     				"ERROR: Option '%s' requires value in %s.\n", tok, __func__);
@@ -1047,7 +1046,7 @@ void cli_config(cli_chan_type *ch, char *args) {
 			}			
 			strcpy(config.timestamp, str);
 		} else if (strcmp(tok, "--device") == 0) {
-			str = strtok(NULL, " \t");
+			char* str = strtok(NULL, " \t\"\'");
 			if (!str) {
     			cli_print(ch, 
     				"ERROR: Option '%s' requires value in %s.\n", tok, __func__);
@@ -1107,27 +1106,17 @@ void cli_config(cli_chan_type *ch, char *args) {
 "Description:\n"
 "  Display or modify Embedded Ethernet Module (EEM) configuration records. The\n"
 "  'show' operation allows us to select one of the three EEM configuration records:\n"
-"  'active', 'flash', or 'factory'. The one we select will be displayed on the CLI\n"
-"  console. The 'set' operation allows us to modify or over-write the EEM\n"
-"  configuration stored in flash memory. With the '--replace' option we name one of\n"
-"  the two possible sources of a replacement configuration: the 'active' or\n"
-"  'factory' configurations. The other options select a single field in the EEM\n"
-"  flash configuration record, and apply a new value to that field. We can specify\n"
-"  as many fields as we like in a single command line. During a normal start-up, in\n"
-"  wich the configuration switch on the motherboard is not depressed, the EEM loads\n"
-"  the flash configuration directly into the active configuration and implements the\n"
-"  active configuraiton. By this means we provide both persistent EEM configuration\n"
-"  through reset and power cycles, and also the means to restore the EEM to a known\n"
-"  state.\n"
-"\n"
-"  The config command respects the active EEM configuration's security level. If the\n"
-"  security level is one or greater, and the command is invoked for anything more\n"
-"  than --info or --help, the command will return an error message. Provided we\n"
-"  have access to the config command, we can set the security level that will be\n"
-"  applied after the next reset, and the password required to log in as well. There\n"
-"  must be no white spaces in the password. With the telnet-port and lwdaq-port\n"
-"  options we can either change the port the corresponding server listens on, or\n"
-"  if we set the port to zero, we will disable the server entirely after reset.\n"
+"  'active', 'flash', or 'factory' for display. The 'set' operation allows us to\n"
+"  modify or over-write the configuration stored in flash memory. With '--replace'\n"
+"  we name 'active' or 'factory' to overwrite the flash configuration. Other 'set'\n"
+"  options allow us to modify individual fields in the flash configuration. Several\n"
+"  fields take the form of character strings. These must contain no spaces or tabs.\n"
+"  Any quotation marks, either single or double, will be interpreted as delimiters\n"
+"  rather than members of the string. This command respects the security level\n"
+"  declared by the active configuration. If the security level is > 0, the command\n"
+"  will prohibit both 'show' and 'set'. operations unless the channel status is\n"
+"  LOGIN_PASS. For the Telnet and LWDAQ port numbers, we enter a value 0-65535, for\n"
+"  which 0 will disable the server.\n"
 "\n"
 "Verbs:\n"
 "  show                  Display active, flash, or factory configuration.\n"
@@ -1143,9 +1132,9 @@ void cli_config(cli_chan_type *ch, char *args) {
 "  --seclevel <0|1|2>    Set security level to value 0-2.\n"
 "  --password <str>      Set password to string containing no whitespace.\n"
 "  --person <str>        Set operator name to string containing no whitespace.\n"
-"  --ip_str <str>        Set flash IP address to 'x.x.x.x'.\n"
-"  --gw_str <str>        Set flash gateway address to new string 'x.x.x.x'.\n"
-"  --nm_str <str>        Set flash network mask to new string 'x.x.x.x'.\n"
+"  --ip-str <str>        Set flash IP address to x.x.x.x.\n"
+"  --gw-str <str>        Set flash gateway address to new string x.x.x.x.\n"
+"  --nm-str <str>        Set flash network mask to new string x.x.x.x.\n"
 "  --timestamp <str>     Set timestamp to string containing no white space.\n"
 "  --device <str>        Set device name to string containing no white space.\n"
 "  --telnet-port <port>  Set flash Telnet sesver port, 0 to disable.\n"

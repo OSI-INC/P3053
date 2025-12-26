@@ -213,10 +213,12 @@ int telnet_tasks(tcpip_server_type* server) {
 	will use d2 as a power indicator, turning it on for 10% of the time so
 	quickly that it looks constant when the EEM is idle, and will flicker when
 	the EEM is laboring. We will use d5 as a heartbeat, flashing briefly every
-	second in the main loop when the network is up and running. The time between
-	flashes will be longer when the EEM is laboring. But if the network is down,
-	d5 will turn on continuously. If the EEM crashes, the green and red lights
-	will be stuck on or off.
+	second in the main loop when the network and link are up and running. The
+	time between flashes will be longer when the EEM is laboring. If the network
+	and link are both down, d5 will turn on continuously. If the network is up,
+	but the link is down, which seems to happen sometimes after re-programming
+	the EEM, d5 will turn off briefly every two seconds. If the EEM crashes, the
+	green and red lights will be stuck on or off.
 */
 void lamp_signal(uint32_t period) {
 	static uint32_t i = 0;
@@ -230,7 +232,12 @@ void lamp_signal(uint32_t period) {
 		i++;
 		if (i % 100 == 0) pic_d2_off();
 		if (i % 1000 == 0) pic_d2_on();
-		if (server_network_up() && i % 10000 == 0) pic_d5_off();
+		if (server_network_up() && server_link_up() && i == 10000) {
+			pic_d5_off();
+		}
+		if (server_network_up() && !server_link_up() && i == period - 100000) {
+			pic_d5_off();
+		}
 		if (i == period) {
 			pic_d5_on();
 			i = 0;
@@ -273,9 +280,15 @@ int main (void) {
 	cli_cmd_register("status",cli_status);
 	
 	/*
-		Start up the lamp signaling.
+		Wait for the power supplies to settle before we check the configuration
+		switch. If we read the switch location too soon, we will think it is
+		depressed when it is not.
 	*/
 	lamp_signal(0);
+	uint32_t last_tick = SYS_TMR_TickCountGet();
+	while (SYS_TMR_TickCountGet() - last_tick < EEM_POWERUP_WAIT_MS) {
+		tcp_tick();
+	}
 	
 	/*
 		Check the configuration switch on the motherboard. If it is depressed,
@@ -284,7 +297,7 @@ int main (void) {
 	*/
 	uint8_t val = mpcie_byte_read(40);
    	if ((val & 0x01) == 0) {
-   		console_message("FACTORY RESET: Configuration switch pressed on motherboard.\n");
+   		console_message("FACTORY RESET: Detected configuration switch depressed.\n");
     	eem_config_write(&eem_config_factory);
 	}
 	
