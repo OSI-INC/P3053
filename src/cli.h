@@ -233,8 +233,6 @@ typedef void (*cli_cmd_proc) (cli_chan_type *ch, char *args);
 */
 typedef struct {const char *name; cli_cmd_proc proc;} cli_command_entry;
 #define CLI_MAX_COMMANDS 64
-#define CLI_CMD_SIZE 32
-#define CLI_ARGS_SIZE 256
 
 /*
 	Command-Line Interpreter (CLI) routines. Refer to comments in their

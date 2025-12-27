@@ -268,17 +268,18 @@ void cli_server(cli_chan_type *ch) {
 		cli_print(ch,"ERROR: Access denied, login required in %s.\n", ch->name);
 		ch->status = CLI_FAULT;
 	} else {
-		
+
     // See if we can find a command procedure with a name that matches our
-    // command name. If not, print an error. If we find the procedure, execute
-    // it, passing it the channel descriptor and the argument list pointer.
-    // Command procedures report their own errors to the client directly.
+    // command name. If we find the procedure, execute it, passing it the
+    // channel descriptor and the argument list pointer. Command procedures
+    // report their own errors to the client directly. If we don't find the
+    // procedure, print an error message.
 		cli_cmd_proc proc = NULL;
 		proc = cli_cmd_find(cmd);
-		if (proc == NULL) {
-			cli_print(ch, "ERROR: Unknown command '%s' in %s.\n", cmd, __func__);
-		} else {
+		if (proc != NULL) {
 			proc(ch, args);
+		} else {
+			cli_print(ch, "ERROR: Unknown command '%s' in %s.\n", cmd, __func__);
 		}
 	}	
 
