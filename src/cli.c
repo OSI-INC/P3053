@@ -270,20 +270,23 @@ void cli_server(cli_chan_type *ch) {
 	} else {
 		
     // See if we can find a command procedure with a name that matches our
-    // command name. If not, print an error and return.
+    // command name. If not, print an error. If we find the procedure, execute
+    // it, passing it the channel descriptor and the argument list pointer.
+    // Command procedures report their own errors to the client directly.
 		cli_cmd_proc proc = NULL;
 		proc = cli_cmd_find(cmd);
 		if (proc == NULL) {
 			cli_print(ch, "ERROR: Unknown command '%s' in %s.\n", cmd, __func__);
 		} else {
-
-    // Execute the command procedure, passing it the channel descriptor and the
-    // argument list The command procedure reports its own errors, so does
-    // not return an error or success code.
 			proc(ch, args);
 		}
 	}	
-	
+
+	// Move the receive buffer pointer to the beginning of the buffer and load a
+	// null there as well.
+	ch->rx_len = 0;
+	ch->rx_buff[0] = '\0';
+		
     // We are done. The cursor should be back at the beginning of a new line.
     // We do not print a prompt because prompts make life automated use of the
     // CLI more complicated.
