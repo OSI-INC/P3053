@@ -657,4 +657,57 @@ void cli_login(cli_chan_type *ch, char *args) {
     return;
 }
 
+/*
+	cli_exit sets the channel state to CLI_CLOSE. The channel management routine
+	can act upon this status as it sees fit. In the case of a TCP socket,
+	recommend the task routine return an error code to tcpip_server so as to
+	close the socket. In the case of the UART serial channel, we recomment the
+	console server ignores the channel state.
+*/
+void cli_exit(cli_chan_type *ch, char *args) {
+	bool print_info = false;
+	bool print_help = false;
+
+	char* tok = strtok(args, " \t");
+	while (tok != NULL) {
+ 		if (strcmp(tok, "--info") == 0) {
+ 			print_info = true;
+ 		} else if (strcmp(tok, "--help") == 0) {
+ 			print_help = true;
+ 		} else {
+            cli_print(ch, "ERROR: Unrecognized option '%s' in %s.\n", tok, __func__);
+            return;
+        }
+        tok = strtok(NULL, " \t");
+    }
+    
+	if (print_info) {
+		cli_message(ch, "Attempts to close the communication channel.\n");
+		return;
+	}
+
+	if (print_help) {
+		cli_message(ch,
+"Usage:\n");
+		cli_print(ch,
+"  exit] [--info] [--help]\n", CLI_LOGIN_CMD);
+		cli_message(ch,
+"\n"
+"Summary:\n"
+"  Requests that the communication channel manager close the channel. In the case\n"
+"  of a TCP socket, the socket should close. In the case of a UART serial interface,\n"
+"  nothing will happen.\n"
+"\n"
+"Options:\n"
+"  --info        Print a one-line summary of this command.\n"
+"  --help        Print this help text.\n"
+		);
+		return;
+	}
+
+	ch->status = CLI_CLOSE;
+
+    return;
+}
+
 

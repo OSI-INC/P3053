@@ -1,6 +1,6 @@
 /*
 	cli.h -- Interface of the Command-Line Interpreter (CLI) library. The
-	passages below are an AI-generated description of the CLI purpose and
+	passage below is an AI-generated description of the CLI purpose and
 	implementation.
 
 	Command-Line Interpreter (CLI)
@@ -128,7 +128,16 @@ typedef int (*cli_putchar_func)(void *context, char c);
 typedef int (*cli_flush_func)(void *context);
 
 /*
- 	The cli_chan_status_type structure defines the status codes for CLI channels.
+ 	The cli_chan_status_type structure defines the status codes for CLI
+ 	channels. When we start a CLI that respects the EEM's security level, we
+ 	initialize it with status "login-none" to show that the client has not yet
+ 	submitted a correct password to accomplish a login, but nor has the client
+ 	failed to do so. When we start the console CLI, we initialize to
+ 	"login-pass", so that the console CLI always has the ability to modify the
+ 	flash configuration after a reset. The CLI commands can set the status to
+ 	"fault" or "close". The channel management procedure will decide what to do
+ 	when it sees these CLI status codes. The console CLI does nothing with
+ 	them.
 */
 typedef enum {
     CLI_LOGIN_NONE,
@@ -246,5 +255,6 @@ void cli_help(cli_chan_type *ch, char *args);
 void cli_status(cli_chan_type *ch, char *args);
 void cli_debug(cli_chan_type *ch, char *args);
 void cli_login(cli_chan_type *ch, char *args);
+void cli_exit(cli_chan_type *ch, char *args);
 
 #endif

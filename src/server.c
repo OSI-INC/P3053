@@ -1137,7 +1137,7 @@ void cli_config(cli_chan_type *ch, char *args) {
 "  --nm-str <str>        Set flash network mask to new string x.x.x.x.\n"
 "  --timestamp <str>     Set timestamp to string containing no white space.\n"
 "  --device <str>        Set device name to string containing no white space.\n"
-"  --telnet-port <port>  Set flash Telnet sesver port, 0 to disable.\n"
+"  --telnet-port <port>  Set flash Telnet server port, 0 to disable.\n"
 "  --lwdaq-port <port>   Set flash LWDAQ server port, 0 to disable.\n"
 "  --telnet-timeout <s>  Set flash Telnet server timeout in seconds.\n"
 "  --lwdaq-timeout <s>   Set flash LWDAQ server timeout in seconds.\n"

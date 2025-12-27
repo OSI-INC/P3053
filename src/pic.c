@@ -575,7 +575,7 @@ void cli_mpcie(cli_chan_type *ch, char *args) {
 "  as decimal with no prefix. The 'write' and 'stream-write' operations write as\n"
 "  many values as we pass on the command line. The 'write' operation starts writing\n"
 "  at location 'addr' and increments the location after each write. The\n"
-"  'stream-write' writes all bytes to the same locatin 'addr'. The command reads\n"
+"  'stream-write' writes all bytes to the same location 'addr'. The command reads\n"
 "  bytes as a space-delimited string either in hexadecimal or decimal, just as for\n"
 "  the 'addr'. The 'read' operation reads 'length' bytes from consecutive\n"
 "  locations, starting at location 'addr'. The 'stream-read' operation reads\n"

@@ -269,10 +269,12 @@ int main (void) {
 	
 	/*
 		Register commands in the Command-Line Interpreter (CLI). This is the only 
-		initialization the CLI requires.
+		initialization the CLI requires. The "help" command will list the commands
+		in the order we register them.
 	*/
 	cli_cmd_register("config",cli_config);
 	cli_cmd_register("debug",cli_debug);
+	cli_cmd_register("exit",cli_debug);
 	cli_cmd_register("help",cli_help);
 	cli_cmd_register(CLI_LOGIN_CMD,cli_login);
 	cli_cmd_register("mpcie",cli_mpcie);
