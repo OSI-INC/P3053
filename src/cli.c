@@ -171,14 +171,14 @@ static cli_cmd_proc cli_cmd_find(const char *name) {
 	return with status CLI_FAULT.
 */
 void cli_server(cli_chan_type *ch) {
-	// Static buffers are persistent, but we do not use them to carry
-	// information from one execution of this routine to the next. We merely
-	// avoiding re-allocating stack space for these buffers every time we call
-	// the server routine. Note that these lengths include the null character we
-	// put at the end of the command name or argument list.
-    static char cmd[CLI_CMD_SIZE];
-    static char args[CLI_ARGS_SIZE];
-
+	// We are going to use the existing channel receive buffer as our work space
+	// for commands operating upon incoming lines. The cmd pointer will point to
+	// the first character of the command name, and we will make sure a NULL
+	// sits just after the command name. We will use the args pointer in the
+	// same way for the argument list.
+	char* cmd;
+	char* args;
+	
 	// Read bytes into the channel's receive buffer until we see an end of line.
 	// We execute backspace and delete immediately we see them. If echo is
 	// enabled, we echo all characters, with backspace and delete being echoed
@@ -233,56 +233,27 @@ void cli_server(cli_chan_type *ch) {
 	// If we have no characters at all, return.
 	if (ch->rx_len == 0) return;
 	
-    // Skip over any leading spaces or tabs in the input line.
+    // Skip over any leading spaces or tabs in the input line to find the first
+    // character of the command.
 	uint32_t p = 0;
 	while (ch->rx_buff[p] == ' ' || ch->rx_buff[p] == '\t') p++;
+	cmd = &ch->rx_buff[p];
 
-    // Copy the first word in the input line into our command name buffer. If we
-    // overflow the name buffer, because the name is too long, discard the
-    // entire receive buffer and return.
-	uint32_t t = 0;
+    // Find the space, tab, or null at the end of the command name and put a
+    // null there.
 	while (ch->rx_buff[p] != '\0' 
 			&& ch->rx_buff[p] != ' ' 
 			&& ch->rx_buff[p] != '\t') {
-		if (t >= sizeof(cmd) - 1) {
-			cli_print(ch,"ERROR: Command name buffer overflow, "
-				"discarding all characters in %s.\n", ch->name);
-			ch->rx_len = 0;
-			ch->rx_buff[0] = '\0';
-			return;
-		}
-		cmd[t] = ch->rx_buff[p];
-		t++;
 		p++;
 	}
-	cmd[t] = '\0';
+	ch->rx_buff[p] = '\0';
 
-	// Skip over any leading spaces or tabs after the command name.
+	// Skip over any leading spaces or tabs after the command name to find the first
+	// character of the arguments. We already have a null at the end of the argument
+	// list, so we have now isolated the arguments.
 	while (ch->rx_buff[p] == ' ' || ch->rx_buff[p] == '\t') p++;
+	args = &ch->rx_buff[p];
 
-	// Copy the rest of the input line into our argument list buffer. Terminate
-	// with a null character. If the argument list buffer overflows, discard the
-	// entire receive buffer and return an error. 
-	uint32_t l = 0;
-	while (ch->rx_buff[p] != '\0') {
-		if (l >= sizeof(args) - 1) {
-			cli_print(ch,"ERROR: Argument list buffer overflow, "
-				"discarding all characters in %s.\n", ch->name);
-			ch->rx_len = 0;
-			ch->rx_buff[0] = '\0';
-			return;
-		}
-		args[l] = ch->rx_buff[p];
-		l++;
-		p++;
-	}
-	args[l] = '\0';
-
-	// Move the receive buffer pointer back to the beginning of the buffer and
-	// load a null there as well.
-	ch->rx_len = 0;
-	ch->rx_buff[0] = '\0';
-	
 	// If the command name is an empty string, return.
 	if (strlen(cmd) == 0) return;
 
