@@ -239,14 +239,19 @@ void cli_server(cli_chan_type *ch) {
 	while (ch->rx_buff[p] == ' ' || ch->rx_buff[p] == '\t') p++;
 	cmd = &ch->rx_buff[p];
 
-    // Find the space, tab, or null at the end of the command name and put a
-    // null there.
+    // Find the space, tab, or null at the end of the command name. If it is a
+    // null, then this is the end of the command and there are no arguments. If
+    // it is a space or tab, we might have arguments. Replace the space or tab
+    // with a null and move to the next character.
 	while (ch->rx_buff[p] != '\0' 
 			&& ch->rx_buff[p] != ' ' 
 			&& ch->rx_buff[p] != '\t') {
 		p++;
 	}
-	ch->rx_buff[p] = '\0';
+	if (ch->rx_buff[p] != '\0') {
+		ch->rx_buff[p] = '\0';
+		p++;
+	}
 
 	// Skip over any leading spaces or tabs after the command name to find the first
 	// character of the arguments. We already have a null at the end of the argument
@@ -254,34 +259,31 @@ void cli_server(cli_chan_type *ch) {
 	while (ch->rx_buff[p] == ' ' || ch->rx_buff[p] == '\t') p++;
 	args = &ch->rx_buff[p];
 
-	// If the command name is an empty string, return.
-	if (strlen(cmd) == 0) return;
-
 	// If the active EEM configuration security level is greater than one, and
 	// the name of the command we are about to execute is not CLI_LOGIN_CMD, we
-	// return and error and set the channel status to CLI_FALUT.
+	// print an error message and set the channel status to CLI_FALUT.
 	if (eem_config_active.seclevel > 1 
 			&& ch->status != CLI_LOGIN_PASS
 			&& strcmp(cmd, CLI_LOGIN_CMD) != 0) {
 		cli_print(ch,"ERROR: Access denied, login required in %s.\n", ch->name);
 		ch->status = CLI_FAULT;
-		return;
-	}
-	
+	} else {
+		
     // See if we can find a command procedure with a name that matches our
     // command name. If not, print an error and return.
-    cli_cmd_proc proc = NULL;
-	proc = cli_cmd_find(cmd);
-    if (proc == NULL) {
-        cli_print(ch, "ERROR: Unknown command '%s' in %s.\n", cmd, __func__);
-        return;
-    }
+		cli_cmd_proc proc = NULL;
+		proc = cli_cmd_find(cmd);
+		if (proc == NULL) {
+			cli_print(ch, "ERROR: Unknown command '%s' in %s.\n", cmd, __func__);
+		} else {
 
     // Execute the command procedure, passing it the channel descriptor and the
     // argument list The command procedure reports its own errors, so does
     // not return an error or success code.
-	proc(ch, args);
-
+			proc(ch, args);
+		}
+	}	
+	
     // We are done. The cursor should be back at the beginning of a new line.
     // We do not print a prompt because prompts make life automated use of the
     // CLI more complicated.
