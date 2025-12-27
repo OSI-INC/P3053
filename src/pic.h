@@ -26,7 +26,7 @@
 
 /*
 	We need the CLI declarations for the CLI channel types. These are used by the
-	PIC command procedures we declare below.
+	command procedures we declare below.
 */
 #include "cli.h"
 

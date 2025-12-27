@@ -128,21 +128,21 @@ typedef int (*cli_putchar_func)(void *context, char c);
 typedef int (*cli_flush_func)(void *context);
 
 /*
- 	The cli_chan_status_type structure defines the status codes for CLI
- 	channels. When we start a CLI that respects the EEM's security level, we
- 	initialize it with status "login-none" to show that the client has not yet
- 	submitted a correct password to accomplish a login, but nor has the client
- 	failed to do so. When we start the console CLI, we initialize to
- 	"login-pass", so that the console CLI always has the ability to modify the
- 	flash configuration after a reset. The CLI commands can set the status to
- 	"fault" or "close". The channel management procedure will decide what to do
- 	when it sees these CLI status codes. The console CLI does nothing with
- 	them.
+	The cli_chan_status_type structure defines the status codes for CLI
+	channels. When we start a CLI that respects the EEM's security level, we
+	initialize it with status "connected" to show that the client is connected
+	but has not yet logged in nor failed to log in. When we start the console
+	CLI, we initialize to "pass", implying that the client has logged in with
+	the correct password. If client attempts to log in, but doe so with the
+	wrong password, we set the channel status to "fail". The CLI commands can
+	also set the status to "fault", or "close". The channel management procedure
+	will decide what to do when it sees these CLI status codes. The console CLI
+	does nothing with them.
 */
 typedef enum {
-    CLI_LOGIN_NONE,
-    CLI_LOGIN_PASS,
-    CLI_LOGIN_FAIL,
+    CLI_CONNECTED,
+    CLI_PASS,
+    CLI_FAIL,
     CLI_FAULT,
     CLI_CLOSE
 } cli_chan_status_type;
@@ -179,6 +179,7 @@ typedef enum {
 */
 #define CLI_RX_SIZE 2048
 #define CLI_TX_SIZE 2048
+#define CLI_PROMPT_SIZE 32
 typedef struct {
     cli_getchar_func getchar;
     cli_putchar_func putchar;
@@ -189,6 +190,7 @@ typedef struct {
     uint32_t rx_len;
     char tx_buff[CLI_TX_SIZE];
     char* name;
+    char prompt[CLI_PROMPT_SIZE];
     cli_chan_status_type status;
 } cli_chan_type;
 
@@ -251,8 +253,8 @@ void cli_print(cli_chan_type* ch, const char* fmt, ...);
 */
 void cli_help(cli_chan_type *ch, char *args);
 void cli_status(cli_chan_type *ch, char *args);
-void cli_debug(cli_chan_type *ch, char *args);
 void cli_login(cli_chan_type *ch, char *args);
 void cli_exit(cli_chan_type *ch, char *args);
+void cli_prompt(cli_chan_type *ch, char *args);
 
 #endif

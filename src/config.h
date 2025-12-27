@@ -4,7 +4,7 @@
 	Allows us to configure the EEM software so that it will provide a particular
 	set of services for a particular target. We can enable or disable voluntary
 	debug reporting to the console. We can enable or disable the Telnet
-	command-line interface server. When we introduce variations of the EEM
+	command-line interpreter server. When we introduce variations of the EEM
 	hardware, we can select which variant we are compiling for with flags in
 	this header. We make a distinction between flags that change the way the
 	code is compiled and flags that change the way the code operates. In our
@@ -36,14 +36,13 @@
 
 #define EEM_DEBUG_DEFAULT false
 extern bool debug;
-
 #define EEM_TELNET_ENABLE_DEFAULT true
 extern bool telnet_enable;
-
 #define EEM_POWERUP_WAIT_MS 100
-
 #define EEM_PLATFORM "A3053A"
 #define EEM_HOST "A3042"
 #define EEM_RELAY_VERSION 32
+
+#define CLI_PROMPT_DEFAULT "EEM$ "
 
 #endif 

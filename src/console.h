@@ -51,8 +51,18 @@
 #ifndef CONSOLE_H
 #define CONSOLE_H
 
-// Include the Microchip SYS_CONSOLE routine declarations. We will be supplying 
+/*
+	Include the Microchip SYS_CONSOLE routine declarations. We will be supplying 
+	functions to perform the functions of these routines, so that the Microchip
+	libraries can write to our UART serial console.
+*/
 #include "microchip/system/console/sys_console.h"
+
+/*
+	We need the CLI declarations for the CLI channel types. These are used by the
+	command procedures we declare below.
+*/
+#include "cli.h"
 
 /*
 	Procedures that read and write from the UART console. For now, we preserve
@@ -68,5 +78,10 @@ void console_print(const char* fmt, ...);
 void console_dump_hex(const char* s);
 void console_dump_ascii(const char* s);
 void console_initialize(void);
+
+/*
+	Command-Line Interpreter (CLI) commands.
+*/
+void cli_debug(cli_chan_type *ch, char *args);
 
 #endif

@@ -176,13 +176,14 @@ int telnet_tasks(tcpip_server_type* server) {
 		 
 	if (server->state == S_LISTENING) {
 		server->logged_in = false;
-		telnet_chan.status = CLI_LOGIN_NONE;
+		telnet_chan.status = CLI_CONNECTED;
    		telnet_chan.getchar = telnet_getchar;
 		telnet_chan.putchar = tcp_putchar;
 		telnet_chan.flush = tcp_flush;
 		telnet_chan.context  = (void *) &server->socket;
 		telnet_chan.echo = false;
 		telnet_chan.name = "CLI-Telnet";
+		strcpy(telnet_chan.prompt, "");
 		cli_start(&telnet_chan);
 		if (debug) console_print("Initialized %s connection in %s.\n",
 			server->protocol, __func__);
@@ -191,11 +192,11 @@ int telnet_tasks(tcpip_server_type* server) {
 
 	cli_server(&telnet_chan);
 	switch (telnet_chan.status) {
-		case CLI_LOGIN_NONE: 
+		case CLI_CONNECTED: 
 			server->logged_in = false;
 			return 0;
 		
-		case CLI_LOGIN_PASS:
+		case CLI_PASS:
 			server->logged_in = true;
 			return 0;
 			
@@ -274,10 +275,11 @@ int main (void) {
 	*/
 	cli_cmd_register("config",cli_config);
 	cli_cmd_register("debug",cli_debug);
-	cli_cmd_register("exit",cli_debug);
+	cli_cmd_register("exit",cli_exit);
 	cli_cmd_register("help",cli_help);
 	cli_cmd_register(CLI_LOGIN_CMD,cli_login);
 	cli_cmd_register("mpcie",cli_mpcie);
+	cli_cmd_register("prompt",cli_prompt);
 	cli_cmd_register("reset",cli_reset);
 	cli_cmd_register("status",cli_status);
 	
@@ -328,8 +330,7 @@ int main (void) {
 		console interface status set to 1, so that it is regarded as logged in,
 		and can always read and modify the EEM configuration regardless of the
 		EEM security level, unless it deliberately fails to log itself in using
-		the CLI login command, in which case its state will go to
-		CLI_LOGIN_FAIL.
+		the CLI login command, in which case its state will go to CLI_FAIL.
  	*/
  	static cli_chan_type console_chan;
 	console_chan.getchar = uart2_getchar;
@@ -338,7 +339,8 @@ int main (void) {
 	console_chan.context  = NULL;
 	console_chan.echo = true;
 	console_chan.name = "CLI-Console";
-	console_chan.status = CLI_LOGIN_PASS;
+	strcpy(console_chan.prompt, CLI_PROMPT_DEFAULT);
+	console_chan.status = CLI_PASS;
 	cli_start(&console_chan);
 	
 	/* 

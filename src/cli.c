@@ -123,7 +123,7 @@ static cli_command_entry cli_commands[CLI_MAX_COMMANDS];
 static int cli_num_commands = 0;
 
 /*
-	cli_cmd_register adds a command to our command-line interface (CLI). We pass
+	cli_cmd_register adds a command to our command-line interpreter (CLI). We pass
 	name of the command and a pointer to the procedure that implements the
 	command. The command must all be of type cli_cmd_proc, and it must obey the
 	CLI command procedure rules. The registration routine returns 0 for success,
@@ -230,8 +230,11 @@ void cli_server(cli_chan_type *ch) {
 	// If we are echoing characters, print a newline to terminate the command line.
 	if (ch->echo) cli_message(ch, "\n");
 
-	// If we have no characters at all, return.
-	if (ch->rx_len == 0) return;
+	// If we have no characters at all, print the prompt and return.
+	if (ch->rx_len == 0) {
+	    cli_print(ch, "%s", ch->prompt);	
+		return;
+	}
 	
     // Skip over any leading spaces or tabs in the input line to find the first
     // character of the command.
@@ -263,7 +266,7 @@ void cli_server(cli_chan_type *ch) {
 	// the name of the command we are about to execute is not CLI_LOGIN_CMD, we
 	// print an error message and set the channel status to CLI_FALUT.
 	if (eem_config_active.seclevel > 1 
-			&& ch->status != CLI_LOGIN_PASS
+			&& ch->status != CLI_PASS
 			&& strcmp(cmd, CLI_LOGIN_CMD) != 0) {
 		cli_print(ch,"ERROR: Access denied, login required in %s.\n", ch->name);
 		ch->status = CLI_FAULT;
@@ -289,8 +292,8 @@ void cli_server(cli_chan_type *ch) {
 	ch->rx_buff[0] = '\0';
 		
     // We are done. The cursor should be back at the beginning of a new line.
-    // We do not print a prompt because prompts make life automated use of the
-    // CLI more complicated.
+    // We print the prompt and return.
+    cli_print(ch, "%s", ch->prompt);
     return;
 }
 
@@ -461,15 +464,15 @@ void cli_status(cli_chan_type *ch, char *args) {
  	pic_info(ch->tx_buff);
 	cli_print(ch, "%s\n", ch->tx_buff);
 	switch (ch->status) {
-		case CLI_LOGIN_NONE: 
+		case CLI_CONNECTED: 
 			strcpy(ch->tx_buff, "LOGIN_NONE"); 
 			break;
 			
-		case CLI_LOGIN_PASS:
+		case CLI_PASS:
 			strcpy(ch->tx_buff, "LOGIN_PASS"); 
 			break;
 			
-		case CLI_LOGIN_FAIL: 
+		case CLI_FAIL: 
 			strcpy(ch->tx_buff, "LOGIN_FAIL"); 
 			break;
 			
@@ -492,75 +495,7 @@ void cli_status(cli_chan_type *ch, char *args) {
 	} else {
 		cli_print(ch, "Debug Flag   FALSE\n");	
 	}
-
-    return;
-}
-
-/*
-	cli_debug controls the debugging flag. We can turn debugging on or off by
-	setting or clearing the debug flag.
-*/
-void cli_debug(cli_chan_type *ch, char *args) {
-	bool print_info = false;
-	bool print_help = false;
-	bool verb_received = false;
-	bool set_flag = true;
-
-	char* tok = strtok(args, " \t");
-	while (tok != NULL) {
- 		if (strcmp(tok, "--info") == 0) {
- 			print_info = true;
- 		} else if (strcmp(tok, "--help") == 0) {
- 			print_help = true;
- 		} else if (strcmp(tok, "set") == 0 || strcmp(tok, "clear") == 0) {
- 			if (verb_received) {
-				cli_print(ch,"ERROR: Only one command verb permitted in %s.\n",
-					__func__);
-				return;			
- 			}
- 			if (strcmp(tok, "clear") == 0) {
- 				set_flag = false;
- 			}
- 			verb_received = true;
- 		} else {
-            cli_print(ch, "ERROR: Unrecognized option '%s' in %s.\n", tok, __func__);
-            return;
-        }
-        tok = strtok(NULL, " \t");
-    }
-    
-	if (print_info) {
-		cli_message(ch, "Sets or clears the debug flag.\n");
-		return;
-	}
-
-	if (print_help) {
-		cli_message(ch,
-"Usage:\n"
-"  debug <set|clear> [--info] [--help]\n"
-"\n"
-"Summary:\n"
-"  Sets or clears the debug flag that is used to enable console print commands\n"
-"  for debugging. The default state of this flag on reset is set by a constant in\n"
-"  the source code, but we can change the flag during run-time with this routine.\n"
-"\n"
-"Verbs:\n"
-"  set           Set the debug flag, debug prints enabled.\n"
-"  clear         Clear the debug flag, debug prints disabled.\n"
-"\n"
-"Options:\n"
-"  --info        Print a one-line summary of this command.\n"
-"  --help        Print this help text.\n"
-		);
-		return;
-	}
-
-	if (!verb_received) {
-		cli_print(ch, "ERROR: No verb or option specified in %s.\n", __func__);
-		return;
-	}
-
-	debug = set_flag;
+	cli_print(ch, "CLI Prompt   \"%s\"\n", ch->prompt);
 
     return;
 }
@@ -624,11 +559,11 @@ void cli_login(cli_chan_type *ch, char *args) {
 	if (password_match) {
 		cli_print(ch, "Login succeeded, security level %d in %s.\n",
 			eem_config_active.seclevel, __func__);
-		ch->status = CLI_LOGIN_PASS;
+		ch->status = CLI_PASS;
 	} else {
 		cli_print(ch, "Login failed, security level %d in %s.\n",
 			eem_config_active.seclevel, __func__);
-		ch->status = CLI_LOGIN_FAIL;
+		ch->status = CLI_FAIL;
 	}
 
     return;
@@ -665,15 +600,13 @@ void cli_exit(cli_chan_type *ch, char *args) {
 
 	if (print_help) {
 		cli_message(ch,
-"Usage:\n");
-		cli_print(ch,
-"  exit] [--info] [--help]\n", CLI_LOGIN_CMD);
-		cli_message(ch,
+"Usage:\n"
+"  exit [--info|--help]\n"
 "\n"
 "Summary:\n"
-"  Requests that the communication channel manager close the channel. In the case\n"
-"  of a TCP socket, the socket should close. In the case of a UART serial interface,\n"
-"  nothing will happen.\n"
+"  Requests that the communication channel manager close the channel. In the\n"
+"  case of a TCP socket, the socket should close. In the case of a UART serial\n"
+"   interface, nothing will happen.\n"
 "\n"
 "Options:\n"
 "  --info        Print a one-line summary of this command.\n"
@@ -683,6 +616,62 @@ void cli_exit(cli_chan_type *ch, char *args) {
 	}
 
 	ch->status = CLI_CLOSE;
+
+    return;
+}
+
+/*
+	cli_prompt allows the CLI user to set the prompt string. We enclose the prompet in
+	double-quotes, and the prompt can be an empty string.
+*/
+void cli_prompt(cli_chan_type *ch, char *args) {
+	bool print_info = false;
+	bool print_help = false;
+	bool prompt_received = false;
+	char* prompt;
+
+	char* tok = strtok(args, "\"");
+	if (tok != NULL) {
+		prompt_received = true;
+		prompt = tok;
+		if (strcmp(tok, "--info") == 0) {
+			print_info = true;
+		}
+		if (strcmp(tok, "--help") == 0) {
+			print_help = true;
+		}
+	} 
+
+	if (print_info) {
+		cli_message(ch, "Sets the command-line interpreter prompt.\n");
+		return;
+	}
+
+	if (print_help) {
+		cli_message(ch,
+"Usage:\n"
+"  prompt [--info|--help]\n"
+"  prompt \"prompt\"\n"
+"\n"
+"Summary:\n"
+"  Sets the Command-Line Interpreter (CLI) prompt. We specify a string to act as\n"
+"  the prompt. If the string contains spaces, we must enclose the string in double\n"
+"  -quotes. The string can be empty, which is a good choice for automated\n"
+"  communication with the interpreter. If we pass no string in double-quotes and\n"
+"  neither of the reporting options, the routine will print the current prompt.\n"
+"\n"
+"Options:\n"
+"  --info        Print a one-line summary of this command.\n"
+"  --help        Print this help text.\n"
+		);
+		return;
+	}
+
+	if (prompt_received) {
+		strcpy(ch->prompt, prompt);
+	} else {
+		cli_print(ch, "prompt: \"%s\"\n", ch->prompt);
+	}
 
     return;
 }

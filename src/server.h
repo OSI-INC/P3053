@@ -17,7 +17,7 @@
 	pointer to a TCP_SOCKET type rather than a TCP_SOCKET type itself. Because
 	the routines accept a pointer rather than a TCP-specific type, they can be
 	used with the generic communication channel descriptor structure we define
-	in our Command-Line Interface (CLI) library, so that we can provide a CLI on
+	in our Command-Line Interpreter (CLI) library, so that we can provide a CLI on
 	a TCP/IP socket, as well as on a UART interface, or an artificial channel
 	communicating with memory, or any other channel that writes and reads bytes,
 	without changing the CLI code to accommodate the peculiarities of the
@@ -213,7 +213,7 @@ int tcp_sock_tick(void* context);
 
 /*
 	Routines that read and write from sockets. These are wrappers for Harmony
-	routines. They are compatible with our command-line interface (CLI) through
+	routines. They are compatible with our command-line interpreter (CLI) through
 	their use of a generic pointer rather than a TCP socket index. Instead of a
 	TCP_SOCKET type, we pass to these routines a pointer to a TCP_SOCKET. The
 	routines de-reference the pointer and so fetch the socket index, which they

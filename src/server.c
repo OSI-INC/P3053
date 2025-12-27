@@ -1142,8 +1142,8 @@ void cli_config(cli_chan_type *ch, char *args) {
 "  --telnet-timeout <s>  Set flash Telnet server timeout in seconds.\n"
 "  --lwdaq-timeout <s>   Set flash LWDAQ server timeout in seconds.\n"
 "  --tcp_tick_ms <ms>    Set tcp tick execution period in milliseconds.\n"
-"  --info                Summary of this command, no changes made.\n"
-"  --help                Detailed help for this command, no changes made.\n"
+"  --info                Summary of this command, no modifications made.\n"
+"  --help                Detailed help for this command, no modifications made.\n"
 		);
 		return;
 	}
@@ -1153,7 +1153,7 @@ void cli_config(cli_chan_type *ch, char *args) {
 		return;
 	}
 
-	if (eem_config_active.seclevel > 0 && ch->status != CLI_LOGIN_PASS) {
+	if (eem_config_active.seclevel > 0 && ch->status != CLI_PASS) {
 		cli_print(ch, "ERROR: Access denied, login required in %s.\n", __func__);
 		ch->status = CLI_FAULT;
 		return;

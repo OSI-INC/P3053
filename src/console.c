@@ -286,3 +286,77 @@ void console_initialize(void)
 		console_print("The debug flag is not set, expect quiet output.\n");	
 	}
 }
+
+/*
+	cli_debug is a Command-Line Interpreter (CLI) command that sets, clears, or
+	reports the state of the global debug flag.
+*/
+void cli_debug(cli_chan_type *ch, char *args) {
+	bool print_info = false;
+	bool print_help = false;
+	bool verb_received = false;
+	bool set_flag = true;
+
+	char* tok = strtok(args, " \t");
+	while (tok != NULL) {
+ 		if (strcmp(tok, "--info") == 0) {
+ 			print_info = true;
+ 		} else if (strcmp(tok, "--help") == 0) {
+ 			print_help = true;
+ 		} else if (strcmp(tok, "set") == 0 || strcmp(tok, "clear") == 0) {
+ 			if (verb_received) {
+				cli_print(ch,"ERROR: Only one command verb permitted in %s.\n",
+					__func__);
+				return;			
+ 			}
+ 			if (strcmp(tok, "clear") == 0) {
+ 				set_flag = false;
+ 			}
+ 			verb_received = true;
+ 		} else {
+            cli_print(ch, "ERROR: Unrecognized option '%s' in %s.\n", tok, __func__);
+            return;
+        }
+        tok = strtok(NULL, " \t");
+    }
+    
+	if (print_info) {
+		cli_message(ch, "Sets or clears the debug flag.\n");
+		return;
+	}
+
+	if (print_help) {
+		cli_message(ch,
+"Usage:\n"
+"  debug [set|clear] [--info] [--help]\n"
+"\n"
+"Summary:\n"
+"  Sets or clears the debug flag that is used to enable console print commands\n"
+"  for debugging. The initial state of this flag on reset is set by a constant in\n"
+"  the source code. We can change the flag during run-time with this routine. If\n"
+"  we pass no options to the routine, it returns the state of the flag: true for\n"
+"  set and false for cleared.\n"
+"\n"
+"Verbs:\n"
+"  set           Set the debug flag, debug prints enabled.\n"
+"  clear         Clear the debug flag, debug prints disabled.\n"
+"\n"
+"Options:\n"
+"  --info        Print a one-line summary of this command.\n"
+"  --help        Print this help text.\n"
+		);
+		return;
+	}
+
+	if (!verb_received) {
+		if (debug) {
+			cli_message(ch, "TRUE\n");
+		} else {
+			cli_message(ch, "FALSE\n");
+		}
+	} else {
+		debug = set_flag;
+	}
+	
+    return;
+}
