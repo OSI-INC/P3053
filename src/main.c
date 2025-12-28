@@ -108,12 +108,16 @@
 #include "lwdaq.h"
 
 /*
+	Local constants not important enough to go in config.h.
+*/
+#define EEM_POWERUP_WAIT_MS 100
+
+/*
 	Declare the constants and structures that configure our Telnet server. If we
 	want a timeout, we must set the timeout in seconds as well. We disable the
 	Telnet server by setting the telnet_port field of the flash EEM
 	configuration to zero.
 */
-#define DEFAULT_TELNET_PORT 23
 tcpip_server_type telnet_server = {
     .protocol = "Telnet",
     .socket = INVALID_SOCKET,
@@ -359,7 +363,7 @@ int main (void) {
 		tcp_tick();
 		cli_server(&console_chan);
 		tcpip_server(&lwdaq_server, lwdaq_tasks);
-		if (telnet_enable) tcpip_server(&telnet_server, telnet_tasks);
+		if (EEM_TELNET_ENABLE) tcpip_server(&telnet_server, telnet_tasks);
 		lamp_signal(5e5);
 	}
 	

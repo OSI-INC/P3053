@@ -448,9 +448,9 @@ void cli_status(cli_chan_type *ch, char *args) {
 "  status [--info] [--help]\n"
 "\n"
 "Summary:\n"
-"  Print a table of status information. This includes network status, software tick\n"
-"  frequency, microprocessor clock frequency, and the login status of the command\n"
-"  line interpreter channel.\n"
+"  Print a table of system information. This includes network status, software tick\n"
+"  frequency, microprocessor clock frequency, login status of the command-line\n"
+"  interpreter, motherboard name, platform name, and software version number.\n"
 "\n"
 "Options:\n"
 "  --info        Print a one-line summary of this command.\n"
@@ -459,6 +459,9 @@ void cli_status(cli_chan_type *ch, char *args) {
 		return;
 	}
 
+	cli_print(ch, "Motherboard  %s\n", EEM_MOTHERBOARD_NAME);
+	cli_print(ch, "Platform     %s\n", EEM_MODULE_NAME);
+	cli_print(ch, "Softare      %s\n", EEM_SOFTWARE_VERSION);
 	server_info(ch->tx_buff);
 	cli_print(ch, "%s\n", ch->tx_buff);
  	pic_info(ch->tx_buff);

@@ -70,6 +70,7 @@
 */
 #define LWDAQ_CONFIG_LENGTH 1023
 #define LWDAQ_DEBUG 0
+#define LWDAQ_FIFO_DS 62
 
 /*
 	The LWDAQ server record. We must assign the port and IP string pointers
@@ -270,7 +271,6 @@ int lwdaq_handle_message(tcpip_server_type* server,
 		uint32_t id, uint32_t len, uint8_t* content) {
 	uint8_t register_addr = 0;
 	uint8_t value = 0;
-	uint32_t tx_len = 0;
 	static uint8_t tx_buff[TCP_TX_BUFF_SIZE];
 	static char config_str[LWDAQ_CONFIG_LENGTH];
 	static eem_config_type config;
@@ -314,23 +314,30 @@ int lwdaq_handle_message(tcpip_server_type* server,
 
 		case VERSION_READ: {
 			if (debug) console_print("VERSION_READ in %s.\n", __func__);
-			lwdaq_integer_return(server->socket, EEM_RELAY_VERSION);
+			lwdaq_integer_return(server->socket, EEM_SOFTWARE_VERSION);
 		}
 		break;
 		
 		case STREAM_READ: {
 			register_addr = content[3];
-			tx_len = reverse_load_u32(&content[4]);
+			uint32_t tx_len = reverse_load_u32(&content[4]);
 			if (debug) console_print("STREAM_READ from %d of %d bytes in %s.\n",
 				register_addr, tx_len, __func__);
 			lwdaq_header(server->socket, DATA_RETURN, tx_len);
 			if (tx_len > 0) {
 				int i = 0;
 				for (int j = 0; j < tx_len; j++) {
-					mpcie_byte_write(62, 0);
-					while (mpcie_byte_read(62) == 0) {
+		
+// For telemetry receivers, we have to write to the FIFO data strobe and wait
+// for the same location to return a non-zero value before we can read from the
+// FIFO. When we are compiling for such motherboards, we add the write and poll.
+// In the polling loop, we maintaing the socket, stack, and drivers.
+#if defined(EEM_MOTHERBOARD_A3038) || defined(EEM_MOTHERBOARD_A3042)
+					mpcie_byte_write(LWDAQ_FIFO_DS, 0);
+					while (mpcie_byte_read(LWDAQ_FIFO_DS) == 0) {
 						if (tcp_sock_tick(&server->socket) < 0) return -1;
 					}
+#endif
 					tx_buff[i] = mpcie_byte_read(register_addr);
 					i++;
 					if ((i == sizeof(tx_buff)) || (j == tx_len - 1)) {
@@ -350,6 +357,34 @@ int lwdaq_handle_message(tcpip_server_type* server,
 			if (debug) console_print("STREAM_READ complete in %s.\n", __func__);
 		}
 		break;
+
+#if defined(EEM_MOTHERBOARD_A2071)
+		case STREAM_WRITE: {
+			register_addr = content[3];
+			if (debug) console_print("STREAM_WRITE to %d of %d bytes in %s.\n",
+				register_addr, len - 4, __func__);
+			for (int i = 4; i < len; i++) {
+				mpcie_byte_write(register_addr, content[i]);
+			}
+			if (debug) console_print("STREAM_WRITE complete in %s.\n", __func__);
+		}
+		break;
+#endif
+
+#if defined(EEM_MOTHERBOARD_A2071)
+		case STREAM_DELETE: {
+			register_addr = content[3];
+			uint32_t wr_len = reverse_load_u32(&content[4]);
+			value = content[8];
+			if (debug) console_print("STREAM_DELETE %d to %d of %d bytes in %s.\n",
+				value, register_addr, len - 4, __func__);
+			for (int i = 0; i < wr_len; i++) {
+				mpcie_byte_write(register_addr, value);
+			}
+			if (debug) console_print("STREAM_DELETE complete in %s.\n", __func__);
+		}
+		break;
+#endif
 
 		case LOGIN: {
 			content[len] = '\0';

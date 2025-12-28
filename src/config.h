@@ -2,10 +2,8 @@
 	config.h -- Embedded Ethernet Module Configuration File Interface
 
 	Allows us to configure the EEM software so that it will provide a particular
-	set of services for a particular target. We can enable or disable voluntary
-	debug reporting to the console. We can enable or disable the Telnet
-	command-line interpreter server. When we introduce variations of the EEM
-	hardware, we can select which variant we are compiling for with flags in
+	set of services for a particular target. When we introduce variations of the
+	EEM hardware, we can select which variant we are compiling for with flags in
 	this header. We make a distinction between flags that change the way the
 	code is compiled and flags that change the way the code operates. In our
 	debug reporting code, for example, we use a "debug" flag that the process
@@ -34,15 +32,61 @@
 #ifndef CONFIG_H
 #define CONFIG_H
 
+/*
+	When we want to provide a global flag that we can subsequently change in
+	software, we give it a default value, and initialize a global variable with
+	this default value.
+*/
 #define EEM_DEBUG_DEFAULT false
 extern bool debug;
-#define EEM_TELNET_ENABLE_DEFAULT true
-extern bool telnet_enable;
-#define EEM_POWERUP_WAIT_MS 100
-#define EEM_PLATFORM "A3053A"
-#define EEM_HOST "A3042"
-#define EEM_RELAY_VERSION 32
 
+/*
+	Some features we want to be able to turn off for certaing. We have compiler
+	macros to make sure they are turned off. If we leave them turned on, we
+	might still be able to turn them off in software or with the EEM
+	configuration.
+*/
+#define EEM_TELNET_ENABLE true
+
+/*
+	Default server configurations.
+*/
+#define DEFAULT_TELNET_PORT 23
+
+/*
+	The module is the EEM circuit board. The A3053A is the first EEM circuit
+	board, with an inconvenient allocation of PIC32MZ pins to the mPCIe bus. The
+	A3053B is the second EEM, which has a more convenient allocation. We define
+	a name string for the module and a compiler macro that contains the module
+	name. We use the macro to perform conditional compilation that configures
+	the EEM for each particular module.
+*/
+#define EEM_MODULE_NAME "A3053A"
+#define EEM_MODULE_A3053
+
+/*
+	The motherboard is the board that the EEM plugs into. In our case, this
+	might be an A2071 LWDAQ Driver, A2087 VME-TCPIP Interface, A3038 Animal
+	Location Tracker, A3042 Telemetry Control Box, or the A3052 Analog Signal
+	Generator, to name a few. We define a name string for the motherboard and a
+	compiler macro that contains the motherboard name. We use the macro to
+	perform conditional compilation that configures the EEM for each particular
+	motherboard.
+*/
+#define EEM_MOTHERBOARD_NAME "A3042"
+#define EEM_MOTHERBOARD_A3042
+
+/*
+	When our GitHub repository version is X.Y, we let the software version we report
+	for our EEM be 32+X. We do this so that we can tell the difference between LWDAQ
+	Relays equipped with the RCM6700 from those equipped with the EEM. The RCM6700
+	relays have software version numbers less than 32.
+*/
+#define EEM_SOFTWARE_VERSION 33
+
+/*
+	Default configuration of the CLI.
+*/
 #define CLI_PROMPT_DEFAULT "EEM$ "
 
 #endif 

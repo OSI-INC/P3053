@@ -33,4 +33,3 @@
 #include "config.h"
 
 bool debug = EEM_DEBUG_DEFAULT;
-bool telnet_enable = EEM_TELNET_ENABLE_DEFAULT;
