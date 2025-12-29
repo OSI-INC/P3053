@@ -303,13 +303,13 @@ void cli_debug(cli_chan_type *ch, char *args) {
  			print_info = true;
  		} else if (strcmp(tok, "--help") == 0) {
  			print_help = true;
- 		} else if (strcmp(tok, "set") == 0 || strcmp(tok, "clear") == 0) {
+ 		} else if (strcmp(tok, "on") == 0 || strcmp(tok, "off") == 0) {
  			if (verb_received) {
 				cli_print(ch,"ERROR: Only one command verb permitted in %s.\n",
 					__func__);
 				return;			
  			}
- 			if (strcmp(tok, "clear") == 0) {
+ 			if (strcmp(tok, "off") == 0) {
  				set_flag = false;
  			}
  			verb_received = true;
@@ -328,18 +328,18 @@ void cli_debug(cli_chan_type *ch, char *args) {
 	if (print_help) {
 		cli_message(ch,
 "Usage:\n"
-"  debug [set|clear] [--info] [--help]\n"
+"  debug [on|off] [--info] [--help]\n"
 "\n"
 "Summary:\n"
-"  Sets or clears the debug flag that is used to enable console print commands\n"
-"  for debugging. The initial state of this flag on reset is set by a constant in\n"
-"  the source code. We can change the flag during run-time with this routine. If\n"
-"  we pass no options to the routine, it returns the state of the flag: true for\n"
-"  set and false for cleared.\n"
+"  Sets or clears the debug flag that the EEM process uses to enable console print\n"
+"  commands for debugging. The initial state of this flag on reset is set by a\n"
+"  constant in the source code. We can change the flag during run-time with this\n"
+"  routine. If we pass no options to the routine, it returns the state of the flag:\n"
+"  ON for set and OFF for cleared.\n"
 "\n"
 "Verbs:\n"
-"  set           Set the debug flag, debug prints enabled.\n"
-"  clear         Clear the debug flag, debug prints disabled.\n"
+"  on           Set the debug flag, debug prints enabled.\n"
+"  off          Clear the debug flag, debug prints disabled.\n"
 "\n"
 "Options:\n"
 "  --info        Print a one-line summary of this command.\n"
@@ -350,9 +350,9 @@ void cli_debug(cli_chan_type *ch, char *args) {
 
 	if (!verb_received) {
 		if (debug) {
-			cli_message(ch, "TRUE\n");
+			cli_message(ch, "ON\n");
 		} else {
-			cli_message(ch, "FALSE\n");
+			cli_message(ch, "OFF\n");
 		}
 	} else {
 		debug = set_flag;

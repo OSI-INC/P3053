@@ -599,23 +599,23 @@ bool server_network_up(void) {
 */
 int server_info(char* out) {
 	int len = 0;
-	len += sprintf(out+len,   "Interface    ");
+	len += sprintf(out+len,   "Interface       ");
 	len += server_interface_str(out+len);
-	len += sprintf(out+len, "\nIP           ");
+	len += sprintf(out+len, "\nIP              ");
 	len += server_ip_str(out+len);
-	len += sprintf(out+len, "\nMask         ");
+	len += sprintf(out+len, "\nMask            ");
 	len += server_nm_str(out+len);
-	len += sprintf(out+len, "\nGateway      ");
+	len += sprintf(out+len, "\nGateway         ");
 	len += server_gw_str(out+len);
-	len += sprintf(out+len, "\nMAC          ");
+	len += sprintf(out+len, "\nMAC             ");
 	len += server_mac_str(out+len);
-	len += sprintf(out+len, "\nLink         ");
+	len += sprintf(out+len, "\nLink            ");
 	if (server_link_up()) {
 		len += sprintf(out+len, "UP");
 	} else {
 		len += sprintf(out+len, "DOWN");
 	}
-	len += sprintf(out+len, "\nNetwork      ");
+	len += sprintf(out+len, "\nNetwork         ");
 	if (server_network_up()) {
 		len += sprintf(out+len, "UP");
 	} else {

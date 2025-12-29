@@ -204,6 +204,10 @@ int telnet_tasks(tcpip_server_type* server) {
 			server->logged_in = true;
 			return 0;
 			
+		case CLI_FAIL:
+			server->logged_in = false;
+			return 0;
+			
 		default:
 			server->logged_in = false;
 			return -1;

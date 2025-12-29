@@ -264,7 +264,7 @@ void cli_server(cli_chan_type *ch) {
 
 	// If the active EEM configuration security level is greater than one, and
 	// the name of the command we are about to execute is not CLI_LOGIN_CMD, we
-	// print an error message and set the channel status to CLI_FALUT.
+	// print an error message and set the channel status to CLI_FAULT.
 	if (eem_config_active.seclevel > 1 
 			&& ch->status != CLI_PASS
 			&& strcmp(cmd, CLI_LOGIN_CMD) != 0) {
@@ -367,7 +367,8 @@ void cli_cmd_template(cli_chan_type *ch, char *args) {
 	cli_help with no arguments prints to the specified channel a list of all
 	registered commands and their information strings. If we pass it "--info" it
 	prints its info string only. Otherwise, if we pass it "--help", it prints
-	its own help string.
+	its own help string. Otherwise, if we pass it the name of a command, it
+	calls this procedure with the "--help" option.
 */
 void cli_help(cli_chan_type *ch, char *args) {
 	bool print_info = false;
@@ -376,10 +377,21 @@ void cli_help(cli_chan_type *ch, char *args) {
 	char* tok = strtok(args, " \t");
 	
 	while (tok != NULL) {
- 		if (strcmp(tok, "--info") == 0) {print_info = true;} 
- 		else if (strcmp(tok, "--help") == 0) {print_help = true;} else {
-            cli_print(ch, "ERROR: Unrecognized option '%s' in %s.\n", tok, __func__);
-            return;
+ 		if (strcmp(tok, "--info") == 0) {
+ 			print_info = true;
+ 			break;
+ 		} else if (strcmp(tok, "--help") == 0) {
+ 			print_help = true;
+ 			break;
+ 		} else {
+ 			cli_cmd_proc proc = NULL;
+			proc = cli_cmd_find(tok);
+			if (proc != NULL) {
+				proc(ch, "--help");
+			} else {
+				cli_print(ch, "ERROR: Unknown command '%s' in %s.\n", tok, __func__);
+			}
+			return;
         }
         tok = strtok(NULL, " \t");
     }
@@ -392,10 +404,12 @@ void cli_help(cli_chan_type *ch, char *args) {
 	if (print_help) {
 		cli_message(ch,
 "Usage:\n"
-"  help [--info] [--help]\n"
+"  help [command] [--info] [--help]\n"
 "\n"
 "Summary:\n"
-"  List all registered commands and show their '--info' descriptions.\n"
+"  List all registered commands and show their '--info' descriptions. If we pass\n"
+"  the name of a command, the help command will call this named command with the\n"
+"  '--help' option and so print help for the named command.\n"
 "\n"
 "Options:\n"
 "  --info        Print a one-line summary of this command.\n"
@@ -459,9 +473,9 @@ void cli_status(cli_chan_type *ch, char *args) {
 		return;
 	}
 
-	cli_print(ch, "Motherboard  %s\n", EEM_MOTHERBOARD_NAME);
-	cli_print(ch, "Platform     %s\n", EEM_MODULE_NAME);
-	cli_print(ch, "Softare      %s\n", EEM_SOFTWARE_VERSION);
+	cli_print(ch, "Motherboard     %s\n", EEM_MOTHERBOARD_NAME);
+	cli_print(ch, "Module          %s\n", EEM_MODULE_NAME);
+	cli_print(ch, "Software        %d\n", EEM_SOFTWARE_VERSION);
 	server_info(ch->tx_buff);
 	cli_print(ch, "%s\n", ch->tx_buff);
  	pic_info(ch->tx_buff);
@@ -491,14 +505,13 @@ void cli_status(cli_chan_type *ch, char *args) {
 			strcpy(ch->tx_buff, "UNKNOWN"); 
 			break;
 	}
-	cli_print(ch, "Chan Status  %s\n", ch->tx_buff);
-	cli_print(ch, "Sec Level    %d\n", eem_config_active.seclevel);
+	cli_print(ch, "ChannelStatus   %s\n", ch->tx_buff);
+	cli_print(ch, "SecurityLevel   %d\n", eem_config_active.seclevel);
 	if (debug) {
-		cli_print(ch, "Debug Flag   TRUE\n");
+		cli_print(ch, "Debug           ON\n");
 	} else {
-		cli_print(ch, "Debug Flag   FALSE\n");	
+		cli_print(ch, "Debug           OFF\n");	
 	}
-	cli_print(ch, "CLI Prompt   \"%s\"\n", ch->prompt);
 
     return;
 }
@@ -661,7 +674,8 @@ void cli_prompt(cli_chan_type *ch, char *args) {
 "  the prompt. If the string contains spaces, we must enclose the string in double\n"
 "  -quotes. The string can be empty, which is a good choice for automated\n"
 "  communication with the interpreter. If we pass no string in double-quotes and\n"
-"  neither of the reporting options, the routine will print the current prompt.\n"
+"  neither of the reporting options, the routine will set the prompt to an empty\n"
+"  string.\n"
 "\n"
 "Options:\n"
 "  --info        Print a one-line summary of this command.\n"
@@ -673,7 +687,7 @@ void cli_prompt(cli_chan_type *ch, char *args) {
 	if (prompt_received) {
 		strcpy(ch->prompt, prompt);
 	} else {
-		cli_print(ch, "prompt: \"%s\"\n", ch->prompt);
+		strcpy(ch->prompt, "");
 	}
 
     return;

@@ -38,7 +38,7 @@
 #include "console.h"
 #include "lwdaq.h"
 
-// LWDAQ messages
+// Message header and footer sizes.
 #define START_CODE 0xA5 
 #define END_CODE 0x5A
 #define CLOSE_CODE 0x04
@@ -65,12 +65,35 @@
 #define STREAM_WRITE	12
 #define REBOOT			13
 
-/*
-	Miscellaneous constants.
-*/
-#define LWDAQ_CONFIG_LENGTH 1023
+// Content sizes for particular messages.
+#define BYTE_WRITE_LEN		5
+#define BYTE_READ_LEN		4
+#define BYTE_POLL_LEN		5
+
+// The maximum length of a configuration string.
+#define CONFIG_LENGTH 1023
+
+// Turn on additional debugging for the tasks routine and message handler.
 #define LWDAQ_DEBUG 0
-#define LWDAQ_FIFO_DS 62
+
+// Standard LWDAQ controller addresses.
+#define FIFO_STROBE_ADDR 62
+
+// Compiler switches based upon motherboard assembly number.
+#if defined(EEM_MOTHERBOARD_A3038) \
+	|| defined(EEM_MOTHERBOARD_A3042)
+#define ENABLE_FIFO_STROBE
+#endif
+
+#if defined(EEM_MOTHERBOARD_A2071) \
+	|| defined(EEM_MOTHERBOARD_A3050) \
+	|| defined(EEM_MOTHERBOARD_A3052)
+#define ENABLE_STREAM_WRITE
+#endif
+
+#if defined(EEM_MOTHERBOARD_A2071)
+#define ENABLE_STREAM_DELETE
+#endif
 
 /*
 	The LWDAQ server record. We must assign the port and IP string pointers
@@ -272,7 +295,7 @@ int lwdaq_handle_message(tcpip_server_type* server,
 	uint8_t register_addr = 0;
 	uint8_t value = 0;
 	static uint8_t tx_buff[TCP_TX_BUFF_SIZE];
-	static char config_str[LWDAQ_CONFIG_LENGTH];
+	static char config_str[CONFIG_LENGTH];
 	static eem_config_type config;
 
 	if (eem_config_active.seclevel >= 2 && !server->logged_in && id != LOGIN) {
@@ -283,7 +306,20 @@ int lwdaq_handle_message(tcpip_server_type* server,
 	}
 
 	switch (id) {
+	
+		// The byte-write operation writes a single byte to a specified location
+		// in controller address space. The LWDAQ message allows four bytes to
+		// specify this address, in big-endian order, but the EEM communicates
+		// with the controller through an eight-bit address bus, so we must
+		// ignore all but one of the bytes of the address, and so obtain the
+		// single-byte "register address" to which we will write. The byte value
+		// occupies the fifth byte of the content.
 		case BYTE_WRITE: {
+			if (len != BYTE_WRITE_LEN) {
+				console_print("ERROR: Length '%d' <> BYTE_WRITE_LEN in %s.\n", 
+					len, __func__);
+				return -1;			
+			}
 			register_addr = content[3];
 			value = content[4];
 			if (debug) console_print("BYTE_WRITE to %d of %d in %s.\n",
@@ -292,7 +328,16 @@ int lwdaq_handle_message(tcpip_server_type* server,
 		}
 		break;
 
+		// The byte-read instruction reads the value of a register and uses a data 
+		// return message to send this value back to the client. The register address
+		// we obtain in the same way as for byte-write: we use the fourth byte of
+		// the content.
 		case BYTE_READ: {
+			if (len != BYTE_READ_LEN) {
+				console_print("ERROR: Length '%d' <> BYTE_READ_LEN in %s.\n", 
+					len, __func__);
+				return -1;			
+			}
 			register_addr = content[3];
 			value = mpcie_byte_read(register_addr);
 			lwdaq_byte_return(server->socket, value);
@@ -301,7 +346,22 @@ int lwdaq_handle_message(tcpip_server_type* server,
 		}
 		break;
 
+		// The byte-poll causes the controller to wait for a particular location
+		// to assume a particular value. We use byte-poll to wait for data
+		// acquisition tasks to complete. As soon as the byte-poll completes, we
+		// process the next LWDAQ operation, which will be waiting in our LWDAQ
+		// server's input buffer. The delay between the byte poll completion and
+		// the next operation commencing is microseconds. If we were to poll a
+		// controller byte from our LWDAQ client, this delay will be tens of
+		// milliseconds, during which time our time-sensitive data acquisition,
+		// such as acquiring an image from a radiation-damaged sensor, will be
+		// ruined.
 		case BYTE_POLL: {
+			if (len != BYTE_POLL_LEN) {
+				console_print("ERROR: Length '%d' <> BYTE_POLL_LEN in %s.\n", 
+					len, __func__);
+				return -1;			
+			}
 			register_addr = content[3];
 			value = content[4];
 			if (debug) console_print("BYTE_POLL of %d for %d in %s.\n",
@@ -312,12 +372,25 @@ int lwdaq_handle_message(tcpip_server_type* server,
 		}
 		break;
 
+		// The version-read retrieves the EEM's software version number, which will
+		// hope will be some sensible function of the GitHub repository version, and
+		// also let us deduce that this server is an EEM, not an RCM6700.
 		case VERSION_READ: {
 			if (debug) console_print("VERSION_READ in %s.\n", __func__);
 			lwdaq_integer_return(server->socket, EEM_SOFTWARE_VERSION);
 		}
 		break;
 		
+		// The stream-read operation reads repeatedly from the same location.
+		// The operation is useful when the location acts like a First-In,
+		// First-Out (FIFO) buffer, as is the case for the RAM Portal location
+		// in all standard LWDAQ Controllers. The RAM Portal is at address 0x3F.
+		// As we are reading data from the portal, we will accumulated it in a
+		// transmit buffer. When that buffer is full, we write the entire buffer
+		// to the TCP socket that has requested the data. The transmit buffer
+		// will be a few kilobytes long, but the requested data might be several
+		// megabytes, so we will be filling and writing the buffer hundreds of
+		// times during the course of the stream-read operation.
 		case STREAM_READ: {
 			register_addr = content[3];
 			uint32_t tx_len = reverse_load_u32(&content[4]);
@@ -328,16 +401,23 @@ int lwdaq_handle_message(tcpip_server_type* server,
 				int i = 0;
 				for (int j = 0; j < tx_len; j++) {
 		
-// For telemetry receivers, we have to write to the FIFO data strobe and wait
-// for the same location to return a non-zero value before we can read from the
-// FIFO. When we are compiling for such motherboards, we add the write and poll.
-// In the polling loop, we maintaing the socket, stack, and drivers.
-#if defined(EEM_MOTHERBOARD_A3038) || defined(EEM_MOTHERBOARD_A3042)
-					mpcie_byte_write(LWDAQ_FIFO_DS, 0);
-					while (mpcie_byte_read(LWDAQ_FIFO_DS) == 0) {
+		// In the case of telemetry receivers like the Animal Location Tracker
+		// (A3038) or Telemetry Control Box (A3042), the RAM Portal cannot
+		// provide immediately the data we want to read. Sometimes, we have to
+		// wait to pop a message from the FIFO output while the receiver pushes
+		// another message into the FIFO input. In these receivers, we must
+		// write to the FIFO data strobe register to request a byte from the
+		// FIFO, and poll the same register until it returns a non-zero value.
+		// Now we can read the byte. While polling the strobe register, we call
+		// our TCP maintenance routine to keep the stack and network drivers
+		// going.
+#ifdef ENABLE_FIFO_STROBE
+					mpcie_byte_write(FIFO_STROBE_ADDR, 0);
+					while (mpcie_byte_read(FIFO_STROBE_ADDR) == 0) {
 						if (tcp_sock_tick(&server->socket) < 0) return -1;
 					}
 #endif
+
 					tx_buff[i] = mpcie_byte_read(register_addr);
 					i++;
 					if ((i == sizeof(tx_buff)) || (j == tx_len - 1)) {
@@ -358,7 +438,14 @@ int lwdaq_handle_message(tcpip_server_type* server,
 		}
 		break;
 
-#if defined(EEM_MOTHERBOARD_A2071)
+#ifdef ENABLE_STREAM_READ
+		// The stream-write operation uploads a block of data to the
+		// controller's memory by writing repeatedly to its RAM Portal. Each
+		// time we write to the RAM Portal, the data address associated with the
+		// portal increments by one, so that the next byte written to the portal
+		// is written to the next address in controller memory. We use this
+		// operation to test the memory on LWDAQ Drivers, and to upload
+		// waveforms to Analog Signal Generators (A3052).
 		case STREAM_WRITE: {
 			register_addr = content[3];
 			if (debug) console_print("STREAM_WRITE to %d of %d bytes in %s.\n",
@@ -371,7 +458,12 @@ int lwdaq_handle_message(tcpip_server_type* server,
 		break;
 #endif
 
-#if defined(EEM_MOTHERBOARD_A2071)
+#ifdef ENABLE_STREAM_DELETE
+		// The stream-delete operation sets a block of controller RAM locations
+		// to a particular value by writing this value repeatedly to the
+		// controller's RAM Portal. We use this operation to test the memory on
+		// LWDAQ Drivers. We delete the rows of a simulated vertical gray-scale
+		// image and then read it back with stream-read to see if it is perfect.
 		case STREAM_DELETE: {
 			register_addr = content[3];
 			uint32_t wr_len = reverse_load_u32(&content[4]);
@@ -386,6 +478,10 @@ int lwdaq_handle_message(tcpip_server_type* server,
 		break;
 #endif
 
+		// The login operation compares the password in the message content to
+		// the EEM active configuration password. If they are the same, the
+		// operation returns byte value 0x01 to the client. If they are
+		// different, the operation returns byte value 0x00.
 		case LOGIN: {
 			content[len] = '\0';
 			if (debug) console_print("LOGIN in %s.\n", __func__);
@@ -393,13 +489,18 @@ int lwdaq_handle_message(tcpip_server_type* server,
 				server->logged_in = true;
 				if (debug) console_print("Logged in with password '%s'.\n", content);
 			} else {
-			  server->logged_in = false;
+				server->logged_in = false;
 				console_print("REJECTED: Login attempt with password '%s'.\n", content);
 			}
 			lwdaq_byte_return(server->socket, server->logged_in);
 		}
 		break;
 
+		// The config-read will look up the active EEM configuration, extract
+		// the values that the LWDAQ Configurator Tool expects to see, format
+		// them into the string the tool expects to receive, and tranmit the
+		// configuration string to the client. If the client has not logged in,
+		// and security level is one or higher, the operation returns an error.
 		case CONFIG_READ:{
 			if (debug) console_print("CONFIG_READ in %s.\n", __func__);
 			if (server->logged_in || eem_config_active.seclevel == 0) {
@@ -416,10 +517,15 @@ int lwdaq_handle_message(tcpip_server_type* server,
 		}
 		break;
 
+		// The config-write receives a string in the format provided by the
+		// LWDAQ Configurator Tool and extracts from it EEM configuration
+		// fields, which it applies to the flash configuration. If the client
+		// has not logged in, and security level is one or higher, the operation
+		// returns an error.
 		case CONFIG_WRITE:{
 			if (debug) console_print("CONFIG_WRITE in %s.\n",__func__);
 			if (server->logged_in || eem_config_active.seclevel == 0) {
-				if (len<LWDAQ_CONFIG_LENGTH) {
+				if (len<CONFIG_LENGTH) {
 					if (debug) console_print("Accepted: config %d characters.\n",len);
 					content[len]=0x00;
 					console_print("%s",(char*) content);
@@ -438,6 +544,8 @@ int lwdaq_handle_message(tcpip_server_type* server,
 		}
 		break;
 
+		// The mac-read operation returns the Media Access Control (MAC) address
+		// of the EEM.
 		case MAC_READ:{
 			if (debug) console_print("MAC_READ in %s.\n", __func__);
 			server_mac(tx_buff);
@@ -445,6 +553,8 @@ int lwdaq_handle_message(tcpip_server_type* server,
 		}
 		break;
 
+		// The echo operation returns what was sent to it. We use this operation
+		// for diagnostics.
 		case ECHO: {
 			if (debug) console_print("ECHO of %u bytes in %s.\n", len, __func__);
 			lwdaq_data_return(server->socket, content, len);
@@ -453,6 +563,9 @@ int lwdaq_handle_message(tcpip_server_type* server,
 		}
 		break;
 
+		// The reboot command initiates a software reset. If the security level
+		// requires a login, and the client is not logged in, the operation
+		// generates an error.
 		case REBOOT: {
 			if (debug) console_print("REBOOT in %s.\n", __func__);
 			if (server->logged_in || eem_config_active.seclevel == 0) {

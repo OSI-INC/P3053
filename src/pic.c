@@ -325,9 +325,9 @@ void pic_initialize(void) {
 */
 void pic_info(char* out) {
 	sprintf(out, 
-		"Tick Counter %.3f (kHz)\n"
-		"Sys Counter  %.3f (MHz)\n"
-		"Sys Clock    %.3f (MHz)",
+		"TickCounter_kHz %.3f\n"
+		"SysCounter_MHz  %.3f\n"
+		"SysClock_MHz    %.3f",
 		(double) SYS_TMR_TickCounterFrequencyGet() * 1e-3,
 		(double) SYS_TMR_SystemCountFrequencyGet() * 1e-6,
 		(double) SYS_TMR_SystemCountFrequencyGet() * 2e-6);
@@ -566,7 +566,7 @@ void cli_mpcie(cli_chan_type *ch, char *args) {
 	if (print_help) {
 		cli_message(ch,
 "Usage:\n"
-"  mpcie [--info|--help]"
+"  mpcie [--info|--help]\n"
 "  mpcie <read|stream-read> <addr> [length] [--decimal|--packed]\n"
 "  mpcie <write|stream-write> <addr> <value> [value...]\n"
 "  \n"

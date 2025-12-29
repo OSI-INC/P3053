@@ -66,15 +66,27 @@ extern bool debug;
 
 /*
 	The motherboard is the board that the EEM plugs into. In our case, this
-	might be an A2071 LWDAQ Driver, A2087 VME-TCPIP Interface, A3038 Animal
-	Location Tracker, A3042 Telemetry Control Box, or the A3052 Analog Signal
-	Generator, to name a few. We define a name string for the motherboard and a
-	compiler macro that contains the motherboard name. We use the macro to
-	perform conditional compilation that configures the EEM for each particular
-	motherboard.
+	might be a LWDAQ Driver with Ethernet Interface, a an Animal Location
+	Tracker, a Telemetry Control Box, or an Analog Signal Generator, to name a
+	few. We define a name string for the motherboard and a compiler macro that
+	contains the motherboard name. We use the macro to perform conditional
+	compilation that configures the EEM for each particular motherboard. Here
+	are the assembly numbers the EEM code recognises.
+	
+	LWDAQ Driver with Ethernet Interface  A2071
+	TCPIP-VME Interface                   A2087
+	Animal Location Tracker               A3038
+	Telemetry Control Box                 A3042
+	Function Generator                    A3050
+	Analog Signal Generator               A3052
+	
+	In each case, we insert the motherboard assembly number into the compiler
+	macros below, twice, just the same, in order to configure the EEM code for
+	the motherboard.
+
 */
-#define EEM_MOTHERBOARD_NAME "A3042"
-#define EEM_MOTHERBOARD_A3042
+#define EEM_MOTHERBOARD_NAME "A2071"
+#define EEM_MOTHERBOARD_A2071
 
 /*
 	When our GitHub repository version is X.Y, we let the software version we report
@@ -87,6 +99,6 @@ extern bool debug;
 /*
 	Default configuration of the CLI.
 */
-#define CLI_PROMPT_DEFAULT "EEM$ "
+#define CLI_PROMPT_DEFAULT "EEM % "
 
 #endif 
