@@ -384,19 +384,35 @@ int lwdaq_handle_message(tcpip_server_type* server,
 		// The stream-read operation reads repeatedly from the same location.
 		// The operation is useful when the location acts like a First-In,
 		// First-Out (FIFO) buffer, as is the case for the RAM Portal location
-		// in all standard LWDAQ Controllers. The RAM Portal is at address 0x3F.
-		// As we are reading data from the portal, we will accumulated it in a
-		// transmit buffer. When that buffer is full, we write the entire buffer
-		// to the TCP socket that has requested the data. The transmit buffer
-		// will be a few kilobytes long, but the requested data might be several
-		// megabytes, so we will be filling and writing the buffer hundreds of
-		// times during the course of the stream-read operation.
+		// in all standard LWDAQ Controllers. The RAM Portal in these
+		// controllers is at address 0x3F. As we are reading data from the
+		// portal, we will accumulated it in a transmit buffer. When that buffer
+		// is full, we write the entire buffer to the TCP socket that has
+		// requested the data. The transmit buffer will be a few kilobytes long,
+		// but the requested data might be several megabytes, so we will be
+		// filling and writing the buffer hundreds of times during the course of
+		// the stream-read operation.
 		case STREAM_READ: {
 			register_addr = content[3];
 			uint32_t tx_len = reverse_load_u32(&content[4]);
 			if (debug) console_print("STREAM_READ from %d of %d bytes in %s.\n",
 				register_addr, tx_len, __func__);
 			lwdaq_header(server->socket, DATA_RETURN, tx_len);
+			
+		// Here we are setting up a stream read, where we assert the address and 
+		// unassert /CW only once. Subsequent reads are faster because the 
+		// controller logic is incrementing the data address. But these three
+		// instructions don't do anything for the motherboards that have to
+		// check the FIFO strobe register.
+#ifndef ENABLE_FIFO_STROBE		
+			mpcie_addr_set(register_addr);
+			mpcie_data_input();
+    		mpcie_cw_unassert(); 
+#endif
+
+		// Start the stream read loop. We will be reading until we have read
+		// 'len' bytes, but we will be stopping to flush our transmit buffer
+		// along the way.
 			if (tx_len > 0) {
 				int i = 0;
 				for (int j = 0; j < tx_len; j++) {
@@ -416,9 +432,13 @@ int lwdaq_handle_message(tcpip_server_type* server,
 					while (mpcie_byte_read(FIFO_STROBE_ADDR) == 0) {
 						if (tcp_sock_tick(&server->socket) < 0) return -1;
 					}
+					tx_buff[i] = mpcie_byte_read(register_addr);
+#else
+		// If we don't have to check the FIFO strobe register, all we need
+		// to do is reapeat-read the same FIFO address.
+					tx_buff[i] = mpcie_byte_read_repeat();
 #endif
 
-					tx_buff[i] = mpcie_byte_read(register_addr);
 					i++;
 					if ((i == sizeof(tx_buff)) || (j == tx_len - 1)) {
 						tcp_writeall(&server->socket, tx_buff, i);

@@ -753,7 +753,8 @@ void tcpip_server(tcpip_server_type* server, tcpip_tasks_type tasks) {
 					server->port);
 				server->state = S_ERROR;
 			} else {
-				console_print("%s server listening for connection on %s:%d.\n",
+				if (debug) console_print(
+					"%s server listening for connection on %s:%d.\n",
 					server->protocol, server->ip_str,
 					server->port);
 				server->state = S_LISTENING;
@@ -766,17 +767,17 @@ void tcpip_server(tcpip_server_type* server, tcpip_tasks_type tasks) {
 				if (TCPIP_TCP_SocketInfoGet(server->socket, &sock_info)) {
 					IPV4_ADDR ip = sock_info.remoteIPaddress.v4Add;
 					server->last_tick = SYS_TMR_TickCountGet();
-					console_print("%s server connection from %u.%u.%u.%u.\n",
+					if (debug) console_print("%s server connection from %u.%u.%u.%u.\n",
 						server->protocol, ip.v[0], ip.v[1], ip.v[2], ip.v[3]);
 				} else {
-					console_print("%s server connection from unknown peer.\n",
+					if (debug) console_print("%s server connection from unknown peer.\n",
 						server->protocol);
 				}
 				status = tasks(server);
 				if (status >= 0) {
 					server->state = S_SERVING;
 				} else {
-					console_print("%s server socket closed.\n",
+					if (debug) console_print("%s server socket closed.\n",
 						server->protocol);			
 					server->state = S_CLOSE;
 				}
@@ -787,7 +788,7 @@ void tcpip_server(tcpip_server_type* server, tcpip_tasks_type tasks) {
 		case S_SERVING: {
 			if (!TCPIP_TCP_IsConnected(server->socket) ||
 					TCPIP_TCP_WasDisconnected(server->socket)) {
-				console_print("%s server socket closed.\n",
+				if (debug) console_print("%s server socket closed.\n",
 					server->protocol);
 				server->state = S_CLOSE;
 			} else {
@@ -796,14 +797,14 @@ void tcpip_server(tcpip_server_type* server, tcpip_tasks_type tasks) {
 						server->last_tick = SYS_TMR_TickCountGet();
 					} else if (SYS_TMR_TickCountGet() - server->last_tick 
 							>  (server->tcp_timeout * 1000u)) {
-						console_print("%s server timeout, closing socket.\n",
+						if (debug) console_print("%s server timeout, closing socket.\n",
 							server->protocol);			
 						server->state = S_CLOSE;
 					}
 				}
 				status = tasks(server);
 				if (status < 0) {
-					console_print("%s server socket closed.\n",
+					if (debug) console_print("%s server socket closed.\n",
 						server->protocol);			
 					server->state = S_CLOSE;
 				}

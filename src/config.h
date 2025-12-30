@@ -85,8 +85,8 @@ extern bool debug;
 	the motherboard.
 
 */
-#define EEM_MOTHERBOARD_NAME "A2071"
-#define EEM_MOTHERBOARD_A2071
+#define EEM_MOTHERBOARD_NAME "A3042"
+#define EEM_MOTHERBOARD_A3042
 
 /*
 	When our GitHub repository version is X.Y, we let the software version we report
