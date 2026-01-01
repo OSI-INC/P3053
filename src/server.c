@@ -52,7 +52,7 @@ eem_config_type eem_config_active;
 	eem_config_write writes a EEM configuration record to the flash
 	configuration address in flash memory.
 */
-int eem_config_write(const eem_config_type* config_ptr) {
+int eem_config_write(const eem_config_type *config_ptr) {
 	return pic_flash_putbytes(
 		EEM_CONFIG_ADDR, 
 		(const uint8_t *) config_ptr,
@@ -67,7 +67,7 @@ int eem_config_write(const eem_config_type* config_ptr) {
 	magic string does not match, we create the factory configuration record and
 	use that instead.
 */
-int eem_config_read(eem_config_type* config_ptr) {
+int eem_config_read(eem_config_type *config_ptr) {
 	int len;
 	len = pic_flash_getbytes(
 		(uint8_t*) config_ptr,
@@ -90,7 +90,7 @@ int eem_config_read(eem_config_type* config_ptr) {
 	string. It does not check to make sure that the destination string is large
 	enough.
 */
-int server_str_from_config(char* str, const eem_config_type* config_ptr) {
+int server_str_from_config(char *str, const eem_config_type *config_ptr) {
 	int len = 0;
 	len += sprintf(str+len, "seclevel: %u\n", config_ptr->seclevel);
 	len += sprintf(str+len, "password: %s\n", config_ptr->password);
@@ -242,7 +242,7 @@ int tcp_tick(void) {
 	when the socket has been closed or has been determined by the stack to be
 	disconnected. It returns zero if it did not check anything.
 */
-int tcp_sock_tick(void* context) {
+int tcp_sock_tick(void *context) {
 	TCP_SOCKET sock = *(TCP_SOCKET *) context;
 	if (tcp_tick()) {
 		if (!TCPIP_TCP_IsConnected(sock) || TCPIP_TCP_WasDisconnected(sock)) {
@@ -261,7 +261,7 @@ int tcp_sock_tick(void* context) {
 	integers to thirty-two bit integers for our thirty-two bit processor. Its
 	name is in our opinion more suitable.	
 */ 
-int tcp_readcount(void* context) {
+int tcp_readcount(void *context) {
 	TCP_SOCKET sock = *(TCP_SOCKET *) context;
 	return (int) TCPIP_TCP_GetIsReady(sock);
 }
@@ -273,7 +273,7 @@ int tcp_readcount(void* context) {
 	is available. It takes as arguments a socket handle, a byte buffer pointer,
 	and an unsigned integer length.
 */
-int tcp_read(void* context, uint8_t* buffer, uint32_t len) {
+int tcp_read(void *context, uint8_t *buffer, uint32_t len) {
 	TCP_SOCKET sock= *(TCP_SOCKET *) context;
 	return (int) TCPIP_TCP_ArrayGet(sock, buffer, len);
 }
@@ -284,7 +284,7 @@ int tcp_read(void* context, uint8_t* buffer, uint32_t len) {
 	connected but there is no character to be read. Otherwise it returns a
 	character. This routine can be deployed in a CLI channel descriptor.
 */
-int tcp_getchar(void* context) {
+int tcp_getchar(void *context) {
 	TCP_SOCKET sock= *(TCP_SOCKET *) context;
 	uint8_t c;
 	if (sock == INVALID_SOCKET) return -2;
@@ -297,7 +297,7 @@ int tcp_getchar(void* context) {
 	tcp_writecount returns how much space we have available for writing to the
 	outgoing TCP buffer of a socket. It takes a socket handle.
 */
-int tcp_writecount(void* context) {
+int tcp_writecount(void *context) {
 	TCP_SOCKET sock= *(TCP_SOCKET *) context;
 	return (int) TCPIP_TCP_PutIsReady(sock);
 }
@@ -310,7 +310,7 @@ int tcp_writecount(void* context) {
 	that should be written, and an unsigned integer length. The routine does not
 	flush the socket. It does not block.
 */
-int tcp_write(void* context, const uint8_t* data, uint32_t len) {
+int tcp_write(void *context, const uint8_t *data, uint32_t len) {
 	TCP_SOCKET sock= *(TCP_SOCKET *) context;
 	return (int) TCPIP_TCP_ArrayPut(sock, data, len);
 }
@@ -322,7 +322,7 @@ int tcp_write(void* context, const uint8_t* data, uint32_t len) {
 	the character, it returns a 1. This routine can be deployed in a CLI channel
 	descriptor.
 */
-int tcp_putchar(void* context, char c) {
+int tcp_putchar(void *context, char c) {
 	TCP_SOCKET sock= *(TCP_SOCKET *) context;
 	if (sock == INVALID_SOCKET) return -2;
 	while (TCPIP_TCP_PutIsReady(sock) == 0) {
@@ -337,7 +337,7 @@ int tcp_putchar(void* context, char c) {
 	buffer as soon as it can. This routine can be deployed in a CLI channel
 	descriptor.
 */
-int tcp_flush(void* context) {
+int tcp_flush(void *context) {
 	TCP_SOCKET sock= *(TCP_SOCKET *) context;
 	TCPIP_TCP_Flush(sock);
 	return 0;
@@ -352,7 +352,7 @@ int tcp_flush(void* context) {
 	error. If it does not return an error, it returns the number of bytes
 	written, which must be the number specified.
 */
-int tcp_writeall(void* context, const uint8_t *buf, uint16_t len) {
+int tcp_writeall(void *context, const uint8_t *buf, uint16_t len) {
 	int total = 0;
 	int written = 0;
 	while (total < len) {
@@ -419,7 +419,7 @@ void ping_gateway(void) {
 	does not allow us to call this routine at any time other than when the EEM
 	is starting up.
 */
-int server_set_ip(const char* ip_str, const char* gw_str, const char* nm_str) {
+int server_set_ip(const char *ip_str, const char *gw_str, const char *nm_str) {
 	IPV4_ADDR ip_addr;
 	IPV4_ADDR mask_addr;
 	IPV4_ADDR gw_addr;
@@ -466,10 +466,10 @@ int server_set_ip(const char* ip_str, const char* gw_str, const char* nm_str) {
 	address as a six-byte block. The routine does not check the size of the
 	destination byte buffer, but it does return the number of bytes it wrote.
 */
-int server_mac(uint8_t* out) {
+int server_mac(uint8_t *out) {
 	TCPIP_NET_HANDLE net_hdl;
-	TCPIP_NET_IF* pNetIf;
-	uint8_t* mac;
+	TCPIP_NET_IF *pNetIf;
+	uint8_t *mac;
 
 	net_hdl = TCPIP_STACK_IndexToNet(0);
 	pNetIf = _TCPIPStackHandleToNet(net_hdl);
@@ -491,7 +491,7 @@ int server_mac(uint8_t* out) {
 	the destination string buffer, but it does return the number of characters
 	it wrote.
 */
-int server_mac_str(char* out) {
+int server_mac_str(char *out) {
 	uint8_t m[6];
 	server_mac(m);
 	return sprintf(out, 
@@ -506,9 +506,9 @@ int server_mac_str(char* out) {
 	the destination string buffer, but it does return the number of characters
 	it wrote.
 */
-int server_ip_str(char* out) {
+int server_ip_str(char *out) {
 	TCPIP_NET_HANDLE net_hdl;
-	TCPIP_NET_IF* pNetIf;
+	TCPIP_NET_IF *pNetIf;
 	IPV4_ADDR ip;
 
 	net_hdl = TCPIP_STACK_IndexToNet(0);
@@ -525,9 +525,9 @@ int server_ip_str(char* out) {
 	the destination string buffer, but it does return the number of characters
 	it wrote.
 */
-int server_nm_str(char* out) {
+int server_nm_str(char *out) {
 	TCPIP_NET_HANDLE net_hdl;
-	TCPIP_NET_IF* pNetIf;
+	TCPIP_NET_IF *pNetIf;
 	IPV4_ADDR nm;
 
 	net_hdl = TCPIP_STACK_IndexToNet(0);
@@ -544,9 +544,9 @@ int server_nm_str(char* out) {
 	the destination string buffer, but it does return the number of characters
 	it wrote.
 */
-int server_gw_str(char* out) {
+int server_gw_str(char *out) {
 	TCPIP_NET_HANDLE net_hdl;
-	TCPIP_NET_IF* pNetIf;
+	TCPIP_NET_IF *pNetIf;
 	IPV4_ADDR gw;
 
 	net_hdl = TCPIP_STACK_IndexToNet(0);
@@ -562,9 +562,9 @@ int server_gw_str(char* out) {
 	printable string. The routine does not check the size of the destination
 	string buffer, but it does return the number of characters it wrote.
 */
-int server_interface_str(char* out) {
+int server_interface_str(char *out) {
 	TCPIP_NET_HANDLE net_hdl;
-	const char* name;
+	const char *name;
 
 	net_hdl = TCPIP_STACK_IndexToNet(0);
 	name = TCPIP_STACK_NetNameGet(net_hdl);
@@ -597,7 +597,7 @@ bool server_network_up(void) {
 	the entire string. The routine does not check the size of the destination
 	string buffer, but it does return the number of characters it wrote.
 */
-int server_info(char* out) {
+int server_info(char *out) {
 	int len = 0;
 	len += sprintf(out+len,   "Interface       ");
 	len += server_interface_str(out+len);
@@ -687,30 +687,24 @@ int server_info(char* out) {
 
 	In the default state, the server remains stuck. 
 */
-void tcpip_server(tcpip_server_type* server, tcpip_tasks_type tasks) {
-	#define HEARTBEAT_PERIOD 50000000
+void tcpip_server(tcpip_server_type *server, tcpip_tasks_type tasks) {
 
 	SYS_STATUS tcpip_status;
 	TCP_SOCKET_INFO sock_info;
 	TCPIP_NET_HANDLE net_hdl;
 
-	const char* interface_name, *host_name;
+	const char *interface_name, *host_name;
 	int status;
-	static bool print_init_wait = true;
-	static bool ping_sent = false;
 	
-	if (server->port == 0) {
-		server->state = S_DISABLED;
-	}
+	if (server->port == 0) server->state = S_DISABLED;
 	
 	switch (server->state) {
 		case S_WAIT_STACK: {
+			static bool flag = true;
 			tcpip_status = TCPIP_STACK_Status(sysObj.tcpip);
 			if (tcpip_status < 0) {   
-				if (print_init_wait) {
-					console_print(
-						"ERROR: TCP/IP stack initialization failed in %s.\n", __func__);
-				}
+				console_print("ERROR: Stack initialization for %s server failed.\n",
+					server->protocol);
 				server->state = S_ERROR;
 			} else if (tcpip_status == SYS_STATUS_READY) {
 				net_hdl = TCPIP_STACK_IndexToNet(0);
@@ -722,22 +716,24 @@ void tcpip_server(tcpip_server_type* server, tcpip_tasks_type tasks) {
 					interface_name,
 					string_trim(host_name));
 				server->state = S_WAIT_IP;
-			} else if (print_init_wait) {
-				console_print("Waiting for TCP/IP stack in %s.\n", __func__);
-				print_init_wait = false;
+			} else if (flag) {
+				console_print("%s server waiting for stack initialization.\n",
+					server->protocol);
+				flag = false;
 			}
 		}
 		break;
 
 		case S_WAIT_IP: {
+			static bool flag = false;
 			net_hdl = TCPIP_STACK_IndexToNet(0);
 			if (TCPIP_STACK_NetIsReady(net_hdl)) {
 				server_ip_str(server->ip_str);
 				console_print("%s server assigned IP address %s.\n", 
 					server->protocol, server->ip_str);
-				if (!ping_sent) {
+				if (!flag) {
 					ping_gateway();
-					ping_sent = true;
+					flag = true;
 				}
 				server->state = S_OPEN_SERVER;
 			}
@@ -883,7 +879,7 @@ void tcpip_server(tcpip_server_type* server, tcpip_tasks_type tasks) {
 	showing help or info.	
 */
 void cli_config(cli_chan_type *ch, char *args) {
-	char* source = NULL;
+	char *source = NULL;
     bool update = false;
     bool verb_received = false;
     bool print_info = false;
@@ -892,9 +888,9 @@ void cli_config(cli_chan_type *ch, char *args) {
 	
 	eem_config_type config;
 	eem_config_read(&config);
-	const eem_config_type* config_ptr = NULL;
+	const eem_config_type *config_ptr = NULL;
 	
-	char* tok = strtok(args, " \t");
+	char *tok = strtok(args, " \t");
 	while (tok != NULL) {
 		if (strcmp(tok, "--info") == 0) {
 			print_info = true;
@@ -964,7 +960,7 @@ void cli_config(cli_chan_type *ch, char *args) {
 		} else if (strcmp(tok, "--ip-str") == 0 
 				|| strcmp(tok, "--gw-str") == 0
 				|| strcmp(tok, "--nm-str") == 0)  {
-			char* str = strtok(NULL, " \t\"\'");
+			char *str = strtok(NULL, " \t\"\'");
 			if (!TCPIP_Helper_StringToIPAddress(str, &addr)) {
 				cli_print(ch, "ERROR: Invalid IP address '%s' in %s.\n", str, __func__);
 				return;
@@ -978,7 +974,7 @@ void cli_config(cli_chan_type *ch, char *args) {
 			}
 		} else if (strcmp(tok, "--telnet-port") == 0 
 				|| strcmp(tok, "--lwdaq-port") == 0) {
-			char* val = strtok(NULL, " \t");
+			char *val = strtok(NULL, " \t");
 			if (!val) {
     			cli_print(ch, 
     				"ERROR: Option '%s' requires value in %s.\n", tok, __func__);
@@ -1004,7 +1000,7 @@ void cli_config(cli_chan_type *ch, char *args) {
 			}
 		} else if (strcmp(tok, "--telnet-timeout") == 0 
 				|| strcmp(tok, "--lwdaq-timeout") == 0) {
-			char* val = strtok(NULL, " \t");
+			char *val = strtok(NULL, " \t");
 			if (!val) {
     			cli_print(ch, 
     				"ERROR: Option '%s' requires value in %s.\n", tok, __func__);
@@ -1023,7 +1019,7 @@ void cli_config(cli_chan_type *ch, char *args) {
 				config.lwdaq_timeout = (uint32_t) p;
 			}
 		} else if (strcmp(tok, "--password") == 0) {
-			char* str = strtok(NULL, " \t\"\'");
+			char *str = strtok(NULL, " \t\"\'");
 			if (!str) {
     			cli_print(ch, 
     				"ERROR: Option '%s' requires value in %s.\n", tok, __func__);
@@ -1031,7 +1027,7 @@ void cli_config(cli_chan_type *ch, char *args) {
 			}			
 			strcpy(config.password, str);
 		} else if (strcmp(tok, "--person") == 0) {
-			char* str = strtok(NULL, " \t\"\'");
+			char *str = strtok(NULL, " \t\"\'");
 			if (!str) {
     			cli_print(ch, 
     				"ERROR: Option '%s' requires value in %s.\n", tok, __func__);
@@ -1039,7 +1035,7 @@ void cli_config(cli_chan_type *ch, char *args) {
 			}			
 			strcpy(config.person, str);
 		} else if (strcmp(tok, "--timestamp\"\'") == 0) {
-			char* str = strtok(NULL, " \t");
+			char *str = strtok(NULL, " \t");
 			if (!str) {
     			cli_print(ch, 
     				"ERROR: Option '%s' requires value in %s.\n", tok, __func__);
@@ -1047,7 +1043,7 @@ void cli_config(cli_chan_type *ch, char *args) {
 			}			
 			strcpy(config.timestamp, str);
 		} else if (strcmp(tok, "--device") == 0) {
-			char* str = strtok(NULL, " \t\"\'");
+			char *str = strtok(NULL, " \t\"\'");
 			if (!str) {
     			cli_print(ch, 
     				"ERROR: Option '%s' requires value in %s.\n", tok, __func__);
@@ -1055,7 +1051,7 @@ void cli_config(cli_chan_type *ch, char *args) {
 			}			
 			strcpy(config.device, str);
 		} else if (strcmp(tok, "--tcp_tick_ms") == 0) {
-			char* val = strtok(NULL, " \t");
+			char *val = strtok(NULL, " \t");
 			if (!val) {
     			cli_print(ch, 
     				"ERROR: Option '%s' requires value in %s.\n", tok, __func__);
@@ -1070,7 +1066,7 @@ void cli_config(cli_chan_type *ch, char *args) {
 			}
 			config.telnet_timeout = (uint32_t) p;
 		} else if (strcmp(tok, "--seclevel") == 0) {
-			char* val = strtok(NULL, " \t");
+			char *val = strtok(NULL, " \t");
 			if (!val) {
     			cli_print(ch, 
     				"ERROR: Option '%s' requires value in %s.\n", tok, __func__);

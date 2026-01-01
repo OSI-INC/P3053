@@ -116,7 +116,7 @@ static uint8_t pic_flash_write_buff[NVM_FLASH_ROWSIZE]
 	of the row with erase bytes 0xFF. The routine returns the number of bytes it
 	wrote, not counting erase bytes.
 */
-int pic_flash_putbytes(uint32_t flash_addr, const uint8_t* buff, uint32_t len) {
+int pic_flash_putbytes(uint32_t flash_addr, const uint8_t *buff, uint32_t len) {
     uint32_t i = 0;
     if (len >= NVM_FLASH_ROWSIZE) {len = NVM_FLASH_ROWSIZE;}
     memcpy(pic_flash_write_buff, buff, len);
@@ -134,7 +134,7 @@ int pic_flash_putbytes(uint32_t flash_addr, const uint8_t* buff, uint32_t len) {
 	pic_flash_putbytes to perform the copy. It returns the number of characters
 	written, which will be the string length plus one, or an error code.
 */
-int pic_flash_writestr(uint32_t flash_addr, const char* str) {
+int pic_flash_writestr(uint32_t flash_addr, const char *str) {
     uint32_t len = strlen(str) + 1;
     return pic_flash_putbytes(flash_addr, (const uint8_t*) str, len);
 }
@@ -151,8 +151,8 @@ int pic_flash_writestr(uint32_t flash_addr, const char* str) {
 	flash memmory. We can read from any address and we can read any number of
 	bytes, by simply using memcpy.
 */
-int pic_flash_getbytes(uint8_t* buff, uint32_t flash_addr, uint32_t len)  {
-	const uint8_t* row = (const uint8_t*) flash_addr;
+int pic_flash_getbytes(uint8_t *buff, uint32_t flash_addr, uint32_t len)  {
+	const uint8_t *row = (const uint8_t*) flash_addr;
 	memcpy(buff, row, len);
 	return len;
 }
@@ -168,8 +168,8 @@ int pic_flash_getbytes(uint8_t* buff, uint32_t flash_addr, uint32_t len)  {
 	copied. If it does not find a null, it will make an empty string and return
 	a negative value.
 */
-int pic_flash_readstr(char* str, uint32_t flash_addr, uint32_t str_size) {
-	const uint8_t* row = (const uint8_t*) flash_addr;
+int pic_flash_readstr(char *str, uint32_t flash_addr, uint32_t str_size) {
+	const uint8_t *row = (const uint8_t*) flash_addr;
 	uint32_t i = 0;
 	while ((i < str_size) && (row[i] != '\0')) {i++;}
 	if (i + 1 > str_size) {
@@ -323,7 +323,7 @@ void pic_initialize(void) {
 	ensure that the buffer is big enough. We do not bother implementing any
 	check in this routine of the buffer size.
 */
-void pic_info(char* out) {
+void pic_info(char *out) {
 	sprintf(out, 
 		"TickCounter_kHz %.3f\n"
 		"SysCounter_MHz  %.3f\n"
@@ -355,7 +355,7 @@ int uart2_readcount(void *context)
 	readcount routine, so the bytes are all waiting to be read. The context
 	pointer is for use by channel descriptors.
 */
-int uart2_read(void *context, uint8_t* buff, uint32_t len) {
+int uart2_read(void *context, uint8_t *buff, uint32_t len) {
     (void) context;
     int num_got = (int) UART2_Read(buff, len);
     return num_got;
@@ -384,7 +384,7 @@ int uart2_getchar(void *context) {
 	to the buffer. So we must type-cast the buffer into a modifiable buffer to
 	avoid a compiler warning.
 */
-int uart2_write(void *context, const uint8_t* buff, uint32_t len) {
+int uart2_write(void *context, const uint8_t *buff, uint32_t len) {
     (void)context;
     for (uint32_t i = 0; i < len; i++) {
         while (UART2_Write((uint8_t*) &buff[i], 1) == 0);
@@ -427,7 +427,7 @@ int uart2_flush(void *context) {
 void cli_reset(cli_chan_type *ch, char *args) {
 	bool print_info = false;
 	bool print_help = false;
-	char* tok = strtok(args, " \t");
+	char *tok = strtok(args, " \t");
 
 	while (tok != NULL) {
  		if (strcmp(tok, "--info") == 0) {print_info = true;} 
@@ -491,7 +491,7 @@ void cli_mpcie(cli_chan_type *ch, char *args) {
 	uint32_t read_len = 1;
 	
 	
-	char* tok = strtok(args, " \t");
+	char *tok = strtok(args, " \t");
 	while (tok != NULL) {
  		if (strcmp(tok, "--info") == 0) {
  			print_info = true;

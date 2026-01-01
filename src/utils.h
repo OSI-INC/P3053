@@ -58,7 +58,7 @@ static inline bool is_printable(char c) {
 /*
 	String manipulation and checking procedures.
 */
-const char* string_trim(const char *s);
+const char *string_trim(const char *s);
 bool parse_uint8(const char *tok, uint8_t *out_ptr);
 bool parse_uint32(const char *tok, uint32_t *out_ptr);
 

@@ -72,11 +72,11 @@
 */
 void console_put_int_hex(uint32_t value);
 void console_put_int_trace(uint32_t value);
-void console_write(const void* buff, size_t size);
+void console_write(const void *buff, size_t size);
 void console_message(const char *s);
-void console_print(const char* fmt, ...);
-void console_dump_hex(const char* s);
-void console_dump_ascii(const char* s);
+void console_print(const char *fmt, ...);
+void console_dump_hex(const char *s);
+void console_dump_ascii(const char *s);
 void console_initialize(void);
 
 /*

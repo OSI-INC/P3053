@@ -189,7 +189,7 @@ typedef struct {
     char rx_buff[CLI_RX_SIZE];
     uint32_t rx_len;
     char tx_buff[CLI_TX_SIZE];
-    char* name;
+    char *name;
     char prompt[CLI_PROMPT_SIZE];
     cli_chan_status_type status;
 } cli_chan_type;
@@ -241,12 +241,12 @@ typedef struct {const char *name; cli_cmd_proc proc;} cli_command_entry;
 	definitions for instructions on how to use each routine.
 */
 void cli_initialize(void);
-void cli_start(cli_chan_type* ch);
-void cli_server(cli_chan_type* ch);
+void cli_start(cli_chan_type *ch);
+void cli_server(cli_chan_type *ch);
 int cli_cmd_register(const char *name, cli_cmd_proc proc);
 void cli_putchar(cli_chan_type *ch, char c);
-void cli_message(cli_chan_type* ch, const char* buff);
-void cli_print(cli_chan_type* ch, const char* fmt, ...);
+void cli_message(cli_chan_type *ch, const char *buff);
+void cli_print(cli_chan_type *ch, const char *fmt, ...);
 
 /*
 	Build in and example CLI command procedures.

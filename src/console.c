@@ -75,8 +75,8 @@ void console_put_int_trace(uint32_t value) {
 	terminator. We pass it a pointer to the byte array and the size of the
 	array.
 */
-void console_write(const void* buff, size_t size) {
-    const uint8_t* p = (const uint8_t*) buff;
+void console_write(const void *buff, size_t size) {
+    const uint8_t *p = (const uint8_t*) buff;
     for (size_t i = 0; i < size; i++) {
         uart2_putchar(NULL, p[i]);
     }
@@ -127,7 +127,7 @@ void console_message(const char *s) {
 	specficiations and literal arguments. This machinery is: va_start, va_list,
 	vsnprintf, and va_end.
 */
-void console_print(const char* fmt, ...) {
+void console_print(const char *fmt, ...) {
     char buff[2048];
     va_list args;
     va_start(args, fmt);
@@ -141,8 +141,8 @@ void console_print(const char* fmt, ...) {
 	of hexadecimal digits so we can see what the values of the non-printable
 	characters.
 */
-void console_dump_hex(const char* s) {
-    const unsigned char* p = (const unsigned char*) s;
+void console_dump_hex(const char *s) {
+    const unsigned char *p = (const unsigned char*) s;
     while (*p != '\0') {
         console_print("%02X ", *p);
         p++;
@@ -154,8 +154,8 @@ void console_dump_hex(const char* s) {
 	console_dump_ascii prints the charactesr of a null-terminated string one
 	after the other, but transforms non-printable characters into periods.
 */
-void console_dump_ascii(const char* s) {
-    const unsigned char* p = (const unsigned char*) s;
+void console_dump_ascii(const char *s) {
+    const unsigned char *p = (const unsigned char*) s;
     while (*p != '\0') {
         if (is_printable(*p)) {
             uart2_putchar(NULL, (char) *p);
@@ -174,7 +174,7 @@ void console_dump_ascii(const char* s) {
 	We pass it an index to select a console, which in our case we ignore. We
 	pass it a pointer to the byte array and we specify the size of the array.
 */
-void SYS_CONSOLE_Write(int index, const void* buff, size_t size) {
+void SYS_CONSOLE_Write(int index, const void *buff, size_t size) {
     console_write(buff, size);
 }
 
@@ -185,7 +185,7 @@ void SYS_CONSOLE_Write(int index, const void* buff, size_t size) {
 	ignore the index. The next argument is a pointer to a null-terminated
 	string. We pas that pointer to our own console_message routine.
 */
-void SYS_CONSOLE_Message(int index, const char* msg) {
+void SYS_CONSOLE_Message(int index, const char *msg) {
     (void) index;
     console_message(msg);
 }
@@ -201,7 +201,7 @@ void SYS_CONSOLE_Message(int index, const char* msg) {
 	it the string and arguments. We must repeat our console_print instructions,
 	using the same stdarg.h machinery.
 */
-void SYS_CONSOLE_Print(int index, const char* fmt, ...) {
+void SYS_CONSOLE_Print(int index, const char *fmt, ...) {
 	(void) index;
     char buff[2048];
     va_list args;
@@ -233,9 +233,9 @@ int SYS_CONSOLE_ReadCountGet(int index) {
 	available bytes. The routine transfers the bytes from the console receive
 	buffer into the buffer.
 */
-void SYS_CONSOLE_Read(int index, void* buff, size_t size) {
+void SYS_CONSOLE_Read(int index, void *buff, size_t size) {
     (void) index;
-    uint8_t* p = (uint8_t*) buff;
+    uint8_t *p = (uint8_t*) buff;
     for (size_t i = 0; i < size; i++) {
         if (uart2_readcount(NULL) == 0) {
             return;
@@ -297,7 +297,7 @@ void cli_debug(cli_chan_type *ch, char *args) {
 	bool verb_received = false;
 	bool set_flag = true;
 
-	char* tok = strtok(args, " \t");
+	char *tok = strtok(args, " \t");
 	while (tok != NULL) {
  		if (strcmp(tok, "--info") == 0) {
  			print_info = true;

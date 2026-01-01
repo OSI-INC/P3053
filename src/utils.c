@@ -38,7 +38,7 @@
 	purpose before the next call to string_trim, because it is a static string
 	allocated for the routine in memory. 
 */
-const char* string_trim(const char *s) {
+const char *string_trim(const char *s) {
     static char buf[256];
     const char *start = s;
     const char *end;

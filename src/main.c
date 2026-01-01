@@ -175,7 +175,7 @@ int telnet_getchar(void *context) {
 	channel descriptor record to manage communication with the TCP socket. We
 	configure this descriptor when the socket starts listening for a connection.
 */
-int telnet_tasks(tcpip_server_type* server) {
+int telnet_tasks(tcpip_server_type *server) {
 	static cli_chan_type telnet_chan;
 		 
 	if (server->state == S_LISTENING) {

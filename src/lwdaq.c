@@ -117,7 +117,7 @@ tcpip_server_type lwdaq_server = {
 */
 int lwdaq_header(TCP_SOCKET s, uint32_t id, uint32_t len) {
 	uint8_t buff[FRAME_BUFF_SIZE];
-	uint32_t* lp;
+	uint32_t *lp;
 	buff[START_OFFSET] = START_CODE;
 	lp = (uint32_t*) &buff[ID_OFFSET];
 	*lp = flip_bytes_u32(id);
@@ -156,7 +156,7 @@ int lwdaq_byte_return(TCP_SOCKET s, uint8_t data) {
 */
 int lwdaq_integer_return(TCP_SOCKET s, uint32_t data) {
 	uint8_t buff[FRAME_BUFF_SIZE];
-	uint32_t* lp;
+	uint32_t *lp;
 	lwdaq_header(s, DATA_RETURN, sizeof(data));
 	lp = (uint32_t*) &buff[0];
 	*lp = flip_bytes_u32(data);
@@ -168,7 +168,7 @@ int lwdaq_integer_return(TCP_SOCKET s, uint32_t data) {
 /*
 	lwdaq_data_return sends a block of data through a socket.
 */
-int lwdaq_data_return(TCP_SOCKET s, uint8_t* block, uint32_t len) {
+int lwdaq_data_return(TCP_SOCKET s, uint8_t *block, uint32_t len) {
 	lwdaq_header(s, DATA_RETURN, len);
 	tcp_writeall(&s, block, len);
 	lwdaq_footer(s);
@@ -183,7 +183,7 @@ int lwdaq_data_return(TCP_SOCKET s, uint8_t* block, uint32_t len) {
 	generated string. It does not check to make sure that the destination string
 	is large enough.
 */
-int lwdaq_str_from_config(char* str, const eem_config_type* config_ptr) {
+int lwdaq_str_from_config(char *str, const eem_config_type *config_ptr) {
 	int len = 0;
 	len += sprintf(str+len, "lwdaq_relay_configuration:\n");
 	len += sprintf(str+len, "configuration_time: %s\n", config_ptr->timestamp);
@@ -290,8 +290,8 @@ int lwdaq_config_from_str(eem_config_type *config_ptr, const char *str) {
 	flag that the message handler uses to determine whether or not it should
 	permit access to the LWDAQ instructions. 
 */
-int lwdaq_handle_message(tcpip_server_type* server,
-		uint32_t id, uint32_t len, uint8_t* content) {
+int lwdaq_handle_message(tcpip_server_type *server,
+		uint32_t id, uint32_t len, uint8_t *content) {
 	uint8_t register_addr = 0;
 	uint8_t value = 0;
 	static uint8_t tx_buff[TCP_TX_BUFF_SIZE];
@@ -655,7 +655,7 @@ int lwdaq_handle_message(tcpip_server_type* server,
 	only the socket handle but also the server state, which allows the tasks
 	manager to determine when to reset its buffer.
 */
-int lwdaq_tasks(tcpip_server_type* server) {
+int lwdaq_tasks(tcpip_server_type *server) {
 	static uint8_t rx_buffer[TCP_RX_BUFF_SIZE];
 	static uint32_t rx_available = 0;
 	uint32_t id, len, rx_ready, rx_space, rx_received;

@@ -88,7 +88,7 @@ void cli_message(cli_chan_type *ch, const char *s) {
 	specficiations and literal arguments. This machinery is: va_start, va_list,
 	vsnprintf, and va_end.
 */
-void cli_print(cli_chan_type* ch, const char* fmt, ...) {
+void cli_print(cli_chan_type *ch, const char *fmt, ...) {
     char buff[511];
     va_list args;
     va_start(args, fmt);
@@ -104,7 +104,7 @@ void cli_print(cli_chan_type* ch, const char* fmt, ...) {
 	initialization routine by the time we start this CLI, so the help command
 	will be installed in all CLI server.
 */
-void cli_start(cli_chan_type* ch) {
+void cli_start(cli_chan_type *ch) {
 	ch->rx_len = 0;
 	ch->rx_buff[0] = '\0';
 	cli_print(ch, "===========================================================\n");
@@ -176,8 +176,8 @@ void cli_server(cli_chan_type *ch) {
 	// the first character of the command name, and we will make sure a NULL
 	// sits just after the command name. We will use the args pointer in the
 	// same way for the argument list.
-	char* cmd;
-	char* args;
+	char *cmd;
+	char *args;
 	
 	// Read bytes into the channel's receive buffer until we see an end of line.
 	// We execute backspace and delete immediately we see them. If echo is
@@ -310,7 +310,7 @@ void cli_cmd_template(cli_chan_type *ch, char *args) {
 	// from the argument list. If we encounter an invalid argument, or an
 	// invalid combination of arguments, we print an error to the channel and
 	// exit.
-	char* tok = strtok(args, " \t");
+	char *tok = strtok(args, " \t");
 
 	// If tok is not null, we have found an argument. If the argument is valid,
 	// set a flag. If invalid, print an error message and return.
@@ -374,7 +374,7 @@ void cli_help(cli_chan_type *ch, char *args) {
 	bool print_info = false;
 	bool print_help = false;
 
-	char* tok = strtok(args, " \t");
+	char *tok = strtok(args, " \t");
 	
 	while (tok != NULL) {
  		if (strcmp(tok, "--info") == 0) {
@@ -436,7 +436,7 @@ void cli_help(cli_chan_type *ch, char *args) {
 void cli_status(cli_chan_type *ch, char *args) {
 	bool print_info = false;
 	bool print_help = false;
-	char* tok = strtok(args, " \t");
+	char *tok = strtok(args, " \t");
 
 	while (tok != NULL) {
  		if (strcmp(tok, "--info") == 0) {
@@ -527,7 +527,7 @@ void cli_login(cli_chan_type *ch, char *args) {
 	bool print_help = false;
 	bool password_match = false;
 
-	char* tok = strtok(args, " \t");
+	char *tok = strtok(args, " \t");
 	while (tok != NULL) {
  		if (strcmp(tok, "--info") == 0) {
  			print_info = true;
@@ -596,7 +596,7 @@ void cli_exit(cli_chan_type *ch, char *args) {
 	bool print_info = false;
 	bool print_help = false;
 
-	char* tok = strtok(args, " \t");
+	char *tok = strtok(args, " \t");
 	while (tok != NULL) {
  		if (strcmp(tok, "--info") == 0) {
  			print_info = true;
@@ -644,9 +644,9 @@ void cli_prompt(cli_chan_type *ch, char *args) {
 	bool print_info = false;
 	bool print_help = false;
 	bool prompt_received = false;
-	char* prompt;
+	char *prompt;
 
-	char* tok = strtok(args, "\"");
+	char *tok = strtok(args, "\"");
 	if (tok != NULL) {
 		prompt_received = true;
 		prompt = tok;

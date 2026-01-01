@@ -196,7 +196,6 @@ static inline void mpcie_byte_write(uint8_t addr, uint8_t data) {
         "nop\n\t"
      );    
 
-    mpcie_data_set(data);
     mpcie_data_output();
     
 	__asm__ volatile (
@@ -461,17 +460,17 @@ static inline uint8_t mpcie_byte_read_repeat(void) {
 	configuration string, so we will suffer no loss of performance from reading
 	direction from flash memory.
 */
-int pic_flash_putbytes(uint32_t flash_addr, const uint8_t* buff, uint32_t len);
-int pic_flash_writestr(uint32_t flash_addr, const char* str);
-int pic_flash_getbytes(uint8_t* buff, uint32_t flash_addr, uint32_t len);
-int pic_flash_readstr(char* str, uint32_t flash_addr, uint32_t str_size);
+int pic_flash_putbytes(uint32_t flash_addr, const uint8_t *buff, uint32_t len);
+int pic_flash_writestr(uint32_t flash_addr, const char *str);
+int pic_flash_getbytes(uint8_t *buff, uint32_t flash_addr, uint32_t len);
+int pic_flash_readstr(char *str, uint32_t flash_addr, uint32_t str_size);
 
 /*
 	Reset, initialization, and configuration routines.
 */
 void pic_reset(void);
 void pic_initialize(void);
-void pic_info(char* out);
+void pic_info(char *out);
 
 /*
 	Generic UART2 communication routines. Each of these takes a context pointer
@@ -481,9 +480,9 @@ void pic_info(char* out);
 	the channel they use is always the same channel.
 */
 int uart2_readcount(void *context);
-int uart2_read(void *context, uint8_t* buff, uint32_t len);
+int uart2_read(void *context, uint8_t *buff, uint32_t len);
 int uart2_getchar(void *context);
-int uart2_write(void *context, const uint8_t* buff, uint32_t len);
+int uart2_write(void *context, const uint8_t *buff, uint32_t len);
 int uart2_putchar(void *context, char c);
 int uart2_flush(void *context);
 

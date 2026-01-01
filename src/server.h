@@ -193,10 +193,10 @@ extern eem_config_type eem_config_active;
 	direction from flash memory.
 */
 #define EEM_CONFIG_ADDR 0xBD100000
-int eem_config_write(const eem_config_type* config);
-int eem_config_read(eem_config_type* config);
-int server_str_from_config(char* str, const eem_config_type* config_ptr);
-int eem_config_from_str(eem_config_type* config_ptr, const char* str);
+int eem_config_write(const eem_config_type *config);
+int eem_config_read(eem_config_type *config);
+int server_str_from_config(char *str, const eem_config_type *config_ptr);
+int eem_config_from_str(eem_config_type *config_ptr, const char *str);
 
 /*
 	Buffer sizes we recommend for server tasks.
@@ -209,7 +209,7 @@ int eem_config_from_str(eem_config_type* config_ptr, const char* str);
 	physical interface driver.
 */
 int tcp_tick(void);
-int tcp_sock_tick(void* context);
+int tcp_sock_tick(void *context);
 
 /*
 	Routines that read and write from sockets. These are wrappers for Harmony
@@ -221,14 +221,14 @@ int tcp_sock_tick(void* context);
 	generic pointer that makes the routines compatible with the CLI and other
 	channel-agnostic communication processes we might devise.
 */
-int tcp_readcount(void* context);
-int tcp_read(void* context, uint8_t* buffer, uint32_t len);
-int tcp_getchar(void* context);
-int tcp_writecount(void* context);
-int tcp_write(void* context, const uint8_t* data, uint32_t len);
-int tcp_putchar(void* context, char c);
-int tcp_flush(void* context);
-int tcp_writeall(void* context, const uint8_t *buf, uint16_t len);
+int tcp_readcount(void *context);
+int tcp_read(void *context, uint8_t *buffer, uint32_t len);
+int tcp_getchar(void *context);
+int tcp_writecount(void *context);
+int tcp_write(void *context, const uint8_t *data, uint32_t len);
+int tcp_putchar(void *context, char c);
+int tcp_flush(void *context);
+int tcp_writeall(void *context, const uint8_t *buf, uint16_t len);
 
 /*
  	The tcpip_server_state structure defines the states of our generic TCP/IP server process.
@@ -268,7 +268,7 @@ typedef enum {
 	argument.
 */
 typedef struct {
-	const char* protocol;
+	const char *protocol;
 	TCP_SOCKET socket;
  	tcpip_server_state_type state;
 	uint16_t port;
@@ -282,16 +282,16 @@ typedef struct {
 	Routines for TCP/IP management and reporting.
 */
 void ping_gateway(void);
-int server_set_ip(const char* ip_str, const char* gw_str, const char* nm_str);
-int server_mac(uint8_t* out);
-int server_mac_str(char* out);
-int server_ip_str(char* out);
-int server_nm_str(char* out);
-int server_gw_str(char* out);
-int server_interface_str(char* out);
+int server_set_ip(const char *ip_str, const char *gw_str, const char *nm_str);
+int server_mac(uint8_t *out);
+int server_mac_str(char *out);
+int server_ip_str(char *out);
+int server_nm_str(char *out);
+int server_gw_str(char *out);
+int server_interface_str(char *out);
 bool server_link_up(void);
 bool server_network_up(void);
-int server_info(char* out);
+int server_info(char *out);
 
 /*
  	A tcpip_tasks_type is the type of procedure that will be called by our
@@ -300,7 +300,7 @@ int server_info(char* out);
  	is blocking. If tcp_sock_tick returns a negative value, the task must
  	abort and return a negative value itself.
 */
-typedef int (*tcpip_tasks_type)(tcpip_server_type* s);
+typedef int (*tcpip_tasks_type)(tcpip_server_type *s);
 
 /*
 	Our generic TCP/IP server procedure. The tcpip_server is a generic
@@ -308,7 +308,7 @@ typedef int (*tcpip_tasks_type)(tcpip_server_type* s);
 	long as the protocol tasks can be implemented in a non-blocking state
 	machine of its own.
 */
-void tcpip_server(tcpip_server_type* s, tcpip_tasks_type tasks);
+void tcpip_server(tcpip_server_type *s, tcpip_tasks_type tasks);
 
 /*
 	Command-Line Interpreter (CLI) procedures that can be registered with our CLI
