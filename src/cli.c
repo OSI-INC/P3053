@@ -452,7 +452,7 @@ void cli_status(cli_chan_type *ch, char *args) {
     }
     
 	if (print_info) {
-		cli_message(ch, "List PIC32MZ internal information.\n");
+		cli_message(ch, "Print table of system information.\n");
 		return;
 	}
 

@@ -372,10 +372,11 @@ int tcp_writeall(void *context, const uint8_t *buf, uint16_t len) {
 	gatewayt, becauyse if there is no such entry in the local network's ARP
 	table, the Harmony TCP/IP stack will refuse to generate the ping. We use the
 	ping to announce the presence of the EEM on the local network when it boots
-	up. We provide no routine currently to determine if the ping succeeded. The
-	ping identifier we pass is arbitrary.
+	up. We provide no routine to determine if the ping succeeded. The ping
+	identifier we pass is arbitrary. The routine returns a negative value if it
+	encounters an error.
 */
-void ping_gateway(void) {
+int ping_gateway(void) {
 	TCPIP_NET_HANDLE net_hdl;
 	IPV4_ADDR gwAddr;
 	TCPIP_ICMP_ECHO_REQUEST echoReq;
@@ -386,7 +387,7 @@ void ping_gateway(void) {
 	gwAddr.Val = TCPIP_STACK_NetAddressGateway(net_hdl);
 	TCPIP_MAC_ADDR fakeMac = { .v = { 0x02, 0x00, 0x00, 0x00, 0x00, 0x01 } };
 	TCPIP_ARP_EntrySet(net_hdl, &gwAddr, &fakeMac, true);
-	console_print("Pinging %d.%d.%d.%d...",
+	if (debug) console_print("Pinging %d.%d.%d.%d...",
 		gwAddr.v[0], gwAddr.v[1], gwAddr.v[2], gwAddr.v[3], __func__);
 	memset(&echoReq, 0, sizeof(echoReq));
 	echoReq.netH = net_hdl;
@@ -398,11 +399,12 @@ void ping_gateway(void) {
 	echoReq.callback = NULL;
 	echoReq.param = NULL;
 	res = TCPIP_ICMP_EchoRequest(&echoReq, &reqHandle);
-	if (res == ICMP_ECHO_OK) {
-		console_print(" Succeeded in %s.\n", __func__);
-	} else {
-		console_print(" Failed with code %u in %s.\n", res, __func__);
+	if (res != ICMP_ECHO_OK) {
+		if (debug) console_print("Ping failed with error code %u.\n", res);
+		return -1;
 	}
+	if (debug) console_print("Ping succeeded.\n");
+	return 0;
 }
 
 /*
@@ -711,7 +713,7 @@ void tcpip_server(tcpip_server_type *server, tcpip_tasks_type tasks) {
 				interface_name = TCPIP_STACK_NetNameGet(net_hdl);
 				host_name = TCPIP_STACK_NetBIOSName(net_hdl);
 				console_print(
-					"%s server waiting for IP address, interface %s, host %s.\n",
+					"%s server waiting for IP address on interface %s of %s.\n",
 					server->protocol,
 					interface_name,
 					string_trim(host_name));
@@ -725,15 +727,17 @@ void tcpip_server(tcpip_server_type *server, tcpip_tasks_type tasks) {
 		break;
 
 		case S_WAIT_IP: {
-			static bool flag = false;
 			net_hdl = TCPIP_STACK_IndexToNet(0);
 			if (TCPIP_STACK_NetIsReady(net_hdl)) {
 				server_ip_str(server->ip_str);
 				console_print("%s server assigned IP address %s.\n", 
 					server->protocol, server->ip_str);
-				if (!flag) {
-					ping_gateway();
-					flag = true;
+				if (ping_gateway() >= 0) {
+					console_print("%s server ping of gateway %s complete.\n",
+						server->protocol, eem_config_active.gw_str);
+				} else {
+					console_print("%s server ping of gateway %s failed.\n",
+						server->protocol, eem_config_active.gw_str);
 				}
 				server->state = S_OPEN_SERVER;
 			}
@@ -1089,7 +1093,7 @@ void cli_config(cli_chan_type *ch, char *args) {
 	}
 	
 	if (print_info) {
-		cli_message(ch, "Display or modify EEM configuration records.\n");
+		cli_message(ch, "Display or modify configuration records.\n");
 		return;
 	}
 

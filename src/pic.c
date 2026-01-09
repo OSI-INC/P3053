@@ -440,7 +440,7 @@ void cli_reset(cli_chan_type *ch, char *args) {
     }
     
 	if (print_info) {
-		cli_message(ch, "Initiate a software reset of the EEM.\n");
+		cli_message(ch, "Initiate software reset of module.\n");
 		return;
 	}
 

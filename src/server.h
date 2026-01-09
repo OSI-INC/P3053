@@ -281,7 +281,7 @@ typedef struct {
 /*
 	Routines for TCP/IP management and reporting.
 */
-void ping_gateway(void);
+int ping_gateway(void);
 int server_set_ip(const char *ip_str, const char *gw_str, const char *nm_str);
 int server_mac(uint8_t *out);
 int server_mac_str(char *out);
