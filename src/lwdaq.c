@@ -103,11 +103,13 @@
 */
 #define DEFAULT_LWDAQ_PORT 90
 tcpip_server_type lwdaq_server = {
+	.network_up = false,
+	.ip_assigned = false,
+	.sock_init = true,
+	.logged_in = false,
     .protocol = "LWDAQ",
-    .socket = INVALID_SOCKET,
-    .state = S_WAIT_STACK,
-    .port = DEFAULT_LWDAQ_PORT,
     .ip_str = "0.0.0.0",
+    .port = DEFAULT_LWDAQ_PORT,
     .tcp_timeout = 0,
     .last_tick = 0,
 };
@@ -661,26 +663,20 @@ int lwdaq_tasks(tcpip_server_type *server) {
 	uint32_t id, len, rx_ready, rx_space, rx_received;
 	int status;
 	
-	/*
-		When the server is listening for a new connection, and it receives a
-		connection, it calls the task routine. So when we check for the server
-		being in its listening state, we are checking to see if a new socket has
-		just been opened. We reset our input buffer.
-	*/
-	if (server->state == S_LISTENING) {
-		rx_available = 0;
+	// When the server has just begun to service a socket, the sock_init flag
+	// will be set.
+	if (server->sock_init) {
 		server->logged_in = false;
+		rx_available = 0;
 		if (debug) console_print("Initialized %s connection in %s.\n",
 			server->protocol, __func__);
 		return 0;
 	};
 
-	/*
-		The server is handling an existing, open socket. Our input buffer
-		counter is persistent from one call to the next, so we know how many
-		bytes we have in our buffer. We start by finding out how many bytes are
-		available for us to read from the socket and add to our buffer.
-	*/
+	// The server is handling an existing, open socket. Our input buffer counter
+	// is persistent from one call to the next, so we know how many bytes we
+	// have in our buffer. We start by finding out how many bytes are available
+	// for us to read from the socket and add to our buffer.
 	rx_ready = tcp_readcount(&server->socket);
 	rx_space = TCP_RX_BUFF_SIZE - rx_available;
 	if (rx_ready > rx_space) rx_ready = rx_space;
@@ -689,16 +685,12 @@ int lwdaq_tasks(tcpip_server_type *server) {
 		rx_available = rx_available + rx_received;
 	}
 	
-	/*
-		If we have nothing available, we are going to return.
-	*/
+	// If we have nothing available, we are going to return.
 	if (rx_available == 0) return 0;
 	
-	/*
-		We have at least one byte, so we will check to see if we have a complete
-		message. We need at least nine bytes: the start code, the four-byte
-		message identifier, and the four-byte length.
-	*/
+	// We have at least one byte, so we will check to see if we have a complete
+	// message. We need at least nine bytes: the start code, the four-byte
+	// message identifier, and the four-byte length.
 	if (LWDAQ_DEBUG) console_print("rx_ready=%u rx_available=%u in %s.\n",
 		rx_ready, rx_available, __func__);
 	if (rx_buffer[0] != START_CODE) {
@@ -711,51 +703,42 @@ int lwdaq_tasks(tcpip_server_type *server) {
 	}
 	if (rx_available<CONTENT_OFFSET) return rx_available;
 	
-	/*
-		We have a complete header, so extract the message identifier and length. Once
-		we have these, we can see if we have the content bytes in our buffer already. 
-		If not, we return the number of byts available and do nothing more.
-	*/
+	// We have a complete header, so extract the message identifier and length.
+	// Once we have these, we can see if we have the content bytes in our buffer
+	// already. If not, we return the number of byts available and do nothing
+	// more.
 	id = reverse_load_u32(&rx_buffer[ID_OFFSET]);
 	len = reverse_load_u32(&rx_buffer[CLEN_OFFSET]);
 	if (LWDAQ_DEBUG) console_print("id=%u len=%u in %s.\n", id, len, __func__);
 	
-	/*
-		We have the header, but we don't have all the content yet, so return.
-		The LWDAQ client is responsible for making sure that any incoming data
-		is broken into chunks smaller than our receive buffer. In the LWDAQ
-		client code, we assume the rx_buffer has size is equal to the
-		LWDAQ_Driver parameter server_buffer_size = 1400 bytes. In this server,
-		the buffer is can accommodate TCP_RX_BUFF_SIZE = 4096 bytes.
-	*/
+	// We have the header, but we don't have all the content yet, so return.
+	// The LWDAQ client is responsible for making sure that any incoming data
+	// is broken into chunks smaller than our receive buffer. In the LWDAQ
+	// client code, we assume the rx_buffer has size is equal to the
+	// LWDAQ_Driver parameter server_buffer_size = 1400 bytes. In this server,
+	// the buffer is can accommodate TCP_RX_BUFF_SIZE = 4096 bytes.
 	if (rx_available < len + FRAME_SIZE) return rx_available;
 	
-	/*
-		We have all the content bytes we need, and a byte afterwards for the end
-		code. Check to see if the end code is valie. If not, we return a
-		negative value to indicate an error.
-	*/
+	// We have all the content bytes we need, and a byte afterwards for the end
+	// code. Check to see if the end code is valie. If not, we return a
+	// negative value to indicate an error.
 	if (rx_buffer[len+CONTENT_OFFSET] != END_CODE) {
 		if (debug) console_print("Invalid end code in %s.\n", __func__);
 		return -1;
 	}
 	
-	/*
-		We appear to have a complete LWDAQ message, so pass it to the message
-		handler. We point the message handler to the tenth byte in our buffer,
-		which is byte nine, and corresponds to the first byte of the message
-		content. If the message handler returns an error, we exit with the same
-		error code.
-	*/
+	// We appear to have a complete LWDAQ message, so pass it to the message
+	// handler. We point the message handler to the tenth byte in our buffer,
+	// which is byte nine, and corresponds to the first byte of the message
+	// content. If the message handler returns an error, we exit with the same
+	// error code.
 	status = lwdaq_handle_message(server, id, len, &rx_buffer[CONTENT_OFFSET]);
 	if (status<0) return status;
 	
-	/*
-		We always read from our socket as many bytes as it has to give. If we
-		have received bytes following the message we just handled, copy all the
-		bytes to the front of the buffer, so we can begin our message
-		accumulation process again.
-	*/
+	// We always read from our socket as many bytes as it has to give. If we
+	// have received bytes following the message we just handled, copy all the
+	// bytes to the front of the buffer, so we can begin our message
+	// accumulation process again.
 	if (rx_available > len + FRAME_SIZE) {
 		if (LWDAQ_DEBUG) console_print("Copying %u to %u from %u in %s.\n",
 			rx_available - len - FRAME_SIZE, 0, len + FRAME_SIZE, __func__);
@@ -768,9 +751,7 @@ int lwdaq_tasks(tcpip_server_type *server) {
 	}
 	if (LWDAQ_DEBUG) console_print("rx_available=%u in %s.\n", rx_available, __func__);
 		
-	/*
-		Return the number of bytes available. This will certainly be zero or greater.
-	*/
+	// Return the number of bytes available. This will certainly be zero or greater.
 	return rx_available;
 }
 

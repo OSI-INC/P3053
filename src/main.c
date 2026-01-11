@@ -119,14 +119,15 @@
 	configuration to zero.
 */
 tcpip_server_type telnet_server = {
+	.network_up = false,
+	.ip_assigned = false,
+	.sock_init = true,
+	.logged_in = false,
     .protocol = "Telnet",
-    .socket = INVALID_SOCKET,
-    .state = S_WAIT_STACK,
-    .port = DEFAULT_TELNET_PORT,
     .ip_str = "0.0.0.0",
+    .port = DEFAULT_TELNET_PORT,
     .tcp_timeout = 0,
     .last_tick = 0,
-    .logged_in = false
 };
 
 /*
@@ -178,7 +179,7 @@ int telnet_getchar(void *context) {
 int telnet_tasks(tcpip_server_type *server) {
 	static cli_chan_type telnet_chan;
 		 
-	if (server->state == S_LISTENING) {
+	if (server->sock_init) {
 		server->logged_in = false;
 		telnet_chan.status = CLI_CONNECTED;
    		telnet_chan.getchar = telnet_getchar;
@@ -267,20 +268,16 @@ void lamp_signal(uint32_t period) {
 */
 int main (void) {
 
-	/*
-		Initialize the microcontroller and its peripherals, which include clock,
-		memory, core timers, system timer, UART console, Ethernet physical
-		interface, and the TCP/IP stack. Configure the general-purpose
-		input-output pins to communicate with indicator lamps, test pins, and
-		the eight-bit parallel bus.
-	*/
+	// Initialize the microcontroller and its peripherals, which include clock,
+	// memory, core timers, system timer, UART console, Ethernet physical
+	// interface, and the TCP/IP stack. Configure the general-purpose
+	// input-output pins to communicate with indicator lamps, test pins, and
+	// the eight-bit parallel bus.
 	pic_initialize();
 	
-	/*
-		Register commands in the Command-Line Interpreter (CLI). This is the only 
-		initialization the CLI requires. The "help" command will list the commands
-		in the order we register them.
-	*/
+	// Register commands in the Command-Line Interpreter (CLI). This is the only 
+	// initialization the CLI requires. The "help" command will list the commands
+	// in the order we register them.
 	cli_cmd_register("config",cli_config);
 	cli_cmd_register("debug",cli_debug);
 	cli_cmd_register("exit",cli_exit);
@@ -291,39 +288,31 @@ int main (void) {
 	cli_cmd_register("reset",cli_reset);
 	cli_cmd_register("status",cli_status);
 	
-	/*
-		Wait for the power supplies to settle before we check the configuration
-		switch. If we read the switch location too soon, we will think it is
-		depressed when it is not.
-	*/
+	// Wait for the power supplies to settle before we check the configuration
+	// switch. If we read the switch location too soon, we will think it is
+	// depressed when it is not.
 	lamp_signal(0);
 	uint32_t last_tick = SYS_TMR_TickCountGet();
 	while (SYS_TMR_TickCountGet() - last_tick < EEM_POWERUP_WAIT_MS) {
 		tcp_tick();
 	}
 	
-	/*
-		Check the configuration switch on the motherboard. If it is depressed,
-		the least significant bit of location forty will be zero. If depressed,
-		write the factory EEM configuration to flash, for factory reset.
-	*/
+	// Check the configuration switch on the motherboard. If it is depressed,
+	// the least significant bit of location forty will be zero. If depressed,
+	// write the factory EEM configuration to flash, for factory reset.
 	uint8_t val = mpcie_byte_read(40);
    	if ((val & 0x01) == 0) {
    		console_message("FACTORY RESET: Detected configuration switch depressed.\n");
     	eem_config_write(&eem_config_factory);
 	}
 	
-	/*
-		Read the flash configuration into the active configuration.
-	*/
+	// Read the flash configuration into the active configuration.
 	eem_config_read(&eem_config_active);
 
-   	/*
-		Wait for the TCP/IP stack to establish itself. Once the stack is ready,
-		we apply our IP address, gateway address, and network mask, as read from
-		the active configuration. Lamp signaling shows that the EEM is alive
-		during the wait.
-   	*/
+   	// Wait for the TCP/IP stack to establish itself. Once the stack is ready,
+	// we apply our IP address, gateway address, and network mask, as read from
+	// the active configuration. Lamp signaling shows that the EEM is alive
+	// during the wait.
    	while (TCPIP_STACK_Status(sysObj.tcpip) != SYS_STATUS_READY) { 
    		tcp_tick();
    		lamp_signal(1e5);
@@ -332,14 +321,12 @@ int main (void) {
    		eem_config_active.gw_str,
    		eem_config_active.nm_str);
  
- 	/*
-		Start up a Command-Line Interpreter (CLI) for the console interface,
-		which runs on UART2 in this version of the EEM. We start with the
-		console interface status set to 1, so that it is regarded as logged in,
-		and can always read and modify the EEM configuration regardless of the
-		EEM security level, unless it deliberately fails to log itself in using
-		the CLI login command, in which case its state will go to CLI_FAIL.
- 	*/
+ 	// Start up a Command-Line Interpreter (CLI) for the console interface,
+	// which runs on UART2 in this version of the EEM. We start with the
+	// console interface status set to 1, so that it is regarded as logged in,
+	// and can always read and modify the EEM configuration regardless of the
+	// EEM security level, unless it deliberately fails to log itself in using
+	// the CLI login command, in which case its state will go to CLI_FAIL.
  	static cli_chan_type console_chan;
 	console_chan.getchar = uart2_getchar;
 	console_chan.putchar = uart2_putchar;
@@ -351,18 +338,14 @@ int main (void) {
 	console_chan.status = CLI_PASS;
 	cli_start(&console_chan);
 	
-	/* 
-		Set the LWDAQ and Telnet server ports and timeouts.
-	*/
+	// Set the LWDAQ and Telnet server ports and timeouts.
 	lwdaq_server.port = eem_config_active.lwdaq_port;
 	lwdaq_server.tcp_timeout = eem_config_active.lwdaq_timeout;
 	telnet_server.port = eem_config_active.telnet_port;
 	telnet_server.tcp_timeout = eem_config_active.telnet_timeout;
 
-   	/*
-   		Perform maintenance tasks one after another and repeat. The lamp
-   		signaling will show that the EEM is alive.
-   	*/
+   	// Perform maintenance tasks one after another and repeat. The lamp
+   	// signaling will show that the EEM is alive.
 	while (true) {
 		tcp_tick();
 		cli_server(&console_chan);

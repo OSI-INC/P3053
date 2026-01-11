@@ -627,67 +627,29 @@ int server_info(char *out) {
 }
 
 /*
-	tcpip_server provides management of connection, service, and closure of a
-	TCP/IP protocol.  The core actions of waiting for the TCP/IP stack to start
-	up, waiting for an IP address to be assigned, listening on the port assigned
-	to the protocol, accepting a socket connection on that port, maintaining
-	service of the protocol on that socket by repeatedly calling a task
-	management routine, and closing the socket when the management routine
-	returns an error, are all handled by tcpip_server.
+	tcpip_server manages connections to a TCP/IP server and deploys a custom
+	server to them using a call-back function we provide. To service a
+	socket, the server routine calls this task procedure. It creates a listening
+	socket. It places connected sockets in a queue. It services connections in
+	the order they are received. It applies a timeout to the serviced
+	connection.
 
-	The tcpip_server is a state machine that does not block its calling
-	procedure, excepting when the protocol task provided to it causes a block.
+	The tcpip_server is a sequence of conditional clauses that implement the server
+	logic with the help of a few flags, an active socket, a listening socket, and
+	a socket queue. The routine does not block unless its protocol task provided to it blocks.
 	The task procedure is permitted to block, but it must call tcp_sock_tick
 	while it is blocking, so as to maintain the TCP/IP stack, and to detect
 	closure of the socket by the client. If the client closes the socket, the
-	protocol task must abort and return a negative value. The tcpip_server will
-	close the listening socket and open a new one. By this arrangement, the
-	protocol task can block the servicing of other protocols by other
-	tcpip_server processes indefinitely, but it can block its own server only so
-	long as its client does not close its socket.
+	protocol task must abort and return a negative value. 
+	
+	Whenever the server receives a connection, it puts the connection at the 
+	back of the queue and opens a new listening socket. If the queue is full, the
+	server closes the new socket immediately.
 
-	In order to support a particular protocol, we pass into the routine a
-	call-back function. This call-back function takes as a parameter the
-	server's status record, which includes the server state and a handle to the
-	socket. The server procedure calls the task procedure first when the socket
-	is accepted, and then repeatedly every time the server procedure is called
-	by the main event loop.
-
-	The task procedure can tell whether it should initialize the protocol
-	interaction or continue an existing interaction because it has access to the
-	server state, which will be S_LISTENING for a newly-opened socket and
-	S_SERVING for a pre-existing socket. The task procedure can read and write
-	from the socket using the tcp_get and tcp_put routines. If it encounters an
-	error, or detects that the socket has closed, it should return a negative
-	value. When the server receives this negative value, it closes the socket
-	and starts listening again for the next connection.
-
-	In S_WAIT_STACK, the server checks the status of the TCP/IP stack. If the
-	stack initialization failed, the server will move to its error state. The
-	first server to check for success or failure reports its finding to the
-	console.
-
-	In the S_WAIT_IP state, the server waits until the network interface has its
-	IP address. When the IP address is established, the first server to detect
-	the establishment pings the gateway, so as to announce the presence of the
-	ethernet module. This same server will report its ping to the console.
-
-	In the S_OPEN_SERVER state, the server opens a listening socket. When it
-	receives a connection, it calls its tasks routine, and moves to the next
-	state after that.
-
-	In S_SERVING, the server checks the connection is still active and calls the
-	tasks routine. If it receives a negative return from the tasks routine, the
-	server moves to its socket close state.
-
-	In S_CLOSE, the server closes the socket, and in S_ERROR the server sits and
-	makes an occasional heartbeat announcement about its state.
-
-	In S_ERROR, the server will be stuck in this state until some external agent
-	changes its state. In debug mode, the server will issue a heartbeat report
-	of its error state to the console.
-
-	In the default state, the server remains stuck. 
+	The protocol tasks call-back function takes as a parameter the server status
+	record, which includes an initialization flag and the socket handle. The server
+	sets the initialization flag before the first call to the tasks routine on a
+	new socket. It clears the flag after this first call.
 */
 void tcpip_server(tcpip_server_type *server, tcpip_tasks_type tasks) {
 
@@ -698,152 +660,145 @@ void tcpip_server(tcpip_server_type *server, tcpip_tasks_type tasks) {
 	const char *interface_name, *host_name;
 	int status;
 	
-	if (server->port == 0) server->state = S_DISABLED;
+	if (server->port == 0) return;
 	
-	switch (server->state) {
-		case S_WAIT_STACK: {
-			static bool flag = true;
-			tcpip_status = TCPIP_STACK_Status(sysObj.tcpip);
-			if (tcpip_status < 0) {   
-				console_print("ERROR: Stack initialization for %s server failed.\n",
-					server->protocol);
-				server->state = S_ERROR;
-			} else if (tcpip_status == SYS_STATUS_READY) {
-				net_hdl = TCPIP_STACK_IndexToNet(0);
-				interface_name = TCPIP_STACK_NetNameGet(net_hdl);
-				host_name = TCPIP_STACK_NetBIOSName(net_hdl);
-				console_print(
-					"%s server waiting for IP address on interface %s of %s.\n",
-					server->protocol,
-					interface_name,
-					string_trim(host_name));
-				server->state = S_WAIT_IP;
-			} else if (flag) {
-				console_print("%s server waiting for stack initialization.\n",
+	if (!server->network_up) {
+		static bool flag = true;
+		tcpip_status = TCPIP_STACK_Status(sysObj.tcpip);
+		if (tcpip_status < 0) {
+			if (flag) {
+				console_print("ERROR: Stack initialization failed for %s server\n",
 					server->protocol);
 				flag = false;
 			}
-		}
-		break;
-
-		case S_WAIT_IP: {
+			return;
+		} else if (tcpip_status == SYS_STATUS_READY) {
 			net_hdl = TCPIP_STACK_IndexToNet(0);
-			if (TCPIP_STACK_NetIsReady(net_hdl)) {
-				server_ip_str(server->ip_str);
-				console_print("%s server assigned IP address %s.\n", 
-					server->protocol, server->ip_str);
-				if (ping_gateway() >= 0) {
-					console_print("%s server ping of gateway %s complete.\n",
-						server->protocol, eem_config_active.gw_str);
-				} else {
-					console_print("%s server ping of gateway %s failed.\n",
-						server->protocol, eem_config_active.gw_str);
-				}
-				server->state = S_OPEN_SERVER;
-			}
+			interface_name = TCPIP_STACK_NetNameGet(net_hdl);
+			host_name = TCPIP_STACK_NetBIOSName(net_hdl);
+			console_print(
+				"%s server waiting for IP address on interface %s of %s.\n",
+				server->protocol,
+				interface_name,
+				string_trim(host_name));
+			server->network_up = true;
+		} else if (flag) {
+			console_print("%s server waiting for stack initialization.\n",
+				server->protocol);
+			flag = false;
+		} else {
+			return;
 		}
-		break;
+	}
 
-		case S_OPEN_SERVER: {
-			server->socket = TCPIP_TCP_ServerOpen(
-				IP_ADDRESS_TYPE_IPV4, server->port, 0);
-			if (server->socket == INVALID_SOCKET) {
-				console_print("%s server failed to open socket on %s:%d.\n",
-					server->protocol, server->ip_str,
-					server->port);
-				server->state = S_ERROR;
+	if (!server->ip_assigned) {
+		net_hdl = TCPIP_STACK_IndexToNet(0);
+		if (TCPIP_STACK_NetIsReady(net_hdl)) {
+			server_ip_str(server->ip_str);
+			console_print("%s server assigned IP address %s.\n", 
+				server->protocol, server->ip_str);
+			if (ping_gateway() >= 0) {
+				console_print("%s server ping of gateway %s complete.\n",
+					server->protocol, eem_config_active.gw_str);
 			} else {
-				if (debug) console_print(
-					"%s server listening for connection on %s:%d.\n",
-					server->protocol, server->ip_str,
-					server->port);
-				server->state = S_LISTENING;
+				console_print("%s server ping of gateway %s failed.\n",
+					server->protocol, eem_config_active.gw_str);
 			}
+			server->ip_assigned = true;
+			server->socket = INVALID_SOCKET;
+			server->listening = INVALID_SOCKET;
+			for (int i = 0; i < EEM_TCB_QUEUE_SIZE; i++) {
+				server->queue[i] = INVALID_SOCKET;
+			}
+		} else {
+			return;
 		}
-		break;
-
-		case S_LISTENING: {
-			if (TCPIP_TCP_IsConnected(server->socket)) {
-				if (TCPIP_TCP_SocketInfoGet(server->socket, &sock_info)) {
-					IPV4_ADDR ip = sock_info.remoteIPaddress.v4Add;
+	}
+	
+	if (server->socket != INVALID_SOCKET) { 
+		if (!TCPIP_TCP_IsConnected(server->socket) ||
+				TCPIP_TCP_WasDisconnected(server->socket)) {
+			if (debug) console_print("%s server socket closed.\n",
+				server->protocol);
+			TCPIP_TCP_Close(server->socket);
+			server->socket = INVALID_SOCKET;
+		} else {
+			if (server->tcp_timeout > 0) {
+				if (TCPIP_TCP_GetIsReady(server->socket) > 0) {
 					server->last_tick = SYS_TMR_TickCountGet();
-					if (debug) console_print("%s server connection from %u.%u.%u.%u.\n",
-						server->protocol, ip.v[0], ip.v[1], ip.v[2], ip.v[3]);
-				} else {
-					if (debug) console_print("%s server connection from unknown peer.\n",
-						server->protocol);
-				}
-				status = tasks(server);
-				if (status >= 0) {
-					server->state = S_SERVING;
-				} else {
-					if (debug) console_print("%s server socket closed.\n",
+				} else if (SYS_TMR_TickCountGet() - server->last_tick 
+						>  (server->tcp_timeout * 1000u)) {
+					if (debug) console_print("%s server timeout, closing socket.\n",
 						server->protocol);			
-					server->state = S_CLOSE;
+					TCPIP_TCP_Close(server->socket);
+					server->socket = INVALID_SOCKET;
 				}
 			}
-		}
-		break;
-
-		case S_SERVING: {
-			if (!TCPIP_TCP_IsConnected(server->socket) ||
-					TCPIP_TCP_WasDisconnected(server->socket)) {
-				if (debug) console_print("%s server socket closed.\n",
-					server->protocol);
-				server->state = S_CLOSE;
-			} else {
-				if (server->tcp_timeout > 0) {
-					if (TCPIP_TCP_GetIsReady(server->socket) > 0) {
-						server->last_tick = SYS_TMR_TickCountGet();
-					} else if (SYS_TMR_TickCountGet() - server->last_tick 
-							>  (server->tcp_timeout * 1000u)) {
-						if (debug) console_print("%s server timeout, closing socket.\n",
-							server->protocol);			
-						server->state = S_CLOSE;
-					}
-				}
+			if (server->socket != INVALID_SOCKET) { 
 				status = tasks(server);
+				server->sock_init = false;
 				if (status < 0) {
 					if (debug) console_print("%s server socket closed.\n",
 						server->protocol);			
-					server->state = S_CLOSE;
+					TCPIP_TCP_Close(server->socket);
+					server->socket = INVALID_SOCKET;
 				}
 			}
 		}
-		break;
-		
-		case S_CLOSE: {
-			TCPIP_TCP_Close(server->socket);
-			server->socket = INVALID_SOCKET;
-			server->state = S_OPEN_SERVER;
-		}
-		break;
-		
-		case S_ERROR: {
-			if (server_network_up()) {
-				server->state = S_WAIT_STACK;
-			}
-		}
-		break;
-		
-		case S_DISABLED: {
-			static bool flag = true;
-			if (flag) {
-				console_print("%s server disabled.\n", server->protocol);
-				flag = false;		
-			}
-		}
-		break;
-		
-		default: {
-			static bool flag = true;
-			if (flag) {
-				console_print("%s server in unknown state.\n", server->protocol);
-				flag = false;		
-			}
-		}
-		break;
 	}
+	
+	if (server->socket == INVALID_SOCKET && server->queue[0] != INVALID_SOCKET) {
+		server->socket = server->queue[0];
+		server->sock_init = true;
+		server->last_tick = SYS_TMR_TickCountGet();
+		for (int i = 0; i < EEM_TCB_QUEUE_SIZE-1; i++) {
+			server->queue[i] = server->queue[i+1];
+		}
+		server->queue[EEM_TCB_QUEUE_SIZE-1] = INVALID_SOCKET;
+	}
+	
+	if (server->listening != INVALID_SOCKET) {
+		if (TCPIP_TCP_IsConnected(server->listening)) {
+			if (TCPIP_TCP_SocketInfoGet(server->listening, &sock_info)) {
+				IPV4_ADDR ip = sock_info.remoteIPaddress.v4Add;
+				if (debug) console_print("%s connection from %u.%u.%u.%u.\n",
+					server->protocol, ip.v[0], ip.v[1], ip.v[2], ip.v[3]);
+			} else {
+				if (debug) console_print("%s connection from unknown peer.\n",
+					server->protocol);
+			}
+			bool queued = false;
+			for (int i = 0; i < EEM_TCB_QUEUE_SIZE; i++) {
+				if (server->queue[i] == INVALID_SOCKET) {
+					server->queue[i] = server->listening;
+					queued = true;
+					if (server->socket != INVALID_SOCKET) 
+						console_print("%s connection waiting in queue.\n",
+							server->protocol);
+					break;
+				}
+			}
+			if (!queued) {
+				TCPIP_TCP_Close(server->listening);
+			}
+			server->listening = INVALID_SOCKET;
+		}
+	}
+
+	if (server->listening == INVALID_SOCKET) {
+		server->listening = TCPIP_TCP_ServerOpen(IP_ADDRESS_TYPE_IPV4, server->port, 0);
+		if (server->listening == INVALID_SOCKET) {
+			static bool flag = false;
+			if (flag) console_print("%s server failed to open socket on %s:%d.\n",
+				server->protocol, server->ip_str, server->port);
+			flag = true;
+		} else {
+			if (debug) console_print("%s server listening for connection on %s:%d.\n",
+				server->protocol, server->ip_str, server->port);
+		}
+	}
+	
+	return;
 }
 
 /*

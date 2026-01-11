@@ -54,6 +54,13 @@ extern bool debug;
 #define DEFAULT_TELNET_PORT 23
 
 /*
+	The length of the TCP socket queue. This is the number of sockets that
+	can be opened by a server. Only the socket at the front of the queue
+	gets serviced. The others wait.
+*/
+#define EEM_TCB_QUEUE_SIZE 4
+
+/*
 	The module is the EEM circuit board. The A3053A is the first EEM circuit
 	board, with an inconvenient allocation of PIC32MZ pins to the mPCIe bus. The
 	A3053B is the second EEM, which has a more convenient allocation. We define

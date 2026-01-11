@@ -231,21 +231,6 @@ int tcp_flush(void *context);
 int tcp_writeall(void *context, const uint8_t *buf, uint16_t len);
 
 /*
- 	The tcpip_server_state structure defines the states of our generic TCP/IP server process.
-*/
-typedef enum {
-    S_WAIT_STACK,
-    S_WAIT_IP,
-    S_OPEN_SERVER,
-    S_LISTENING,
-    S_CONNECTED,
-    S_SERVING,
-    S_CLOSE,
-    S_ERROR,
-    S_DISABLED
-} tcpip_server_state_type;
-
-/*
 	The tcpip_server_type structure provides a complete description of one of
 	our TCP/IP servers. The protocol string holds the name of the protocol. The
 	socket field holds a TCP socket index. The server state is an enumerated
@@ -268,14 +253,18 @@ typedef enum {
 	argument.
 */
 typedef struct {
+ 	bool network_up;
+ 	bool ip_assigned;
+ 	bool sock_init;
+	bool logged_in;
 	const char *protocol;
-	TCP_SOCKET socket;
- 	tcpip_server_state_type state;
-	uint16_t port;
 	char ip_str[EEM_CONFIG_STR_SIZE];
+	uint16_t port;
 	uint32_t tcp_timeout;
 	uint32_t last_tick;
-	bool logged_in;
+	TCP_SOCKET socket;
+	TCP_SOCKET listening;
+	TCP_SOCKET queue[EEM_TCB_QUEUE_SIZE];
 } tcpip_server_type;
 
 /*
