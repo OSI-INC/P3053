@@ -168,10 +168,9 @@ build: $(OUTPUT_FILE)
 # When we clean, we remove all files and directories in the object and
 # distribution directory trees.
 #
-clean:
+clean: remove
 	@printf "$(YELLOW)Cleaning build directories$(RESET)\n"
-	find build/release -mindepth 1 -delete
-	find build/debug -mindepth 1 -delete
+	find build -mindepth 1 -delete
 
 #
 # The remove target removes the output file so that we can, by calling

@@ -47,7 +47,7 @@
 	LWDAQ Server routines and configuration.
 */
 extern tcpip_server_type lwdaq_server;
-int lwdaq_tasks(tcpip_server_type* s);
+int lwdaq_tasks(tcpip_server_type *s);
 
 #endif
 
