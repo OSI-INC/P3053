@@ -627,29 +627,46 @@ int server_info(char *out) {
 }
 
 /*
-	tcpip_server manages connections to a TCP/IP server and deploys a custom
-	server to them using a call-back function we provide. To service a
-	socket, the server routine calls this task procedure. It creates a listening
-	socket. It places connected sockets in a queue. It services connections in
-	the order they are received. It applies a timeout to the serviced
-	connection.
+	tcpip_server manages connections to a TCP/IP server and deploys a messaging
+	protocol to them using a messaging task function we provide. To service a
+	socket, the server routine calls this task function, passing to the task
+	function the complete server record, which includes a handle to the socket.
 
-	The tcpip_server is a sequence of conditional clauses that implement the server
-	logic with the help of a few flags, an active socket, a listening socket, and
-	a socket queue. The routine does not block unless its protocol task provided to it blocks.
-	The task procedure is permitted to block, but it must call tcp_sock_tick
-	while it is blocking, so as to maintain the TCP/IP stack, and to detect
-	closure of the socket by the client. If the client closes the socket, the
-	protocol task must abort and return a negative value. 
-	
-	Whenever the server receives a connection, it puts the connection at the 
-	back of the queue and opens a new listening socket. If the queue is full, the
-	server closes the new socket immediately.
+	The tcpip_server is a sequence of conditional clauses that implement the
+	server logic with the help of a few flags, an active socket, a listening
+	socket, and a socket queue. The routine does not block unless its protocol
+	task blocks. The protocol task is permitted to block, but it must call
+	tcp_sock_tick while it is blocking, so as to maintain the TCP/IP stack, and
+	to detect closure of the socket by the client. If the client closes the
+	socket, the protocol task must abort and return a negative value.
 
-	The protocol tasks call-back function takes as a parameter the server status
-	record, which includes an initialization flag and the socket handle. The server
-	sets the initialization flag before the first call to the tasks routine on a
-	new socket. It clears the flag after this first call.
+	The server begins its activities by opening a listening socket on the port
+	named in its server record. When it receives a connection, it puts the
+	connection at the back of its socket queue and opens a new listening socket.
+	If the queue is full, the server closes the new socket immediately. In the
+	server record, the listening socket is the one called "listening". The one
+	called "socket" is the one that the protocol call-back function will operate
+	upon. We call it the "active" socket.
+
+	If the active socket is open, the server calls the protocol task function to
+	service the socket. But if the active socket is no longer open, and there is
+	an open socket at the front of the socket queue, the server makes this
+	socket the active socket and moves all the sockets in the queue one step
+	forwards. Once a socket is made active, the server begins a timeout
+	countdown. The countdown resets every time the server sees that the socket
+	input buffer is not empty. The connection ends when the client closes the
+	socket or when the timeout expires. Only then will the next socket in the
+	queue be serviced.
+
+	The protocol task call-back function takes as a parameter the server status
+	record, which includes an initialization flag and a socket handle. The
+	server sets the initialization flag before the first call to the tasks
+	routine on a new socket and clears it after. The task function can use the
+	initialization flag to initialize itself. It uses the socket handle to
+	communicate with the client. A negative return value indicates an error or
+	misbehavior on the part of the client. The server will close the socket when
+	it sees a negative return value. The task call-back function should not
+	close the socket itself.
 */
 void tcpip_server(tcpip_server_type *server, tcpip_tasks_type tasks) {
 
@@ -715,35 +732,37 @@ void tcpip_server(tcpip_server_type *server, tcpip_tasks_type tasks) {
 		}
 	}
 	
-	if (server->socket != INVALID_SOCKET) { 
+	if (server->socket != INVALID_SOCKET) {
+		bool close_socket = false;
 		if (!TCPIP_TCP_IsConnected(server->socket) ||
 				TCPIP_TCP_WasDisconnected(server->socket)) {
-			if (debug) console_print("%s server socket closed.\n",
-				server->protocol);
-			TCPIP_TCP_Close(server->socket);
-			server->socket = INVALID_SOCKET;
+			console_print("%s socket %d closed by client.\n", 
+				server->protocol, (int) server->socket);
+			close_socket = true;
 		} else {
 			if (server->tcp_timeout > 0) {
 				if (TCPIP_TCP_GetIsReady(server->socket) > 0) {
 					server->last_tick = SYS_TMR_TickCountGet();
 				} else if (SYS_TMR_TickCountGet() - server->last_tick 
 						>  (server->tcp_timeout * 1000u)) {
-					if (debug) console_print("%s server timeout, closing socket.\n",
-						server->protocol);			
-					TCPIP_TCP_Close(server->socket);
-					server->socket = INVALID_SOCKET;
+					console_print("%s socket %d timeout, closing socket.\n",
+						server->protocol, (int) server->socket);	
+					close_socket = true;		
 				}
 			}
 			if (server->socket != INVALID_SOCKET) { 
 				status = tasks(server);
 				server->sock_init = false;
 				if (status < 0) {
-					if (debug) console_print("%s server socket closed.\n",
-						server->protocol);			
-					TCPIP_TCP_Close(server->socket);
-					server->socket = INVALID_SOCKET;
+					console_print("%s socket %d closed by protocol rules.\n",
+						server->protocol, (int) server->socket);			
+					close_socket = true;
 				}
 			}
+		}
+		if (close_socket) {
+			TCPIP_TCP_Close(server->socket);
+			server->socket = INVALID_SOCKET;
 		}
 	}
 	
@@ -755,17 +774,21 @@ void tcpip_server(tcpip_server_type *server, tcpip_tasks_type tasks) {
 			server->queue[i] = server->queue[i+1];
 		}
 		server->queue[EEM_TCB_QUEUE_SIZE-1] = INVALID_SOCKET;
+		console_print("%s socket %d activated.\n",
+			server->protocol, (int) server->socket);
 	}
 	
 	if (server->listening != INVALID_SOCKET) {
 		if (TCPIP_TCP_IsConnected(server->listening)) {
 			if (TCPIP_TCP_SocketInfoGet(server->listening, &sock_info)) {
 				IPV4_ADDR ip = sock_info.remoteIPaddress.v4Add;
-				if (debug) console_print("%s connection from %u.%u.%u.%u.\n",
-					server->protocol, ip.v[0], ip.v[1], ip.v[2], ip.v[3]);
+				console_print("%s connection from %u.%u.%u.%u to socket %d.\n",
+					server->protocol, 
+					ip.v[0], ip.v[1], ip.v[2], ip.v[3], 
+					(int) server->listening);
 			} else {
-				if (debug) console_print("%s connection from unknown peer.\n",
-					server->protocol);
+				console_print("%s connection from unknown peer to socket %d.\n",
+					server->protocol, (int) server->listening);
 			}
 			bool queued = false;
 			for (int i = 0; i < EEM_TCB_QUEUE_SIZE; i++) {
@@ -773,8 +796,8 @@ void tcpip_server(tcpip_server_type *server, tcpip_tasks_type tasks) {
 					server->queue[i] = server->listening;
 					queued = true;
 					if (server->socket != INVALID_SOCKET) 
-						console_print("%s connection waiting in queue.\n",
-							server->protocol);
+						console_print("%s socket %d waiting in queue.\n",
+							server->protocol, (int) server->listening);
 					break;
 				}
 			}
@@ -789,11 +812,11 @@ void tcpip_server(tcpip_server_type *server, tcpip_tasks_type tasks) {
 		server->listening = TCPIP_TCP_ServerOpen(IP_ADDRESS_TYPE_IPV4, server->port, 0);
 		if (server->listening == INVALID_SOCKET) {
 			static bool flag = false;
-			if (flag) console_print("%s server failed to open socket on %s:%d.\n",
+			if (flag) console_print("%s failed to open listening socket on %s:%d.\n",
 				server->protocol, server->ip_str, server->port);
 			flag = true;
 		} else {
-			if (debug) console_print("%s server listening for connection on %s:%d.\n",
+			console_print("%s listening for connection on %s:%d.\n",
 				server->protocol, server->ip_str, server->port);
 		}
 	}

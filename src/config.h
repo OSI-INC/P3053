@@ -37,7 +37,7 @@
 	software, we give it a default value, and initialize a global variable with
 	this default value.
 */
-#define EEM_DEBUG_DEFAULT true
+#define EEM_DEBUG_DEFAULT false
 extern bool debug;
 
 /*
