@@ -88,7 +88,8 @@ static inline void pic_d5_toggle(void) {GPIO_PortToggle(GPIO_PORT_A, 0x00000004)
 
 /*
 	mpcie_cw_assert drives /CW low to indicate an MPCIE bus write cycle. After
-	we assert CW, we can set the PIC controller data bus pins to be outputs.
+	we assert CW, we can set the PIC controller data bus pins to be outputs. We
+	assume the controller will turn off its line drivers immediately.
 */
 static inline void mpcie_cw_assert(void) {
 	LATDCLR = MPCIE_CW_RD5;
@@ -113,7 +114,8 @@ static inline void mpcie_data_output(void) {
 
 /*
 	mpcie_data_input sets the controller data bus pins on the PIC as inputs. Must
-	preceed unasserting Controle Write (/CW).
+	preceed unasserting Controle Write (/CW). We assume the PIC will turn off its
+	line drivers immediately.
 */
 static inline void mpcie_data_input(void) {
     TRISCSET = MPCIE_CD_MASK_RC;   // RC13, RC14 as inputs
@@ -121,95 +123,61 @@ static inline void mpcie_data_input(void) {
 }
 
 /*
-	mpcie_ds_assert drives the data strobe LO, which asserts data strobe.
+	mpcie_ds_assert drives asserts data strobe by driving the /DS line low.
 	Indicates that data is valid on a write cycle. Indicates that data is
-	requested on a read cycle. In both cases, we must leave DS asserted
-	long enough for the controller to respond. 
+	requested on a read cycle. We insert a setup delay before DS to allow
+	address and data lines to settle. We insert a hold delay after DS to allow
+	time for the controller to respond. We make the delay out of PIC "nop"
+	instructions, or "no operation" instructions. Each of these takes 5 ns for a
+	PIC clock speed of 200 MHz, so ten of them are 25 ns and twenty are 50 ns.
+	Our controllers interfaces run off either a 40-MHz or 80-MHz clock. We use
+	setup/hold of 50/100 ns for the 40-MHz interfaces and 25/50 ns for the
+	80-MHz interfaces. We use a compiler flag to control the length of the
+	delays.
 */
 static inline void mpcie_ds_assert(void)   {
+
+	__asm__ volatile (
+		"nop\n\t"
+		"nop\n\t"
+		"nop\n\t"
+		"nop\n\t"
+		"nop\n\t"
+		"nop\n\t"
+		"nop\n\t"
+		"nop\n\t"
+		"nop\n\t"
+		"nop\n\t"
+     );    
+     
+#ifdef MPCIE_SLOW_ACCESS
+	__asm__ volatile (
+		"nop\n\t"
+		"nop\n\t"
+		"nop\n\t"
+		"nop\n\t"
+		"nop\n\t"
+		"nop\n\t"
+		"nop\n\t"
+		"nop\n\t"
+		"nop\n\t"
+		"nop\n\t"
+     );    
+#endif
+
 	LATDCLR = MPCIE_DS_RD4;
-}
-
-/*
-	mpcie_ds_unassert drives the data strobe HI, which unasserts data strobe.
-*/
-static inline void mpcie_ds_unassert(void) {
-	LATDSET = MPCIE_DS_RD4;
-}
-
-/*
-	mpcie_addr_set drives the controller address bus with the specified address.
-*/
-static inline void mpcie_addr_set(uint8_t addr) {
-    LATC = (LATC & ~MPCIE_CA_MASK_RC) | ((uint32_t)(addr & 0x0Fu) << 1);
-    LATE = (LATE & ~MPCIE_CA_MASK_RE) | ((uint32_t)(addr >> 4) & 0x03u);
-}
-
-/*
-	mpcie_data_set assigns the controller interface data pins with the specified
-	value. Note that this value will not appear on the data pins unless the pins
-	are set as outputs. We have RC13 as bit0, RC14 as bit1, and RE2-RE7 as
-	bit2-bit7.
-*/
-static inline void mpcie_data_set(uint8_t data) {
-	LATC = (LATC & ~MPCIE_CD_MASK_RC) | ((uint32_t) (data & 0x03u) << 13);
-	LATE = (LATE & ~MPCIE_CD_MASK_RE) | ((uint32_t) (data & 0xFCu));
-}
-
-/*
-	mpcie_data_get obtains the byte value on the controller interface data pins.
-	This byte value is whatever is on the pins. We have to compose a byte from
-	the various PIC pins we have assigned to the data bus, but this turns out to
-	be straightforward: we take PORTC and shift it thirteen times to the right,
-	at which point RC14 is in bit1 and RC13 is in bit0, so we AND it with 0x03. We
-	take PORTE and we AND it immediately with 0xFC so that we get the bits
-	RE2..RE7 in positions bit2..bit7. We OR these two bytes together and we have our
-	value.
-*/
-static inline uint8_t mpcie_data_get(void) {
-    uint8_t value = 0;
-    uint32_t c = PORTC;
-    uint32_t e = PORTE;
-
-	value = (uint8_t) ((c >> 13) & 0x03u) | (e  & 0xFCu);
-
-    return value;
-}
-
-/*
-	mpcie_byte_write writes a byte value to a location in mpcie address space.
-	It begins by setting the address and asserting control write. It waits 
-	while the controller releases the data lines. It sets the data output value
-	and enables the data bus drivers. It waits for these changes to settle. It
-	drives data strobe and waits for the controller to receive the data values,
-	then releases data strobe.
-*/
-static inline void mpcie_byte_write(uint8_t addr, uint8_t data) {
-    mpcie_addr_set(addr);
-    mpcie_data_set(data);
-    mpcie_cw_assert(); 
 
 	__asm__ volatile (
-        "nop\n\t"
-        "nop\n\t"
-        "nop\n\t"
-        "nop\n\t"
-        "nop\n\t"
-     );    
-
-    mpcie_data_output();
-    
-	__asm__ volatile (
-        "nop\n\t"
-        "nop\n\t"
-        "nop\n\t"
-        "nop\n\t"
-        "nop\n\t"
-     );    
-
-    mpcie_ds_assert();
-
-	__asm__ volatile (
+		"nop\n\t"
+		"nop\n\t"
+		"nop\n\t"
+		"nop\n\t"
+		"nop\n\t"
+		"nop\n\t"
+		"nop\n\t"
+		"nop\n\t"
+		"nop\n\t"
+		"nop\n\t"
 		"nop\n\t"
 		"nop\n\t"
 		"nop\n\t"
@@ -247,7 +215,67 @@ static inline void mpcie_byte_write(uint8_t addr, uint8_t data) {
      );    
 #endif
 
-   mpcie_ds_unassert();
+}
+
+/*
+	mpcie_ds_unassert drives the data strobe HI, which unasserts data strobe.
+*/
+static inline void mpcie_ds_unassert(void) {
+	LATDSET = MPCIE_DS_RD4;
+}
+
+/*
+	mpcie_addr_set drives the controller address bus with the specified address.
+*/
+static inline void mpcie_addr_set(uint8_t addr) {
+    LATC = (LATC & ~MPCIE_CA_MASK_RC) | ((uint32_t)(addr & 0x0Fu) << 1);
+    LATE = (LATE & ~MPCIE_CA_MASK_RE) | ((uint32_t)(addr >> 4) & 0x03u);
+}
+
+/*
+	mpcie_data_set assigns the controller interface data pins with the specified
+	value. Note that this value will not appear on the data pins unless the pins
+	are set as outputs. We have RC13 as bit0, RC14 as bit1, and RE2-RE7 as
+	bit2-bit7. We insert a delay to allow the data lines to settle.
+*/
+static inline void mpcie_data_set(uint8_t data) {
+	LATC = (LATC & ~MPCIE_CD_MASK_RC) | ((uint32_t) (data & 0x03u) << 13);
+	LATE = (LATE & ~MPCIE_CD_MASK_RE) | ((uint32_t) (data & 0xFCu));
+}
+
+/*
+	mpcie_data_get obtains the byte value on the controller interface data pins.
+	This byte value is whatever is on the pins. We have to compose a byte from
+	the various PIC pins we have assigned to the data bus, but this turns out to
+	be straightforward: we take PORTC and shift it thirteen times to the right,
+	at which point RC14 is in bit1 and RC13 is in bit0, so we AND it with 0x03. We
+	take PORTE and we AND it immediately with 0xFC so that we get the bits
+	RE2..RE7 in positions bit2..bit7. We OR these two bytes together and we have our
+	value.
+*/
+static inline uint8_t mpcie_data_get(void) {
+    uint8_t value = 0;
+    uint32_t c = PORTC;
+    uint32_t e = PORTE;
+	value = (uint8_t) ((c >> 13) & 0x03u) | (e  & 0xFCu);
+    return value;
+}
+
+/*
+	mpcie_byte_write writes a byte value to a location in mpcie address space.
+	It begins by setting the address and asserting control write. It waits 
+	while the controller releases the data lines. It sets the data output value
+	and enables the data bus drivers. It waits for these changes to settle. It
+	drives data strobe and waits for the controller to receive the data values,
+	then releases data strobe.
+*/
+static inline void mpcie_byte_write(uint8_t addr, uint8_t data) {
+    mpcie_addr_set(addr);
+    mpcie_data_set(data);
+    mpcie_cw_assert(); 
+    mpcie_data_output();
+    mpcie_ds_assert();
+	mpcie_ds_unassert();
 }
 
 /*
@@ -260,50 +288,7 @@ static inline void mpcie_byte_write(uint8_t addr, uint8_t data) {
 */
 static inline void mpcie_byte_write_repeat(uint8_t addr, uint8_t data) {
 	mpcie_data_set(data); 
-	
-	__asm__ volatile (
-		"nop\n\t"
-		"nop\n\t"
-		"nop\n\t"
-		"nop\n\t"
-		"nop\n\t"
-     );    
-
 	mpcie_ds_assert();
-
-	__asm__ volatile (
-		"nop\n\t"
-		"nop\n\t"
-		"nop\n\t"
-		"nop\n\t"
-		"nop\n\t"
-     );    
-
-#ifdef MPCIE_SLOW_ACCESS
-	__asm__ volatile (
-		"nop\n\t"
-		"nop\n\t"
-		"nop\n\t"
-		"nop\n\t"
-		"nop\n\t"
-		"nop\n\t"
-		"nop\n\t"
-		"nop\n\t"
-		"nop\n\t"
-		"nop\n\t"
-		"nop\n\t"
-		"nop\n\t"
-		"nop\n\t"
-		"nop\n\t"
-		"nop\n\t"
-		"nop\n\t"
-		"nop\n\t"
-		"nop\n\t"
-		"nop\n\t"
-		"nop\n\t"
-     );    
-#endif
-
     mpcie_ds_unassert();
 }
 
@@ -315,67 +300,14 @@ static inline void mpcie_byte_write_repeat(uint8_t addr, uint8_t data) {
 	data lines.
 */
 static inline uint8_t mpcie_byte_read(uint8_t addr) {
-    uint8_t value;
-    mpcie_addr_set(addr);
-    mpcie_data_input();
-    mpcie_cw_unassert(); 
-    
-	__asm__ volatile (
-        "nop\n\t"
-        "nop\n\t"
-        "nop\n\t"
-        "nop\n\t"
-        "nop\n\t"
-        "nop\n\t"
-        "nop\n\t"
-        "nop\n\t"
-        "nop\n\t"
-        "nop\n\t"
-     );    
-
-    mpcie_ds_assert();
-    
-	__asm__ volatile (
-        "nop\n\t"
-        "nop\n\t"
-        "nop\n\t"
-        "nop\n\t"
-        "nop\n\t"
-        "nop\n\t"
-        "nop\n\t"
-        "nop\n\t"
-        "nop\n\t"
-        "nop\n\t"
-     );    
-
-#ifdef MPCIE_SLOW_ACCESS
-	__asm__ volatile (
-		"nop\n\t"
-		"nop\n\t"
-		"nop\n\t"
-		"nop\n\t"
-		"nop\n\t"
-		"nop\n\t"
-		"nop\n\t"
-		"nop\n\t"
-		"nop\n\t"
-		"nop\n\t"
-		"nop\n\t"
-		"nop\n\t"
-		"nop\n\t"
-		"nop\n\t"
-		"nop\n\t"
-		"nop\n\t"
-		"nop\n\t"
-		"nop\n\t"
-		"nop\n\t"
-		"nop\n\t"
-     );    
-#endif
-
-    value = mpcie_data_get();
-    mpcie_ds_unassert();
-    return value;
+	uint8_t value;
+	mpcie_addr_set(addr);
+	mpcie_data_input();
+	mpcie_cw_unassert(); 
+	mpcie_ds_assert();
+	value = mpcie_data_get();
+	mpcie_ds_unassert();
+	return value;
 }
 
 /*
@@ -388,49 +320,10 @@ static inline uint8_t mpcie_byte_read(uint8_t addr) {
 	LWDAQ controllers.
 */
 static inline uint8_t mpcie_byte_read_repeat(void) {
-    mpcie_ds_assert();
-
-	__asm__ volatile (
-        "nop\n\t"
-        "nop\n\t"
-        "nop\n\t"
-        "nop\n\t"
-        "nop\n\t"
-        "nop\n\t"
-        "nop\n\t"
-        "nop\n\t"
-        "nop\n\t"
-        "nop\n\t"
-     );    
-
-#ifdef MPCIE_SLOW_ACCESS
-	__asm__ volatile (
-		"nop\n\t"
-		"nop\n\t"
-		"nop\n\t"
-		"nop\n\t"
-		"nop\n\t"
-		"nop\n\t"
-		"nop\n\t"
-		"nop\n\t"
-		"nop\n\t"
-		"nop\n\t"
-		"nop\n\t"
-		"nop\n\t"
-		"nop\n\t"
-		"nop\n\t"
-		"nop\n\t"
-		"nop\n\t"
-		"nop\n\t"
-		"nop\n\t"
-		"nop\n\t"
-		"nop\n\t"
-	);
-#endif
-
-    uint8_t v = mpcie_data_get();
-    mpcie_ds_unassert();
-    return v;
+	mpcie_ds_assert();
+	uint8_t v = mpcie_data_get();
+	mpcie_ds_unassert();
+	return v;
 }
 
 /*

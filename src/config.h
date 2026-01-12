@@ -61,6 +61,15 @@ extern bool debug;
 #define EEM_TCB_QUEUE_SIZE 4
 
 /*
+	The power-up wait delays checking the configuration switch until the
+	motherboard is ready. Note that the power-up wait will not be effective when
+	we load the EEM into a powered mPCIe socket because the contacts will be
+	unreliable as the EEM is powering up. When we plug the EEM into a life mPCIe
+	socket, we might see an unwanted reset to factory default configuration.
+*/
+#define EEM_POWERUP_WAIT_MS 200
+
+/*
 	The module is the EEM circuit board. The A3053A is the first EEM circuit
 	board, with an inconvenient allocation of PIC32MZ pins to the mPCIe bus. The
 	A3053B is the second EEM, which has a more convenient allocation. We define
@@ -92,7 +101,7 @@ extern bool debug;
 	the motherboard.
 
 */
-#define EEM_MOTHERBOARD_NAME "A2071"
+#define EEM_MOTHERBOARD_NAME "A3042"
 #define EEM_MOTHERBOARD_A3042
 
 /*
