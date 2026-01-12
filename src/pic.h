@@ -186,6 +186,7 @@ static inline uint8_t mpcie_data_get(void) {
 */
 static inline void mpcie_byte_write(uint8_t addr, uint8_t data) {
     mpcie_addr_set(addr);
+    mpcie_data_set(data);
     mpcie_cw_assert(); 
 
 	__asm__ volatile (
