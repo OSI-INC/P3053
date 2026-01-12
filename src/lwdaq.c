@@ -548,9 +548,9 @@ int lwdaq_handle_message(tcpip_server_type *server,
 			if (debug) console_print("CONFIG_WRITE in %s.\n",__func__);
 			if (server->logged_in || eem_config_active.seclevel == 0) {
 				if (len<CONFIG_LENGTH) {
-					if (debug) console_print("Accepted: config %d characters.\n",len);
+					if (debug) console_print("Accepted config %d characters:\n",len);
 					content[len]=0x00;
-					console_print("%s",(char*) content);
+					if (debug) console_print("%s",(char*) content);
 					config = eem_config_active;
 					lwdaq_config_from_str(&config, (char*) content);
 					eem_config_write(&config);

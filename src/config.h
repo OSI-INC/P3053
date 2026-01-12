@@ -92,7 +92,7 @@ extern bool debug;
 	the motherboard.
 
 */
-#define EEM_MOTHERBOARD_NAME "A3042"
+#define EEM_MOTHERBOARD_NAME "A2071"
 #define EEM_MOTHERBOARD_A3042
 
 /*

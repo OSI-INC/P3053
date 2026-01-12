@@ -350,9 +350,9 @@ void cli_debug(cli_chan_type *ch, char *args) {
 
 	if (!verb_received) {
 		if (debug) {
-			cli_message(ch, "ON\n");
+			cli_message(ch, "on\n");
 		} else {
-			cli_message(ch, "OFF\n");
+			cli_message(ch, "off\n");
 		}
 	} else {
 		debug = set_flag;

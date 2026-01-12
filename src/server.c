@@ -49,8 +49,8 @@
 eem_config_type eem_config_active;
 
 /*
-	eem_config_write writes a EEM configuration record to the flash
-	configuration address in flash memory.
+	eem_config_write writes a EEM configuration record to the flash memory at a
+	location given by the configuration address.
 */
 int eem_config_write(const eem_config_type *config_ptr) {
 	return pic_flash_putbytes(
