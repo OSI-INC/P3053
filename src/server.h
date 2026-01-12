@@ -287,8 +287,12 @@ int server_info(char *out);
  	generic TCP/IP server. It must take as argument a tcpip_server_info
  	structure. If it blocks the server, it must call tcp_sock_tick while it
  	is blocking. If tcp_sock_tick returns a negative value, the task must
- 	abort and return a negative value itself.
+ 	abort and return a negative value itself. We include below the negative
+ 	value error codes.
 */
+#define EEM_SOCK_ERR -1
+#define EEM_SOCK_END -2
+#define EEM_SOCK_SIN -3
 typedef int (*tcpip_tasks_type)(tcpip_server_type *s);
 
 /*

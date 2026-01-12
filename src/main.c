@@ -208,10 +208,14 @@ int telnet_tasks(tcpip_server_type *server) {
 		case CLI_FAIL:
 			server->logged_in = false;
 			return 0;
-			
+		
+		case CLI_CLOSE:
+			server->logged_in = false;
+			return EEM_SOCK_END;
+
 		default:
 			server->logged_in = false;
-			return -1;
+			return EEM_SOCK_ERR;
 	} 
 }
 
@@ -354,6 +358,7 @@ int main (void) {
 		lamp_signal(5e5);
 	}
 	
+	// If we ever get here, we should return with a failure code.
 	return (EXIT_FAILURE);
 }
 

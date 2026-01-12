@@ -663,10 +663,14 @@ int server_info(char *out) {
 	server sets the initialization flag before the first call to the tasks
 	routine on a new socket and clears it after. The task function can use the
 	initialization flag to initialize itself. It uses the socket handle to
-	communicate with the client. A negative return value indicates an error or
-	misbehavior on the part of the client. The server will close the socket when
-	it sees a negative return value. The task call-back function should not
-	close the socket itself.
+	communicate with the client. The server will close the socket whenever it
+	sees a negative return value. The task call-back function should not close
+	the socket itself. A return value of EEM_SOCK_ERR indicates that the client
+	has closed the socket. A return value of EEM_SOCK_END indicates that the
+	client has requested that the socket be closed, ending the connection. A
+	return value of EEM_SOCK_SIN indicates that the protocol has detected
+	misbehavior on the part of the client and is closing the socket
+	unilaterally. 
 */
 void tcpip_server(tcpip_server_type *server, tcpip_tasks_type tasks) {
 
@@ -677,10 +681,20 @@ void tcpip_server(tcpip_server_type *server, tcpip_tasks_type tasks) {
 	const char *interface_name, *host_name;
 	int status;
 	
+	// We disable the server by setting the port to zero. This way, we can 
+	// disable or enable servers using the EEM configuration record rather
+	// than by setting flags in our source code.
 	if (server->port == 0) return;
 	
+	// The network_up flag must be cleared to false. So long as it is cleared,
+	// we will do nothing more than check this flag and see if the network is up
+	// and running. When the networks is ready to negotiate or assert its
+	// address, we will set the flag. We have another local static flag that
+	// controls our console announcements about the state of the network
+	// interface.
 	if (!server->network_up) {
 		static bool flag = true;
+		server->ip_assigned = false;
 		tcpip_status = TCPIP_STACK_Status(sysObj.tcpip);
 		if (tcpip_status < 0) {
 			if (flag) {
@@ -703,11 +717,17 @@ void tcpip_server(tcpip_server_type *server, tcpip_tasks_type tasks) {
 			console_print("%s server waiting for stack initialization.\n",
 				server->protocol);
 			flag = false;
-		} else {
-			return;
 		}
+		return;
 	}
 
+	// We get here only if the network is up. Now we are waiting for an address.
+	// The ip_assigned flag has been cleared while we waited for the network to
+	// come up. Now we check to see if we have a network address, and if so, we
+	// set the flag and initialize all the sockets in our queue, our listening
+	// socket, and our active socket, to the invalid socket value. At the end of
+	// this clause, we always return. We want to allow the main loop to call the
+	// tcpip_tick routine and do other things.
 	if (!server->ip_assigned) {
 		net_hdl = TCPIP_STACK_IndexToNet(0);
 		if (TCPIP_STACK_NetIsReady(net_hdl)) {
@@ -727,16 +747,31 @@ void tcpip_server(tcpip_server_type *server, tcpip_tasks_type tasks) {
 			for (int i = 0; i < EEM_TCB_QUEUE_SIZE; i++) {
 				server->queue[i] = INVALID_SOCKET;
 			}
-		} else {
-			return;
 		}
+		return;
 	}
 	
+	// If our active socket is open, which is to say: it is not marked as
+	// invalid, we service the socket. If we find the socket has been closed by
+	// the client, or it has timed out, or the protocol task routine returns an
+	// error code, we close the socket at the server end and mark it as invalid,
+	// which is to say: we mark it as closed. We use the socket handle itself as
+	// an identifier, which we can do because the handle is just a sixteen-bit
+	// index into a table of socket records. So we will have small positive
+	// integer values for the socket idendifier, and these will be re-used as
+	// sockets close and are opened again. We will see multiple identifiers when
+	// the queue is used to save connections until we are ready to service them.
+	// The invalid socket constant is just 0xFFFF, or sixteen-bit negative one,
+	// so if we ever see "-1" as our socket identifier, we are printing out the
+	// identifier of an invalid socket. At the end of this clause we do not
+	// return: we must allow the listening socket and queue to be maintained, so
+	// we cannot return after servicing the active socket.
 	if (server->socket != INVALID_SOCKET) {
 		bool close_socket = false;
 		if (!TCPIP_TCP_IsConnected(server->socket) ||
 				TCPIP_TCP_WasDisconnected(server->socket)) {
-			console_print("%s socket %d closed by client.\n", 
+			if (debug) console_print(
+				"%s socket %d closed by client.\n", 
 				server->protocol, (int) server->socket);
 			close_socket = true;
 		} else {
@@ -745,7 +780,8 @@ void tcpip_server(tcpip_server_type *server, tcpip_tasks_type tasks) {
 					server->last_tick = SYS_TMR_TickCountGet();
 				} else if (SYS_TMR_TickCountGet() - server->last_tick 
 						>  (server->tcp_timeout * 1000u)) {
-					console_print("%s socket %d timeout, closing socket.\n",
+					if (debug) console_print(
+						"%s socket %d timeout, server closing socket.\n",
 						server->protocol, (int) server->socket);	
 					close_socket = true;		
 				}
@@ -754,9 +790,29 @@ void tcpip_server(tcpip_server_type *server, tcpip_tasks_type tasks) {
 				status = tasks(server);
 				server->sock_init = false;
 				if (status < 0) {
-					console_print("%s socket %d closed by protocol rules.\n",
-						server->protocol, (int) server->socket);			
 					close_socket = true;
+					switch (status) {
+						case EEM_SOCK_ERR: {
+							if (debug) console_print(
+								"%s socket %d closed by server after socket error.\n",
+								server->protocol, (int) server->socket);
+						}
+						break;
+						
+						case EEM_SOCK_END: {
+							if (debug) console_print(
+								"%s socket %d closed by server at client request.\n",
+								server->protocol, (int) server->socket);
+						}
+						break; 
+						
+						case EEM_SOCK_SIN: {
+							if (debug) console_print(
+								"%s socket %d closed by server after client error.\n",
+								server->protocol, (int) server->socket);
+						}
+						break;
+					}	
 				}
 			}
 		}
@@ -766,6 +822,12 @@ void tcpip_server(tcpip_server_type *server, tcpip_tasks_type tasks) {
 		}
 	}
 	
+	// If our active socket is invalid, but we have a valid socket at the front
+	// of the queue, we move this valid socket to the active position and shift
+	// all the sockets in the queue one step forwards, filling in the last one
+	// with the invalid socket value. No servicing of manipulating of the
+	// communication channels takes place here, and we do not return after
+	// completing the shift. We still have to attend to the listening socket.
 	if (server->socket == INVALID_SOCKET && server->queue[0] != INVALID_SOCKET) {
 		server->socket = server->queue[0];
 		server->sock_init = true;
@@ -774,51 +836,72 @@ void tcpip_server(tcpip_server_type *server, tcpip_tasks_type tasks) {
 			server->queue[i] = server->queue[i+1];
 		}
 		server->queue[EEM_TCB_QUEUE_SIZE-1] = INVALID_SOCKET;
-		console_print("%s socket %d activated.\n",
+		if (debug) console_print("%s socket %d activated.\n",
 			server->protocol, (int) server->socket);
 	}
 	
+	// If our listening socket is open, we check to see if it has a connection.
+	// If it has a connection, it is no longer a listening socket, but a
+	// connected socket. We move the connected socket to the back of the queue.
+	// If there is no space in the queue, we close the socket. Having moved or
+	// closed the formerly listening socket we set the current listening socket
+	// to the invalid code.
 	if (server->listening != INVALID_SOCKET) {
 		if (TCPIP_TCP_IsConnected(server->listening)) {
 			if (TCPIP_TCP_SocketInfoGet(server->listening, &sock_info)) {
 				IPV4_ADDR ip = sock_info.remoteIPaddress.v4Add;
-				console_print("%s connection from %u.%u.%u.%u to socket %d.\n",
-					server->protocol, 
-					ip.v[0], ip.v[1], ip.v[2], ip.v[3], 
+				if (debug) console_print(
+					"%s connection from %u.%u.%u.%u to socket %d.\n",
+					server->protocol, ip.v[0], ip.v[1], ip.v[2], ip.v[3], 
 					(int) server->listening);
 			} else {
-				console_print("%s connection from unknown peer to socket %d.\n",
+				if (debug) console_print(
+					"%s connection from unknown peer to socket %d.\n",
 					server->protocol, (int) server->listening);
 			}
+			int i = 0;
 			bool queued = false;
-			for (int i = 0; i < EEM_TCB_QUEUE_SIZE; i++) {
+			for (i = 0; i < EEM_TCB_QUEUE_SIZE; i++) {
 				if (server->queue[i] == INVALID_SOCKET) {
 					server->queue[i] = server->listening;
 					queued = true;
-					if (server->socket != INVALID_SOCKET) 
-						console_print("%s socket %d waiting in queue.\n",
-							server->protocol, (int) server->listening);
 					break;
 				}
 			}
-			if (!queued) {
-				TCPIP_TCP_Close(server->listening);
+			if (queued) {
+				if (server->socket != INVALID_SOCKET) 
+					if (debug) console_print(
+						"%s socket %d waiting in queue position %d.\n",
+						server->protocol, (int) server->listening, i);
+			} else {
+				TCPIP_TCP_Close(server->listening);	
+				if (debug) console_print(
+					"%s socket %d closed: queue is full.\n",
+					server->protocol, (int) server->listening);
 			}
 			server->listening = INVALID_SOCKET;
 		}
 	}
 
+	// After we first receive our address, this is the only clause in the server
+	// routine that will be executed. All other sockets are invalid, including
+	// the listening socket itself. We try to open a listening sockeet. If we
+	// fail, we make an announcement and set a flag so that we don't keep making
+	// the same announcement. But we will keep trying to open a listening
+	// socket, and if we succeed, we will announce our success.
 	if (server->listening == INVALID_SOCKET) {
+		static bool flag = true;
 		server->listening = TCPIP_TCP_ServerOpen(IP_ADDRESS_TYPE_IPV4, server->port, 0);
 		if (server->listening == INVALID_SOCKET) {
-			static bool flag = false;
 			if (flag) console_print("%s failed to open listening socket on %s:%d.\n",
 				server->protocol, server->ip_str, server->port);
-			flag = true;
+			flag = false;
 		} else {
-			console_print("%s listening for connection on %s:%d.\n",
-				server->protocol, server->ip_str, server->port);
+			if (debug) console_print("%s socket %d listening for connection on %s:%d.\n",
+				server->protocol, (int) server->listening, server->ip_str, server->port);
+			flag = true;
 		}
+		return;
 	}
 	
 	return;

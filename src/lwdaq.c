@@ -304,7 +304,7 @@ int lwdaq_handle_message(tcpip_server_type *server,
 		console_print(
 			"REJECTED: Immediate login required by security level %d in %s.\n",
 			eem_config_active.seclevel, __func__);
-		return -1;
+		return EEM_SOCK_SIN;
 	}
 
 	switch (id) {
@@ -320,7 +320,7 @@ int lwdaq_handle_message(tcpip_server_type *server,
 			if (len != BYTE_WRITE_LEN) {
 				console_print("ERROR: Length '%d' <> BYTE_WRITE_LEN in %s.\n", 
 					len, __func__);
-				return -1;			
+				return EEM_SOCK_SIN;			
 			}
 			register_addr = content[3];
 			value = content[4];
@@ -338,7 +338,7 @@ int lwdaq_handle_message(tcpip_server_type *server,
 			if (len != BYTE_READ_LEN) {
 				console_print("ERROR: Length '%d' <> BYTE_READ_LEN in %s.\n", 
 					len, __func__);
-				return -1;			
+				return EEM_SOCK_SIN;			
 			}
 			register_addr = content[3];
 			value = mpcie_byte_read(register_addr);
@@ -362,14 +362,14 @@ int lwdaq_handle_message(tcpip_server_type *server,
 			if (len != BYTE_POLL_LEN) {
 				console_print("ERROR: Length '%d' <> BYTE_POLL_LEN in %s.\n", 
 					len, __func__);
-				return -1;			
+				return EEM_SOCK_SIN;			
 			}
 			register_addr = content[3];
 			value = content[4];
 			if (debug) console_print("BYTE_POLL of %d for %d in %s.\n",
 				register_addr, value, __func__);
 			while (mpcie_byte_read(register_addr) != value) {
-				if (tcp_sock_tick(&server->socket) < 0) return -1;
+				if (tcp_sock_tick(&server->socket) < 0) return EEM_SOCK_ERR;
 			}
 		}
 		break;
@@ -432,7 +432,7 @@ int lwdaq_handle_message(tcpip_server_type *server,
 #ifdef ENABLE_FIFO_STROBE
 					mpcie_byte_write(FIFO_STROBE_ADDR, 0);
 					while (mpcie_byte_read(FIFO_STROBE_ADDR) == 0) {
-						if (tcp_sock_tick(&server->socket) < 0) return -1;
+						if (tcp_sock_tick(&server->socket) < 0) return EEM_SOCK_ERR;
 					}
 					tx_buff[i] = mpcie_byte_read(register_addr);
 #else
@@ -447,7 +447,7 @@ int lwdaq_handle_message(tcpip_server_type *server,
 						if (tcp_sock_tick(&server->socket) < 0) {
 							console_print(
 								"ERROR: Failed to write %d bytes in %s.\n", i, __func__);
-							return -1;
+							return EEM_SOCK_ERR;
 						}
 						if (debug && LWDAQ_DEBUG) console_print(
 							"Wrote %u bytes in %s.\n", i, __func__);
@@ -534,7 +534,7 @@ int lwdaq_handle_message(tcpip_server_type *server,
 					strlen(config_str));
 			} else {
 				console_print("REJECTED: Not logged in.\n");
-				return -1;
+				return EEM_SOCK_SIN;
 			}
 		}
 		break;
@@ -557,11 +557,11 @@ int lwdaq_handle_message(tcpip_server_type *server,
 					if (debug) console_print("Wrote new configuration to flash.\n",len);
 				} else {
 					console_print("REJECTED: Configuration string too long.\n",len);
-					return -1;
+					return EEM_SOCK_SIN;
 				}
 			} else {
 				console_print("REJECTED: Not logged in.\n");
-				return -1;
+				return EEM_SOCK_SIN;
 			}
 		}
 		break;
@@ -601,14 +601,14 @@ int lwdaq_handle_message(tcpip_server_type *server,
 				pic_reset();
 			} else {
 				if (debug) console_print("REJECTED: not logged in.\n");
-				return -1;
+				return EEM_SOCK_SIN;
 			}
 		}
 		break;
 
 		default: {
 			if (debug) console_print("ERROR: Unrecognised message in %s.\n", __func__);
-			return -1;
+			return EEM_SOCK_SIN;
 		}
 		break;
 	}
@@ -696,10 +696,11 @@ int lwdaq_tasks(tcpip_server_type *server) {
 	if (rx_buffer[0] != START_CODE) {
 		if (rx_buffer[0] == CLOSE_CODE) {
 			if (debug) console_print("Close code received in %s.\n", __func__);
+			return EEM_SOCK_END;
 		} else {
 			if (debug) console_print("Invalid start code in %s.\n", __func__);
+			return EEM_SOCK_SIN;
 		}
-		return -1;
 	}
 	if (rx_available<CONTENT_OFFSET) return rx_available;
 	
@@ -724,7 +725,7 @@ int lwdaq_tasks(tcpip_server_type *server) {
 	// negative value to indicate an error.
 	if (rx_buffer[len+CONTENT_OFFSET] != END_CODE) {
 		if (debug) console_print("Invalid end code in %s.\n", __func__);
-		return -1;
+		return EEM_SOCK_SIN;
 	}
 	
 	// We appear to have a complete LWDAQ message, so pass it to the message
