@@ -75,10 +75,27 @@ extern bool debug;
 	A3053B is the second EEM, which has a more convenient allocation. We define
 	a name string for the module and a compiler macro that contains the module
 	name. We use the macro to perform conditional compilation that configures
-	the EEM for each particular module.
+	the EEM for each particular module. 
+	
+	Embedded Ethernet Module             A3053A
+	Embedded Ethernet Module             A3053B
+	
+	We define a macro below and use it to define a name string for each of the
+	module versions listed in the table above.
 */
+#define EEM_MODULE_A3053A
+
+#ifdef EEM_MODULE_A3053A
 #define EEM_MODULE_NAME "A3053A"
-#define EEM_MODULE_A3053
+#endif
+
+#ifdef EEM_MODULE_A3053B
+#define EEM_MODULE_NAME "A3053B"
+#endif
+
+#ifndef EEM_MODULE_NAME
+#define EEM_MODULE_NAME "UNKNOWN"
+#endif
 
 /*
 	The motherboard is the board that the EEM plugs into. In our case, this
@@ -96,13 +113,38 @@ extern bool debug;
 	Function Generator                    A3050
 	Analog Signal Generator               A3052
 	
-	In each case, we insert the motherboard assembly number into the compiler
-	macros below, twice, just the same, in order to configure the EEM code for
-	the motherboard.
-
+	We use the motherboard macro to define a motherboard name string for each of
+	the motherboard versions listed in the table above.
 */
-#define EEM_MOTHERBOARD_NAME "A3042"
 #define EEM_MOTHERBOARD_A3042
+
+#ifdef EEM_MOTHERBOARD_A2071
+#define EEM_MOTHERBOARD_NAME "A2071"
+#endif
+
+#ifdef EEM_MOTHERBOARD_A2087
+#define EEM_MOTHERBOARD_NAME "A2087"
+#endif
+
+#ifdef EEM_MOTHERBOARD_A3038
+#define EEM_MOTHERBOARD_NAME "A3038"
+#endif
+
+#ifdef EEM_MOTHERBOARD_A3042
+#define EEM_MOTHERBOARD_NAME "A3042"
+#endif
+
+#ifdef EEM_MOTHERBOARD_A3050
+#define EEM_MOTHERBOARD_NAME "A3050"
+#endif
+
+#ifdef EEM_MOTHERBOARD_A3052
+#define EEM_MOTHERBOARD_NAME "A3052"
+#endif
+
+#ifndef EEM_MOTHERBOARD_NAME
+#define EEM_MOTHERBOARD_NAME "UNKNOWN"
+#endif
 
 /*
 	When our GitHub repository version is X.Y, we let the software version we report
