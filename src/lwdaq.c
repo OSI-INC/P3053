@@ -570,8 +570,9 @@ int lwdaq_handle_message(tcpip_server_type *server,
 		// of the EEM.
 		case MAC_READ:{
 			if (debug) console_print("MAC_READ in %s.\n", __func__);
-			server_mac(tx_buff);
-			lwdaq_data_return(server->socket, tx_buff, strlen((char*) tx_buff));
+			int size;
+			size = server_mac(tx_buff);
+			lwdaq_data_return(server->socket, tx_buff, size);
 		}
 		break;
 

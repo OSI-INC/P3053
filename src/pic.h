@@ -128,10 +128,9 @@ static inline void mpcie_data_input(void) {
 	requested on a read cycle. We insert an access delay after DS to allow time
 	for the controller to respond. We make the delay out of PIC "nop"
 	instructions, or "no operation" instructions. Each of these takes 5 ns for a
-	PIC clock speed of 200 MHz, so each set of twenty is 50 ns. Our controllers
-	interfaces run off either a 40-MHz or 80-MHz clock. We use hold time of 100
-	ns and 50 ns ns respectively for these interfaces using a compiler flag to
-	select.
+	PIC clock speed of 200 MHz, so each set of twenty is 100 ns. Our controllers
+	interfaces run off either a 40-MHz or 80-MHz clock. We use hold time of 200
+	ns and 100 ns ns respectively for these interfaces.
 */
 static inline void mpcie_ds_assert(void)   {
 
@@ -201,7 +200,7 @@ static inline void mpcie_ds_unassert(void) {
 	write line and release the data lines before we call this routine, and in
 	this way we the access delay applies to these changes as well. On a write,
 	we set the data value and drive the data lines before we set the address, so
-	as to allow them to settle as well. The delay is either 25 ns or 50 ns for
+	as to allow them to settle as well. The delay is either 50 ns or 100 ns for
 	normal and slow access respectively, as selected by a compiler flag.
 */
 static inline void mpcie_addr_set(uint8_t addr) {
