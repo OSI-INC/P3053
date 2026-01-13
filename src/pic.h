@@ -125,45 +125,15 @@ static inline void mpcie_data_input(void) {
 /*
 	mpcie_ds_assert drives asserts data strobe by driving the /DS line low.
 	Indicates that data is valid on a write cycle. Indicates that data is
-	requested on a read cycle. We insert a setup delay before DS to allow
-	address and data lines to settle. We insert a hold delay after DS to allow
-	time for the controller to respond. We make the delay out of PIC "nop"
+	requested on a read cycle. We insert an access delay after DS to allow time
+	for the controller to respond. We make the delay out of PIC "nop"
 	instructions, or "no operation" instructions. Each of these takes 5 ns for a
-	PIC clock speed of 200 MHz, so ten of them are 25 ns and twenty are 50 ns.
-	Our controllers interfaces run off either a 40-MHz or 80-MHz clock. We use
-	setup/hold of 50/100 ns for the 40-MHz interfaces and 25/50 ns for the
-	80-MHz interfaces. We use a compiler flag to control the length of the
-	delays.
+	PIC clock speed of 200 MHz, so each set of twenty is 50 ns. Our controllers
+	interfaces run off either a 40-MHz or 80-MHz clock. We use hold time of 100
+	ns and 50 ns ns respectively for these interfaces using a compiler flag to
+	select.
 */
 static inline void mpcie_ds_assert(void)   {
-
-	__asm__ volatile (
-		"nop\n\t"
-		"nop\n\t"
-		"nop\n\t"
-		"nop\n\t"
-		"nop\n\t"
-		"nop\n\t"
-		"nop\n\t"
-		"nop\n\t"
-		"nop\n\t"
-		"nop\n\t"
-     );    
-     
-#ifdef MPCIE_SLOW_ACCESS
-	__asm__ volatile (
-		"nop\n\t"
-		"nop\n\t"
-		"nop\n\t"
-		"nop\n\t"
-		"nop\n\t"
-		"nop\n\t"
-		"nop\n\t"
-		"nop\n\t"
-		"nop\n\t"
-		"nop\n\t"
-     );    
-#endif
 
 	LATDCLR = MPCIE_DS_RD4;
 
@@ -225,18 +195,53 @@ static inline void mpcie_ds_unassert(void) {
 }
 
 /*
-	mpcie_addr_set drives the controller address bus with the specified address.
+	mpcie_addr_set drives the mpcie address bus with the specified address. We
+	insert an access delay after asserting the address lines to allow them to
+	settle before we assert data strobe. On a read cycle, we unassert the mpcie
+	write line and release the data lines before we call this routine, and in
+	this way we the access delay applies to these changes as well. On a write,
+	we set the data value and drive the data lines before we set the address, so
+	as to allow them to settle as well. The delay is either 25 ns or 50 ns for
+	normal and slow access respectively, as selected by a compiler flag.
 */
 static inline void mpcie_addr_set(uint8_t addr) {
     LATC = (LATC & ~MPCIE_CA_MASK_RC) | ((uint32_t)(addr & 0x0Fu) << 1);
     LATE = (LATE & ~MPCIE_CA_MASK_RE) | ((uint32_t)(addr >> 4) & 0x03u);
+
+	__asm__ volatile (
+		"nop\n\t"
+		"nop\n\t"
+		"nop\n\t"
+		"nop\n\t"
+		"nop\n\t"
+		"nop\n\t"
+		"nop\n\t"
+		"nop\n\t"
+		"nop\n\t"
+		"nop\n\t"
+     );    
+     
+#ifdef MPCIE_SLOW_ACCESS
+	__asm__ volatile (
+		"nop\n\t"
+		"nop\n\t"
+		"nop\n\t"
+		"nop\n\t"
+		"nop\n\t"
+		"nop\n\t"
+		"nop\n\t"
+		"nop\n\t"
+		"nop\n\t"
+		"nop\n\t"
+     );    
+#endif
 }
 
 /*
-	mpcie_data_set assigns the controller interface data pins with the specified
+	mpcie_data_set assigns the mpcie interface data pins with the specified
 	value. Note that this value will not appear on the data pins unless the pins
 	are set as outputs. We have RC13 as bit0, RC14 as bit1, and RE2-RE7 as
-	bit2-bit7. We insert a delay to allow the data lines to settle.
+	bit2-bit7. 
 */
 static inline void mpcie_data_set(uint8_t data) {
 	LATC = (LATC & ~MPCIE_CD_MASK_RC) | ((uint32_t) (data & 0x03u) << 13);
@@ -244,7 +249,7 @@ static inline void mpcie_data_set(uint8_t data) {
 }
 
 /*
-	mpcie_data_get obtains the byte value on the controller interface data pins.
+	mpcie_data_get obtains the byte value on the mpcie interface data pins.
 	This byte value is whatever is on the pins. We have to compose a byte from
 	the various PIC pins we have assigned to the data bus, but this turns out to
 	be straightforward: we take PORTC and shift it thirteen times to the right,
@@ -263,28 +268,28 @@ static inline uint8_t mpcie_data_get(void) {
 
 /*
 	mpcie_byte_write writes a byte value to a location in mpcie address space.
-	It begins by setting the address and asserting control write. It waits 
-	while the controller releases the data lines. It sets the data output value
-	and enables the data bus drivers. It waits for these changes to settle. It
-	drives data strobe and waits for the controller to receive the data values,
-	then releases data strobe.
+	It begins by setting the asserting the write line, setting the data value,
+	and driving the data lines. It sets the address, which includes a settling
+	delay. It drives data strobe, which includes an access delay to allow the
+	mpcie to accept the data byte. It unasserts data strobe to end the write.
 */
 static inline void mpcie_byte_write(uint8_t addr, uint8_t data) {
-    mpcie_addr_set(addr);
-    mpcie_data_set(data);
     mpcie_cw_assert(); 
+    mpcie_data_set(data);
     mpcie_data_output();
+    mpcie_addr_set(addr);
     mpcie_ds_assert();
 	mpcie_ds_unassert();
 }
 
 /*
-	mpcie_byte_write_repeat writes to the same address that was previously
-	asserted on the mPCIe bus. It assumes the previous access was also a write
-	cycle. It is faster than the random-access write cycle bedause we do not
-	have to assert the address or write lines, and we are already driving the
-	data lines. We use this routine for stream writes to the RAM Portal on LWDAQ
-	controllers.
+	mpcie_byte_write_repeat writes another byte to the same location in mpcie 
+	address space. It sets the data lines, which includes a delay to let
+	the data lines settle. It asserts data strobe, which includes a delay to let
+	the write complete at the mpcie. It unasserts data strobe to end the
+	cycle. It does not change the address, and it assumes that the write line
+	has already been asserted. We use this routine for stream writes to the RAM
+	Portal on LWDAQ Controllers.
 */
 static inline void mpcie_byte_write_repeat(uint8_t addr, uint8_t data) {
 	mpcie_data_set(data); 
@@ -293,17 +298,17 @@ static inline void mpcie_byte_write_repeat(uint8_t addr, uint8_t data) {
 }
 
 /*
-	mpcie_byte_read reads a byte from a location in mpcie address space. After
-	asserting the address and write lines and releasing the data lines, the
-	routine waits for these changes to establish themselves, then asserts data
-	strobe. It waits for the controller to drive the data lines, then reads the
-	data lines.
+	mpcie_byte_read reads a byte from a location in mpcie address space. It sets
+	the data lines as inputs and unasserts the mpcie write line. It sets the
+	address, which includes a settling delay. It asserts data strobe, which
+	includes an access delay. It reads the byte from the data bus and unasserts
+	data strobe.
 */
 static inline uint8_t mpcie_byte_read(uint8_t addr) {
 	uint8_t value;
-	mpcie_addr_set(addr);
 	mpcie_data_input();
 	mpcie_cw_unassert(); 
+	mpcie_addr_set(addr);
 	mpcie_ds_assert();
 	value = mpcie_data_get();
 	mpcie_ds_unassert();
@@ -311,13 +316,13 @@ static inline uint8_t mpcie_byte_read(uint8_t addr) {
 }
 
 /*
-	mpcie_byte_read_repeat assumes that the address lines, the write line, and
-	the data lines are all configured for a read from some address, and we are
-	now going to read again from this address. We do not have to wait for the
-	address, write, or data lines to settle before asserting data strobe. We
-	assert data strobe immediately and wait for the controller to drive the data
-	lines, then read. We use this routine in stream reads from the RAM Portal on
-	LWDAQ controllers.
+	mpcie_byte_read_repeat reads again from the same location in mpcie address
+	space. It assumes that the address lines, the write line, and the data lines
+	are all configured for a read from this location. We do not have to wait for
+	the address, write, or data lines to settle before asserting data strobe. We
+	assert data strobe immediately, which includes an access delay, and then
+	read the data lines. We use this routine in stream reads from the RAM Portal
+	on LWDAQ controllers.
 */
 static inline uint8_t mpcie_byte_read_repeat(void) {
 	mpcie_ds_assert();
