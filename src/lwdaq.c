@@ -254,6 +254,10 @@ int lwdaq_config_from_str(eem_config_type *config_ptr, const char *str) {
 			snprintf(config_ptr->person, sizeof(config_ptr->person),
 				"%.*s", (int) value_len, value);
 			num_copied++;
+		}  else if (strncmp(line_start, "driver_id", name_len) == 0) {
+			snprintf(config_ptr->device, sizeof(config_ptr->device),
+				"%.*s", (int) value_len, value);
+			num_copied++;
 		} else if (strncmp(line_start, "configuration_time", name_len) == 0) {
 			snprintf(config_ptr->timestamp, sizeof(config_ptr->timestamp),
 				"%.*s", (int) value_len, value);
