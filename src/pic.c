@@ -248,14 +248,14 @@ void pic_gpio_initialize(void) {
     TRISECLR = MPCIE_CA_MASK_RE;   // RE0–RE1
 
 	// Configure the MPCIE data strobe and write lines as outputs.
-	TRISDCLR = MPCIE_DS_RD4 | MPCIE_CW_RD5;
+	TRISDCLR = MPCIE_CDS_RD4 | MPCIE_CWR_RD5;
 
     // Set the MPCIE data bus initially as inputs.
     TRISCSET = MPCIE_CD_MASK_RC;   // RC13, RC14
     TRISESET = MPCIE_CD_MASK_RE;   // RE2–RE7
 
     // Unassert MPCIE bus data strobe and control write.
-    LATDSET = MPCIE_DS_RD4 | MPCIE_CW_RD5;
+    LATDSET = MPCIE_CDS_RD4 | MPCIE_CWR_RD5;
 
 	// So far, on our A3053A, we have have D3 and D4 dedicated to UART2, but D2
 	// and D5 are available as test points. Pin U1-56 is RF3, so we want to set

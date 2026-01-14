@@ -415,7 +415,7 @@ int lwdaq_handle_message(tcpip_server_type *server,
 #ifndef ENABLE_FIFO_STROBE		
 			mpcie_addr_set(register_addr);
 			mpcie_data_input();
-    		mpcie_cw_unassert(); 
+    		mpcie_wr_unassert(); 
 #endif
 
 		// Start the stream read loop. We will be reading until we have read
@@ -466,7 +466,7 @@ int lwdaq_handle_message(tcpip_server_type *server,
 		}
 		break;
 
-#ifdef ENABLE_STREAM_READ
+#ifdef ENABLE_STREAM_WRITE
 		// The stream-write operation uploads a block of data to the
 		// controller's memory by writing repeatedly to its RAM Portal. Each
 		// time we write to the RAM Portal, the data address associated with the

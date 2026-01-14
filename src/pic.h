@@ -46,7 +46,7 @@ static inline void pic_d5_toggle(void) {GPIO_PortToggle(GPIO_PORT_A, 0x00000004)
 	We define masks for the MPCIE eight-bit parallel bus. This is the bus by
 	which the EEM controls the motherboard. The EEM is master of this bus. The
 	bus consists of the Control Address Bus (CA0-CA7), the Control Data Bus
-	(DC0-CD7), Data Strobe (/DS) and Control Write (/CW). We define procedures
+	(DC0-CD7), Data Strobe (/CDS) and Control Write (/CWR). We define procedures
 	to access the MPCIE parallel bus. All procedures are declared here as static
 	and inline so they will be combined together and placed in our code without
 	any actual function calls.
@@ -74,9 +74,9 @@ static inline void pic_d5_toggle(void) {GPIO_PortToggle(GPIO_PORT_A, 0x00000004)
 #define MPCIE_CD_MASK_RC 0x00006000u   // RC13-RC14
 #define MPCIE_CD_MASK_RE 0x000000FCu   // RE2-RE7
 
-// Control Data Strobe (/DS) and Control Write (/CW)
-#define MPCIE_DS_RD4     0x00000010u   // /DS=RD4
-#define MPCIE_CW_RD5     0x00000020u   // /CW=RD5
+// Control Data Strobe (/CDS) and Control Write (/CWR)
+#define MPCIE_CDS_RD4     0x00000010u   // /CDS=RD4
+#define MPCIE_CWR_RD5     0x00000020u   // /CWR=RD5
 
 // Determine if we want the slower access cycles. This depends upon the
 // motherboard.
@@ -87,25 +87,25 @@ static inline void pic_d5_toggle(void) {GPIO_PortToggle(GPIO_PORT_A, 0x00000004)
 
 
 /*
-	mpcie_cw_assert drives /CW low to indicate an MPCIE bus write cycle. After
-	we assert CW, we can set the PIC controller data bus pins to be outputs. We
+	mpcie_wr_assert drives /CWR low to indicate an MPCIE bus write cycle. After
+	we assert CWR, we can set the PIC controller data bus pins to be outputs. We
 	assume the controller will turn off its line drivers immediately.
 */
-static inline void mpcie_cw_assert(void) {
-	LATDCLR = MPCIE_CW_RD5;
+static inline void mpcie_wr_assert(void) {
+	LATDCLR = MPCIE_CWR_RD5;
 }
 
 /*
-	mpcie_cw_unassert drives /CW high to indicate a MPCIE bus read cycle. When
-	we unassert CW, the motherboard can drive the controller data bus lines.
+	mpcie_wr_unassert drives /CWR high to indicate a MPCIE bus read cycle. When
+	we unassert CWR, the motherboard can drive the controller data bus lines.
 */
-static inline void mpcie_cw_unassert(void) {
-	LATDSET = MPCIE_CW_RD5;
+static inline void mpcie_wr_unassert(void) {
+	LATDSET = MPCIE_CWR_RD5;
 }
 
 /* 
 	mpcie_data_output sets the MPCIE data bus pins on the PIC as outputs. Must
-	be preceeded by asserting Control Write (/CW).
+	be preceeded by asserting Control Write (/CWR).
 */
 static inline void mpcie_data_output(void) {
     TRISCCLR = MPCIE_CD_MASK_RC;   // RC13-RC14 as outputs
@@ -114,7 +114,7 @@ static inline void mpcie_data_output(void) {
 
 /*
 	mpcie_data_input sets the controller data bus pins on the PIC as inputs. Must
-	preceed unasserting Controle Write (/CW). We assume the PIC will turn off its
+	preceed unasserting Controle Write (/CWR). We assume the PIC will turn off its
 	line drivers immediately.
 */
 static inline void mpcie_data_input(void) {
@@ -123,9 +123,9 @@ static inline void mpcie_data_input(void) {
 }
 
 /*
-	mpcie_ds_assert drives asserts data strobe by driving the /DS line low.
+	mpcie_ds_assert drives asserts data strobe by driving the /CDS line low.
 	Indicates that data is valid on a write cycle. Indicates that data is
-	requested on a read cycle. We insert an access delay after DS to allow time
+	requested on a read cycle. We insert an access delay after CDS to allow time
 	for the controller to respond. We make the delay out of PIC "nop"
 	instructions, or "no operation" instructions. Each of these takes 5 ns for a
 	PIC clock speed of 200 MHz, so each set of twenty is 100 ns. Our controllers
@@ -134,7 +134,7 @@ static inline void mpcie_data_input(void) {
 */
 static inline void mpcie_ds_assert(void)   {
 
-	LATDCLR = MPCIE_DS_RD4;
+	LATDCLR = MPCIE_CDS_RD4;
 
 	__asm__ volatile (
 		"nop\n\t"
@@ -190,7 +190,7 @@ static inline void mpcie_ds_assert(void)   {
 	mpcie_ds_unassert drives the data strobe HI, which unasserts data strobe.
 */
 static inline void mpcie_ds_unassert(void) {
-	LATDSET = MPCIE_DS_RD4;
+	LATDSET = MPCIE_CDS_RD4;
 }
 
 /*
@@ -273,7 +273,7 @@ static inline uint8_t mpcie_data_get(void) {
 	mpcie to accept the data byte. It unasserts data strobe to end the write.
 */
 static inline void mpcie_byte_write(uint8_t addr, uint8_t data) {
-    mpcie_cw_assert(); 
+    mpcie_wr_assert(); 
     mpcie_data_set(data);
     mpcie_data_output();
     mpcie_addr_set(addr);
@@ -306,7 +306,7 @@ static inline void mpcie_byte_write_repeat(uint8_t addr, uint8_t data) {
 static inline uint8_t mpcie_byte_read(uint8_t addr) {
 	uint8_t value;
 	mpcie_data_input();
-	mpcie_cw_unassert(); 
+	mpcie_wr_unassert(); 
 	mpcie_addr_set(addr);
 	mpcie_ds_assert();
 	value = mpcie_data_get();
