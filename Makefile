@@ -26,7 +26,7 @@
 #
 # [22-DEC-25] Kevan Hashemi.
 #
-# Copyright (C) 2025, Kevan Hashemi, Open Source Instruments Inc.
+# Copyright Copyright (C) 2025-2026-2026, Kevan Hashemi, Open Source Instruments Inc.
 # 
 # This program is free software: you can redistribute it and/or modify it under
 # the terms of the GNU General Public License as published by the Free Software

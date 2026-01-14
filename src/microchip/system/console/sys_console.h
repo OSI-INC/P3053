@@ -29,13 +29,8 @@ typedef struct { } SYS_CONSOLE_INIT;
 	from. We will ignore that index in our implementation of the procedures,
 	because we have only one console: UART2.
 */
-void SYS_CONSOLE_Write(int index, const void* buff, size_t size);
 void SYS_CONSOLE_Message(int index, const char* msg);
 void SYS_CONSOLE_Print(int index, const char* fmt, ...);
-int SYS_CONSOLE_ReadCountGet(int index);
-void SYS_CONSOLE_Read(int index, void* buff, size_t size);
-void SYS_CONSOLE_Tasks(int index);
-void SYS_CONSOLE_Task(int index);
 
 /*
 	When the Microchip libraries wants to know the state us of the console, we
@@ -61,7 +56,6 @@ static inline SYS_STATUS SYS_CONSOLE_Status(int index) {
 	to tolerate and manage calls of the macro in which the code provides no
 	conversion specifiers.
 */
-#define SYS_CONSOLE_WRITE(buff, size) SYS_CONSOLE_Write(0, buff, size)
 #define SYS_CONSOLE_MESSAGE(msg) SYS_CONSOLE_Message(0, msg)
 #define SYS_CONSOLE_PRINT(fmt, ...) SYS_CONSOLE_Print(0, fmt, ##__VA_ARGS__)
 #define SYS_DEBUG_MESSAGE(level, msg) SYS_CONSOLE_Message(0, (msg))

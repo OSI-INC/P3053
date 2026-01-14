@@ -13,7 +13,7 @@
 	create "compiler directive". All these compiler macros will be upper-case
 	and begin with "EEM".
 	
-	(C) 2025, Kevan Hashemi, Open Source Instruments Inc.
+	Copyright (C) 2025-2026, Kevan Hashemi, Open Source Instruments Inc.
 
 	This program is free software: you can redistribute it and/or modify it
 	under the terms of the GNU General Public License as published by the Free

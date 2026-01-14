@@ -32,7 +32,7 @@
 	others. In our EEM code, we see only the TCP/IP stack calling a console
 	print to declare that is it initializing and then running.
 
-	(C) 2025, Kevan Hashemi, Open Source Instruments Inc.
+	Copyright (C) 2025-2026, Kevan Hashemi, Open Source Instruments Inc.
 
 	This program is free software: you can redistribute it and/or modify it
 	under the terms of the GNU General Public License as published by the Free
@@ -65,16 +65,13 @@
 #include "cli.h"
 
 /*
-	Procedures that read and write from the UART console. For now, we preserve
-	our original console routines, which go straight to UART2. Eventually, we
-	will replace the console with the generic and multi-channel command line
-	interpreter routines.
+	Procedures that read, write, and initialize the console.
 */
+void console_message(const char *s);
+void console_print(const char *fmt, ...);
 void console_put_int_hex(uint32_t value);
 void console_put_int_trace(uint32_t value);
 void console_write(const void *buff, size_t size);
-void console_message(const char *s);
-void console_print(const char *fmt, ...);
 void console_dump_hex(const char *s);
 void console_dump_ascii(const char *s);
 void console_initialize(void);

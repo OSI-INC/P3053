@@ -1,7 +1,7 @@
 /*
 	console.c -- Implementation of the Process Reporting Console library.
 
-	(C) 2025, Kevan Hashemi, Open Source Instruments Inc.
+	Copyright (C) 2025-2026, Kevan Hashemi, Open Source Instruments Inc.
 
 	This program is free software: you can redistribute it and/or modify it
 	under the terms of the GNU General Public License as published by the Free
@@ -38,49 +38,6 @@
 #include "pic.h"
 #include "server.h"
 #include "console.h"
-
-/*
-	console_put_int_hex takes a thirty-two bit integer, which is eight nibbles,
-	and prints it as eight hexadecimal digits, most significant nibble first, to
-	the console.
-*/
-void console_put_int_hex(uint32_t value) {
-    const char hex[] = "0123456789ABCDEF";
-    for (int shift = 28; shift >= 0; shift -= 4)
-        uart2_putchar(NULL, hex[(value >> shift) & 0xF]);
-}
-
-/*
-	console_put_int_trace is not an ASCII-reporting routine. It is designed to
-	allow us to view thirty-two bit integers on an oscilloscope attached to our
-	console TX signel. It takes an integer value and transmits it, least
-	significant byte first, over the UART. Because the UART sends the least
-	significant bit first, we will see the bits on our oscilloscope trace of
-	UART2 TX line as bit 0 to 32, with a stop bit (1) and a start bit (0)
-	between each of the bytes. We can use it to broadcast raw register values,
-	as in console_putint(RPF3R). We used this routine to look at LATF, PIRTF,
-	ODCF, and RPF3R when we were investigating our start-up GPIP problems. By
-	looking at the bits on an oscilloscope, we do not need a functioning
-	UART-to-USB bridge, and we can view register bits toggling more
-	easily.		
-*/
-void console_put_int_trace(uint32_t value) {
-	int i;
-	for (i = 0; i <= 3; i++) uart2_putchar(NULL, ((uint8_t*)&value)[i]);
-}
-
-/*
-	console_write writes a raw byte array write to the console, with no regard
-	to the byte values, including no recognition of a null character as a
-	terminator. We pass it a pointer to the byte array and the size of the
-	array.
-*/
-void console_write(const void *buff, size_t size) {
-    const uint8_t *p = (const uint8_t*) buff;
-    for (size_t i = 0; i < size; i++) {
-        uart2_putchar(NULL, p[i]);
-    }
-}
 
 /*
 	console_message writes an entire null-terminated string of characters to the
@@ -137,6 +94,48 @@ void console_print(const char *fmt, ...) {
 }
 
 /*
+	console_put_int_hex takes a thirty-two bit integer, which is eight nibbles,
+	and prints it as eight hexadecimal ASCII digits, most significant nibble
+	first, to the console.
+*/
+void console_put_int_hex(uint32_t value) {
+    const char hex[] = "0123456789ABCDEF";
+    for (int shift = 28; shift >= 0; shift -= 4)
+        uart2_putchar(NULL, hex[(value >> shift) & 0xF]);
+}
+
+/*
+	console_put_int_trace uses the UART2 interface to display a thirty-two bit
+	integer for viewing on an oscilloscope. It takes an integer value and
+	transmits it, least significant byte first, over the UART. Because the UART
+	sends the least significant bit first, we will see the bits on our
+	oscilloscope trace of UART2 TX line as bit 0 to 32, with a stop bit (1) and
+	a start bit (0) between each of the bytes. We can use it to broadcast raw
+	register values, as in console_putint(RPF3R). We used this routine to look
+	at LATF, PIRTF, ODCF, and RPF3R when we were investigating our start-up GPIP
+	problems. By looking at the bits on an oscilloscope, we do not need a
+	functioning UART-to-USB bridge, and we can view register bits toggling more
+	easily.		
+*/
+void console_put_int_trace(uint32_t value) {
+	int i;
+	for (i = 0; i <= 3; i++) uart2_putchar(NULL, ((uint8_t*)&value)[i]);
+}
+
+/*
+	console_write writes a raw byte array write to the console, with no regard
+	to the byte values, including no recognition of a null character as a
+	terminator. We pass it a pointer to the byte array and the size of the
+	array.
+*/
+void console_write(const void *buff, size_t size) {
+    const uint8_t *p = (const uint8_t*) buff;
+    for (size_t i = 0; i < size; i++) {
+        uart2_putchar(NULL, p[i]);
+    }
+}
+
+/*
 	console_dump_hex prints the charactesr of a null-terminated string as pairs
 	of hexadecimal digits so we can see what the values of the non-printable
 	characters.
@@ -165,17 +164,6 @@ void console_dump_ascii(const char *s) {
         p++;
     }
     console_message("\r\n");
-}
-
-/*
-	SYS_CONSOLE_Write is a routine used by the Microchip system processes. It
-	writes a raw byte array write to the console, with no regard to the contents
-	of the string, including no recognition of a null character as a terminator.
-	We pass it an index to select a console, which in our case we ignore. We
-	pass it a pointer to the byte array and we specify the size of the array.
-*/
-void SYS_CONSOLE_Write(int index, const void *buff, size_t size) {
-    console_write(buff, size);
 }
 
 /*
@@ -209,55 +197,6 @@ void SYS_CONSOLE_Print(int index, const char *fmt, ...) {
     vsnprintf(buff, sizeof(buff), fmt, args);
     va_end(args);
     console_message(buff);
-}
-
-/*
-	SYS_CONSOLE_ReadCountGet is a routine used by the Microchip system processes.
-	It returns the number of bytes available for reading in the console receive
-	buffer. We pass it a console index, but here we ignore that index.
-*/
-int SYS_CONSOLE_ReadCountGet(int index) {
-    (void) index;
-    return uart2_readcount(NULL);
-}
-
-/*
-	SYS_CONSOLE_Read is a routine used by the Microchip system processes. It reads
-	up to size bytes from the console receive buffer. We pass the routine a
-	console index, a pointer to a buffer in memory, and the number of bytes to
-	be read. We ignore the console index. If there are fewer than size bytes
-	available, the routine returns all available bytes, but makes no effort to
-	indicate how many bytes were read. It does not add a null terminator. The
-	way Microchip uses this routine is to first use SYS_CONSOLE_ReadCountGet, so
-	that it already knows how many bytes are available, and then it reads those
-	available bytes. The routine transfers the bytes from the console receive
-	buffer into the buffer.
-*/
-void SYS_CONSOLE_Read(int index, void *buff, size_t size) {
-    (void) index;
-    uint8_t *p = (uint8_t*) buff;
-    for (size_t i = 0; i < size; i++) {
-        if (uart2_readcount(NULL) == 0) {
-            return;
-        }
-        p[i] = uart2_getchar(NULL);
-    }
-}
-
-/*
-	SYS_CONSOLE_Tasks is a routine used by the Microchip system processes. It is
-	intended to perform a polling task. We are not going to do any polling for
-	the Microchip processes, so our implementation of the routine does nothing.
-*/
-void SYS_CONSOLE_Tasks(int index) {
-}
-
-/*
-	SYS_CONSOLE_Tasks is a routine used by the Microchip system processes. It is
-	intended to perform polling tasks. We are not going to do any polling for
-	the Microchip processes, so our implementation of the routine does nothing.
-*/
-void SYS_CONSOLE_Task(int index) {
 }
 
 /*

@@ -76,7 +76,7 @@
 	This module provides the core interpreter logic. Command registration,
 	channel setup, and command implementations are handled elsewhere.
 
-	(C) 2025, Kevan Hashemi, Open Source Instruments Inc.
+	Copyright (C) 2025-2026, Kevan Hashemi, Open Source Instruments Inc.
 
 	This program is free software: you can redistribute it and/or modify it
 	under the terms of the GNU General Public License as published by the Free
