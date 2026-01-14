@@ -274,7 +274,7 @@ int tcp_readcount(void *context) {
 	and an unsigned integer length.
 */
 int tcp_read(void *context, uint8_t *buffer, uint32_t len) {
-	TCP_SOCKET sock= *(TCP_SOCKET *) context;
+	TCP_SOCKET sock = *(TCP_SOCKET *) context;
 	return (int) TCPIP_TCP_ArrayGet(sock, buffer, len);
 }
 
@@ -285,7 +285,7 @@ int tcp_read(void *context, uint8_t *buffer, uint32_t len) {
 	character. This routine can be deployed in a CLI channel descriptor.
 */
 int tcp_getchar(void *context) {
-	TCP_SOCKET sock= *(TCP_SOCKET *) context;
+	TCP_SOCKET sock = *(TCP_SOCKET *) context;
 	uint8_t c;
 	if (sock == INVALID_SOCKET) return -2;
 	if (TCPIP_TCP_GetIsReady(sock) < 1) return -1;
@@ -298,7 +298,7 @@ int tcp_getchar(void *context) {
 	outgoing TCP buffer of a socket. It takes a socket handle.
 */
 int tcp_writecount(void *context) {
-	TCP_SOCKET sock= *(TCP_SOCKET *) context;
+	TCP_SOCKET sock = *(TCP_SOCKET *) context;
 	return (int) TCPIP_TCP_PutIsReady(sock);
 }
 
@@ -311,7 +311,7 @@ int tcp_writecount(void *context) {
 	flush the socket. It does not block.
 */
 int tcp_write(void *context, const uint8_t *data, uint32_t len) {
-	TCP_SOCKET sock= *(TCP_SOCKET *) context;
+	TCP_SOCKET sock = *(TCP_SOCKET *) context;
 	return (int) TCPIP_TCP_ArrayPut(sock, data, len);
 }
 
@@ -323,7 +323,7 @@ int tcp_write(void *context, const uint8_t *data, uint32_t len) {
 	descriptor.
 */
 int tcp_putchar(void *context, char c) {
-	TCP_SOCKET sock= *(TCP_SOCKET *) context;
+	TCP_SOCKET sock = *(TCP_SOCKET *) context;
 	if (sock == INVALID_SOCKET) return -2;
 	while (TCPIP_TCP_PutIsReady(sock) == 0) {
 		if (tcp_sock_tick(context) < 0) return -2;
@@ -338,7 +338,7 @@ int tcp_putchar(void *context, char c) {
 	descriptor.
 */
 int tcp_flush(void *context) {
-	TCP_SOCKET sock= *(TCP_SOCKET *) context;
+	TCP_SOCKET sock = *(TCP_SOCKET *) context;
 	TCPIP_TCP_Flush(sock);
 	return 0;
 }

@@ -1,5 +1,5 @@
 /*
-	console.c -- Implementation of the Process Reporting Console library.
+	console.c -- Implementation of the Console library.
 
 	Copyright (C) 2025-2026, Kevan Hashemi, Open Source Instruments Inc.
 
@@ -40,31 +40,62 @@
 #include "console.h"
 
 /*
+	The console_context pointer is initialized to NULL. So long as it remains NULL,
+	all console messages will be printed to the UART2 console interface. But if
+	if points to a TCP socket, the messages will be printed to the socket instead.
+*/
+void *console_context = NULL;
+
+/*
+	console_putchar writes a character to the UART2 or to a TCP socket,
+	depending upon the value of the global console context pointer. If the
+	context pointer is set, the routine checks to see if it points to a valid
+	socket. If not, the routine clears the pointer. If the context pointer is
+	cleared, the routine writes to the serial interface. Otherwise it writes to
+	the specified socket.
+*/
+void console_putchar(char c) {
+	if (console_context != NULL) {
+		TCP_SOCKET sock = *(TCP_SOCKET *) console_context;
+		if (sock == INVALID_SOCKET) {
+			console_context = NULL;
+		}
+	} 
+	if (console_context == NULL) {
+		uart2_putchar(NULL, c);
+	} else {
+		tcp_putchar(console_context, c);
+	}
+}
+
+/*
 	console_message writes an entire null-terminated string of characters to the
-	console. We pass the routine a pointer to a string, and it keeps reading
-	characters from the string and writing them to the console until it reaches
-	a null character, which it does not write. One additional service this
-	routine provides is to handle different protocols for carriage returns and
-	line feeds. The routine always prints CRLF ("\r\n") for a new line. If it
-	sees just CR on its own, or LF on its own, it prints CRLF. But if it sees
-	CRLF, it prints only one CRLF, not two CRLFs.
+	console, and possibly to a tcp socket if one has been assigned to be a
+	secondary destination for console messages. We pass the routine a pointer to
+	a string, and it keeps reading characters from the string and writing them
+	to the console until it reaches a null character, which it does not write.
+	One additional service this routine provides is to handle different
+	protocols for carriage returns and line feeds. The routine always prints
+	CRLF ("\r\n") for a new line. If it sees just CR on its own, or LF on its
+	own, it prints CRLF. But if it sees CRLF, it prints only one CRLF, not two
+	CRLFs.
 */
 void console_message(const char *s) {
     bool expect_lf = false;
 
     while (*s) {
         if (*s == '\r') {
-            uart2_putchar(NULL, '\r');
-            uart2_putchar(NULL, '\n');
+            console_putchar('\r');
+            console_putchar('\n');
             expect_lf = true;
         } else if (*s == '\n') {
             if (!expect_lf) {
-                uart2_putchar(NULL, '\r');
-                uart2_putchar(NULL, '\n');
+                console_putchar('\r');
+                console_putchar('\n');
             }
             expect_lf = false;
         } else {
-            uart2_putchar(NULL, *s);
+            console_putchar(*s);
             expect_lf = false;
         }
         s++;
@@ -72,10 +103,13 @@ void console_message(const char *s) {
 }
 
 /*
-	console_print takes a pointer to a string and zero or more literal
-	arguments. For each literal argument there must be a conversion
-	specification in the string. The conversion specifier begins with a percent
-	symbol. Simple examples are: %d for signed integer, %u for unsigned integer,
+	console_print converts a string with conversion specifiers and a list of
+	literal arguments, converts it into a literal string, and prints the literal
+	string to the console, and possibly a tcp socket if one has been assigned as
+	a secondary destiniation for console messages. For each literal argument
+	there must be a conversion specification in the string. The conversion
+	specifier begins with a percent symbol. Simple examples are: %d for signed
+	integer, %u for unsigned integer,
 	%x for hexadecimal, %s for a string, %c for a character, %f for a floating
 	point number or or a double-length floading point number. In the case of the
 	"f" format specifier, we can have %10.3f for width ten characters, padded
@@ -91,79 +125,6 @@ void console_print(const char *fmt, ...) {
     vsnprintf(buff, sizeof(buff), fmt, args);
     va_end(args);
     console_message(buff);
-}
-
-/*
-	console_put_int_hex takes a thirty-two bit integer, which is eight nibbles,
-	and prints it as eight hexadecimal ASCII digits, most significant nibble
-	first, to the console.
-*/
-void console_put_int_hex(uint32_t value) {
-    const char hex[] = "0123456789ABCDEF";
-    for (int shift = 28; shift >= 0; shift -= 4)
-        uart2_putchar(NULL, hex[(value >> shift) & 0xF]);
-}
-
-/*
-	console_put_int_trace uses the UART2 interface to display a thirty-two bit
-	integer for viewing on an oscilloscope. It takes an integer value and
-	transmits it, least significant byte first, over the UART. Because the UART
-	sends the least significant bit first, we will see the bits on our
-	oscilloscope trace of UART2 TX line as bit 0 to 32, with a stop bit (1) and
-	a start bit (0) between each of the bytes. We can use it to broadcast raw
-	register values, as in console_putint(RPF3R). We used this routine to look
-	at LATF, PIRTF, ODCF, and RPF3R when we were investigating our start-up GPIP
-	problems. By looking at the bits on an oscilloscope, we do not need a
-	functioning UART-to-USB bridge, and we can view register bits toggling more
-	easily.		
-*/
-void console_put_int_trace(uint32_t value) {
-	int i;
-	for (i = 0; i <= 3; i++) uart2_putchar(NULL, ((uint8_t*)&value)[i]);
-}
-
-/*
-	console_write writes a raw byte array write to the console, with no regard
-	to the byte values, including no recognition of a null character as a
-	terminator. We pass it a pointer to the byte array and the size of the
-	array.
-*/
-void console_write(const void *buff, size_t size) {
-    const uint8_t *p = (const uint8_t*) buff;
-    for (size_t i = 0; i < size; i++) {
-        uart2_putchar(NULL, p[i]);
-    }
-}
-
-/*
-	console_dump_hex prints the charactesr of a null-terminated string as pairs
-	of hexadecimal digits so we can see what the values of the non-printable
-	characters.
-*/
-void console_dump_hex(const char *s) {
-    const unsigned char *p = (const unsigned char*) s;
-    while (*p != '\0') {
-        console_print("%02X ", *p);
-        p++;
-    }
-    console_message("\r\n");
-}
-
-/*
-	console_dump_ascii prints the charactesr of a null-terminated string one
-	after the other, but transforms non-printable characters into periods.
-*/
-void console_dump_ascii(const char *s) {
-    const unsigned char *p = (const unsigned char*) s;
-    while (*p != '\0') {
-        if (is_printable(*p)) {
-            uart2_putchar(NULL, (char) *p);
-        } else {
-            uart2_putchar(NULL, '.');
-        }
-        p++;
-    }
-    console_message("\r\n");
 }
 
 /*
@@ -227,14 +188,19 @@ void console_initialize(void)
 }
 
 /*
-	cli_debug is a Command-Line Interpreter (CLI) command that sets, clears, or
-	reports the state of the global debug flag.
+	cli_debug is a Command-Line Interpreter (CLI) command that configures debug
+	printing. We can set or clear the global debug flag. We can direct debug
+	printing to the current CLI communication channel, or we can restore debug
+	printing to the UART console.
 */
 void cli_debug(cli_chan_type *ch, char *args) {
 	bool print_info = false;
 	bool print_help = false;
 	bool verb_received = false;
-	bool set_flag = true;
+	bool set_flag = false;
+	bool clear_flag = false;
+	bool grab_flag = false;
+	bool release_flag = false;
 
 	char *tok = strtok(args, " \t");
 	while (tok != NULL) {
@@ -242,15 +208,19 @@ void cli_debug(cli_chan_type *ch, char *args) {
  			print_info = true;
  		} else if (strcmp(tok, "--help") == 0) {
  			print_help = true;
- 		} else if (strcmp(tok, "on") == 0 || strcmp(tok, "off") == 0) {
+ 		} else if (strcmp(tok, "on") == 0 
+ 				|| strcmp(tok, "off") == 0 
+ 				|| strcmp(tok, "grab") == 0 
+ 				|| strcmp(tok, "release") == 0) {
  			if (verb_received) {
 				cli_print(ch,"ERROR: Only one command verb permitted in %s.\n",
 					__func__);
 				return;			
  			}
- 			if (strcmp(tok, "off") == 0) {
- 				set_flag = false;
- 			}
+ 			if (strcmp(tok, "on") == 0) set_flag = true;
+ 			if (strcmp(tok, "off") == 0) clear_flag = true;
+ 			if (strcmp(tok, "grab") == 0) grab_flag = true;
+ 			if (strcmp(tok, "release") == 0) release_flag = true;
  			verb_received = true;
  		} else {
             cli_print(ch, "ERROR: Unrecognized option '%s' in %s.\n", tok, __func__);
@@ -267,18 +237,28 @@ void cli_debug(cli_chan_type *ch, char *args) {
 	if (print_help) {
 		cli_message(ch,
 "Usage:\n"
-"  debug [on|off] [--info] [--help]\n"
+"  debug [on|off|grab|release] [--info] [--help]\n"
 "\n"
 "Summary:\n"
-"  Sets or clears the debug flag that the EEM process uses to enable console print\n"
-"  commands for debugging. The initial state of this flag on reset is set by a\n"
-"  constant in the source code. We can change the flag during run-time with this\n"
-"  routine. If we pass no options to the routine, it returns the state of the flag:\n"
-"  ON for set and OFF for cleared.\n"
+"  The 'on' and 'off' verbs set and clear the global debug flag respectively.\n"
+"  The debug flag turns on and off all console print commands that are made\n"
+"  conditional upon the state of the flag, which we intend to be all debugging\n"
+"  messages. The initial state of this flag is set by a constant in the source code.\n"
+"  The 'grab' command directs all console messages to the communication channel in\n"
+"  which the grab command was entered. The 'release' command restores the console\n"
+"  message to the serial interface, which is a hard-wired, three-wire interface on\n"
+"  the EEM itself. If we redirect the console output to a socket, and the socket\n"
+"  subsequentlycloses, the console messages will automatically restore themselves to\n"
+"  the serial interface. If we pass no options to the routine, it returns the state\n"
+"  of the flag, 'on' for set and 'off' for cleared, and the destination of console\n"
+"  prints, UART2 for the serial interface and SOCKx for a socket, where x is the\n"
+"  socket index.\n"
 "\n"
 "Verbs:\n"
 "  on           Set the debug flag, debug prints enabled.\n"
 "  off          Clear the debug flag, debug prints disabled.\n"
+"  grab         Redirect console reporting to this channel.\n"
+"  release      Restore console reporting to the serial port.\n"
 "\n"
 "Options:\n"
 "  --info        Print a one-line summary of this command.\n"
@@ -289,13 +269,74 @@ void cli_debug(cli_chan_type *ch, char *args) {
 
 	if (!verb_received) {
 		if (debug) {
-			cli_message(ch, "on\n");
+			cli_message(ch, "on ");
 		} else {
-			cli_message(ch, "off\n");
+			cli_message(ch, "off ");
+		}
+		if (console_context != NULL) {
+			TCP_SOCKET sock = *(TCP_SOCKET *) console_context;
+			if (sock == INVALID_SOCKET) {
+				console_context = NULL;
+				cli_message(ch, "UART2\n");
+			} else {
+				cli_print(ch, "SOCK%d\n", (int) sock);
+			}
+		} else {
+			cli_message(ch, "UART2\n");
 		}
 	} else {
-		debug = set_flag;
+		if (set_flag) debug = true;
+		if (clear_flag) debug = false;
+		if (grab_flag) console_context = ch->context;
+		if (release_flag) console_context = NULL;
 	}
 	
     return;
+}
+
+/*
+	console_put_int_hex takes a thirty-two bit integer, which is eight nibbles,
+	and prints it as eight hexadecimal ASCII digits, most significant nibble
+	first, to the console. This routine does not provide support for a secondary
+	destination, but prints only to UART2.
+*/
+void console_put_int_hex(uint32_t value) {
+    const char hex[] = "0123456789ABCDEF";
+    for (int shift = 28; shift >= 0; shift -= 4)
+        uart2_putchar(NULL, hex[(value >> shift) & 0xF]);
+}
+
+/*
+	console_put_int_trace uses the UART2 interface to display a thirty-two bit
+	integer for viewing on an oscilloscope. It takes an integer value and
+	transmits it, least significant byte first, over the UART. Because the UART
+	sends the least significant bit first, we will see the bits on our
+	oscilloscope trace of UART2 TX line as bit 0 to 32, with a stop bit (1) and
+	a start bit (0) between each of the bytes. We can use it to broadcast raw
+	register values, as in console_putint(RPF3R). We used this routine to look
+	at LATF, PIRTF, ODCF, and RPF3R when we were investigating our start-up GPIP
+	problems. By looking at the bits on an oscilloscope, we do not need a
+	functioning UART-to-USB bridge, and we can view register bits toggling more
+	easily.	This routine does not provide support for a secondary
+	destination, but prints only to UART2.	
+*/
+void console_put_int_trace(uint32_t value) {
+	int i;
+	for (i = 0; i <= 3; i++) {
+		uart2_putchar(NULL, ((uint8_t*)&value)[i]);
+	}
+}
+
+/*
+	console_write writes a raw byte array write to the console, with no regard
+	to the byte values, including no recognition of a null character as a
+	terminator. We pass it a pointer to the byte array and the size of the
+	array. This routine does not provide support for a secondary destination,
+	but prints only to UART2.
+*/
+void console_write(const void *buff, size_t size) {
+    const uint8_t *p = (const uint8_t*) buff;
+    for (size_t i = 0; i < size; i++) {
+        uart2_putchar(NULL, p[i]);
+    }
 }

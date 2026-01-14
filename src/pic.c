@@ -342,8 +342,7 @@ void pic_info(char *out) {
 	this pointer, so they mark it as "void" to stop a compiler warning about an
 	unused variable.
 */
-int uart2_readcount(void *context)
-{
+int uart2_readcount(void *context) {
     (void) context;
     return UART2_ReadCountGet();
 }

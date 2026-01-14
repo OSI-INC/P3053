@@ -252,7 +252,7 @@ void cli_print(cli_chan_type *ch, const char *fmt, ...);
 	Build in and example CLI command procedures.
 */
 void cli_help(cli_chan_type *ch, char *args);
-void cli_status(cli_chan_type *ch, char *args);
+void cli_report(cli_chan_type *ch, char *args);
 void cli_login(cli_chan_type *ch, char *args);
 void cli_exit(cli_chan_type *ch, char *args);
 void cli_prompt(cli_chan_type *ch, char *args);

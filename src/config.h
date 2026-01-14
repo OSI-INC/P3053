@@ -52,6 +52,7 @@ extern bool debug;
 	Default server configurations.
 */
 #define DEFAULT_TELNET_PORT 23
+#define DEFAULT_MONITOR_PORT 91
 
 /*
 	The length of the TCP socket queue. This is the number of sockets that
@@ -116,7 +117,7 @@ extern bool debug;
 	We use the motherboard macro to define a motherboard name string for each of
 	the motherboard versions listed in the table above.
 */
-#define EEM_MOTHERBOARD_A3042
+#define EEM_MOTHERBOARD_A2071
 
 #ifdef EEM_MOTHERBOARD_A2071
 #define EEM_MOTHERBOARD_NAME "A2071"

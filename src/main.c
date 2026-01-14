@@ -108,7 +108,7 @@
 #include "lwdaq.h"
 
 /*
-	Declare the constants and structures that configure our Telnet server. If we
+	Declare the structures and fields that configure our Telnet server. If we
 	want a timeout, we must set the timeout in seconds as well. We disable the
 	Telnet server by setting the telnet_port field of the flash EEM
 	configuration to zero.
@@ -123,6 +123,8 @@ tcpip_server_type telnet_server = {
     .port = DEFAULT_TELNET_PORT,
     .tcp_timeout = 0,
     .last_tick = 0,
+    .socket = INVALID_SOCKET,
+    .listening = INVALID_SOCKET
 };
 
 /*
@@ -284,8 +286,8 @@ int main (void) {
 	cli_cmd_register(CLI_LOGIN_CMD,cli_login);
 	cli_cmd_register("mpcie",cli_mpcie);
 	cli_cmd_register("prompt",cli_prompt);
+	cli_cmd_register("report",cli_report);
 	cli_cmd_register("reset",cli_reset);
-	cli_cmd_register("status",cli_status);
 	
 	// Wait for the power supplies to settle before we check the configuration
 	// switch. If we read the switch location too soon, we will think it is

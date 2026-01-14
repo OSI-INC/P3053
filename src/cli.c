@@ -430,10 +430,10 @@ void cli_help(cli_chan_type *ch, char *args) {
 }
 
 /*
-	cli_status accepts the required --info and --help arguments, but if we pass
-	neither of these, it prints out a bunch of status information.
+	cli_report accepts the required --info and --help arguments, but if we pass
+	neither of these, it prints out system status and configuration report.
 */
-void cli_status(cli_chan_type *ch, char *args) {
+void cli_report(cli_chan_type *ch, char *args) {
 	bool print_info = false;
 	bool print_help = false;
 	char *tok = strtok(args, " \t");
@@ -459,10 +459,10 @@ void cli_status(cli_chan_type *ch, char *args) {
 	if (print_help) {
 		cli_message(ch,
 "Usage:\n"
-"  status [--info] [--help]\n"
+"  report [--info] [--help]\n"
 "\n"
 "Summary:\n"
-"  Print a table of system information. This includes network status, software tick\n"
+"  Print a report of system information. This includes network status, software tick\n"
 "  frequency, microprocessor clock frequency, login status of the command-line\n"
 "  interpreter, motherboard name, platform name, and software version number.\n"
 "\n"
