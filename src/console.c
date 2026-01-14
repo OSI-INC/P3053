@@ -52,7 +52,13 @@ void *console_context = NULL;
 	context pointer is set, the routine checks to see if it points to a valid
 	socket. If not, the routine clears the pointer. If the context pointer is
 	cleared, the routine writes to the serial interface. Otherwise it writes to
-	the specified socket.
+	the specified socket. This algorithm for checking whether the socket is
+	valid or not does not necessarily mean that the console messages will be
+	restored to the serial port once a socket that redirected the debug
+	reporting to itself has been closed. If no call to console_putchar takes
+	place before another client is connected, this new client may be assigned
+	the same socket record as was used by the redirecting socket. Now console
+	messsages will be directed to the new socket.
 */
 void console_putchar(char c) {
 	if (console_context != NULL) {
@@ -248,11 +254,12 @@ void cli_debug(cli_chan_type *ch, char *args) {
 "  which the grab command was entered. The 'release' command restores the console\n"
 "  message to the serial interface, which is a hard-wired, three-wire interface on\n"
 "  the EEM itself. If we redirect the console output to a socket, and the socket\n"
-"  subsequentlycloses, the console messages will automatically restore themselves to\n"
-"  the serial interface. If we pass no options to the routine, it returns the state\n"
-"  of the flag, 'on' for set and 'off' for cleared, and the destination of console\n"
-"  prints, UART2 for the serial interface and SOCKx for a socket, where x is the\n"
-"  socket index.\n"
+"  subsequently closes, the console messages will usually restore themselves to the\n"
+"  serial interface, but might be directed towards a new socket that took the place\n"
+"  of the socket that closed. If we pass no options to the routine, the command\n"
+"  returns the state of the debug flag and the current destination of console prints.\n"
+"  For the serial interface, the command writes 'UART2' and for a socket interface\n"
+"  the command writes 'SOCKx', where 'x' is the socket index.\n"
 "\n"
 "Verbs:\n"
 "  on           Set the debug flag, debug prints enabled.\n"
