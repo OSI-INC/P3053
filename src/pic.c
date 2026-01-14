@@ -243,27 +243,25 @@ void pic_gpio_initialize(void) {
 	// the three key values we use to unlock the registers.
 	SYSKEY = 0x33333333;
 	
-    // Configure the MPCIE address bus lines as outputs.
-    TRISCCLR = MPCIE_CA_MASK_RC;   // RC1–RC4
-    TRISECLR = MPCIE_CA_MASK_RE;   // RE0–RE1
+    // Configure the mPCIe address bus lines as outputs.
+    TRISCCLR = MPCIE_CAB_MASK_RC;   // RC1–RC4
+    TRISECLR = MPCIE_CAB_MASK_RE;   // RE0–RE1
 
-	// Configure the MPCIE data strobe and write lines as outputs.
-	TRISDCLR = MPCIE_CDS_RD4 | MPCIE_CWR_RD5;
+	// Configure the mPCIe data strobe and write lines as outputs.
+	TRISDCLR = MPCIE_CDS_MASK | MPCIE_CWR_MASK;
 
-    // Set the MPCIE data bus initially as inputs.
-    TRISCSET = MPCIE_CD_MASK_RC;   // RC13, RC14
-    TRISESET = MPCIE_CD_MASK_RE;   // RE2–RE7
+    // Set the mPCIe data bus initially as inputs.
+    TRISCSET = MPCIE_CDB_MASK_RC;   // RC13, RC14
+    TRISESET = MPCIE_CDB_MASK_RE;   // RE2–RE7
 
-    // Unassert MPCIE bus data strobe and control write.
-    LATDSET = MPCIE_CDS_RD4 | MPCIE_CWR_RD5;
+    // Unassert mPCIe bus data strobe and control write.
+    LATDSET = MPCIE_CDS_MASK | MPCIE_CWR_MASK;
 
 	// So far, on our A3053A, we have have D3 and D4 dedicated to UART2, but D2
-	// and D5 are available as test points. Pin U1-56 is RF3, so we want to set
-	// bit 3 of port F as an output. Pin U1-59 is RA2, so we want to set bit 2
-	// of port A as an output as well. The constants that hold the numerical
-	// port codes are defined in plib_gpio.h. To specify the bit, we provide a
-	// mask.
-   	GPIO_PortOutputEnable(GPIO_PORT_F,0x00000008);
+	// and D5 are available as test points on RC15/U1-50 and RA2/U1-59
+	// respectively. We set both these pins as outputs. The constants that hold
+	// the numerical port codes are defined in plib_gpio.h. To specify the bit,
+	// we provide a mask.
    	GPIO_PortOutputEnable(GPIO_PORT_A,0x00000004);
    	GPIO_PortOutputEnable(GPIO_PORT_C,0x00008000);
 }
@@ -472,8 +470,8 @@ void cli_reset(cli_chan_type *ch, char *args) {
 
 /*
 	cli_mpcie is a Command-Line Interpreter (CLI) procedure that reads and
-	writes form the MPCIE bus. We can install this procedure in the CLI and so
-	gain access to the MPCIE bus with byte-wize reads and writes.
+	writes form the mPCIe bus. We can install this procedure in the CLI and so
+	gain access to the mPCIe bus with byte-wize reads and writes.
 */
 void cli_mpcie(cli_chan_type *ch, char *args) {
 	bool print_info = false;

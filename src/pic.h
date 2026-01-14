@@ -43,40 +43,45 @@ static inline void pic_d5_off(void) {GPIO_PortClear(GPIO_PORT_A, 0x00000004);}
 static inline void pic_d5_toggle(void) {GPIO_PortToggle(GPIO_PORT_A, 0x00000004);}
 
 /*
-	We define masks for the MPCIE eight-bit parallel bus. This is the bus by
+	We define masks for the mPCIe eight-bit parallel bus. This is the bus by
 	which the EEM controls the motherboard. The EEM is master of this bus. The
 	bus consists of the Control Address Bus (CA0-CA7), the Control Data Bus
-	(DC0-CD7), Data Strobe (/CDS) and Control Write (/CWR). We define procedures
-	to access the MPCIE parallel bus. All procedures are declared here as static
+	(DC0-CD7), Data Strobe (!CDS) and Control Write (!CWR). We define procedures
+	to access the mPCIe parallel bus. All procedures are declared here as static
 	and inline so they will be combined together and placed in our code without
 	any actual function calls.
 */
 
-// Control Address Bus, CAB, six bits CA0-CA5.
-#define MPCIE_CA0_RC1      0x00000002u   // CA0=RC1
-#define MPCIE_CA1_RC2      0x00000004u   // CA1=RC2
-#define MPCIE_CA2_RC3      0x00000008u   // CA2=RC3
-#define MPCIE_CA3_RC4      0x00000010u   // CA3=RC4
-#define MPCIE_CA4_RE0      0x00000001u   // CA4=RE0
-#define MPCIE_CA5_RE1      0x00000002u   // CA5=RE1
-#define MPCIE_CA_MASK_RC   0x0000001Eu   // RC1–RC4 bits
-#define MPCIE_CA_MASK_RE   0x00000003u   // RE0–RE1 bits
+/*
+	On the A3053A we have the Control Address Bus (CAB) consisting of six
+	bits CA0-CA5 on RC1-RC4, RE0-RE1. We have the Control Data Bus (CDB) 
+	consisting of eight bits CD0-CD7 on RC13, RC14, RE2-RE7. We have
+	Control Data Strobe (!CDS) on RD4 and Control Write (!CWR) on RD5.
+*/
+#ifdef EEM_MODULE_A3053A
+#define MPCIE_CAB_MASK_RC   0x0000001Eu  // RC1–RC4 
+#define MPCIE_CAB_MASK_RE   0x00000003u  // RE0–RE1 
+#define MPCIE_CDB_MASK_RC   0x00006000u  // RC13-RC14
+#define MPCIE_CDB_MASK_RE   0x000000FCu  // RE2-RE7
+#define MPCIE_CDS_MASK      0x00000010u  // !CDS=RD4
+#define MPCIE_CWR_MASK      0x00000020u  // !CWR=RD5
+#endif
 
-// Control Data Bus, CDB, eight bits CD0-CD7.
-#define MPCIE_CD0_RC13   0x00002000u   // CD0=RC13
-#define MPCIE_CD1_RC14   0x00004000u   // CD1=RC14
-#define MPCIE_CD2_RE2    0x00000004u   // CD2=RE2
-#define MPCIE_CD3_RE3    0x00000008u   // CD3=RE3
-#define MPCIE_CD4_RE4    0x00000010u   // CD4=RE4
-#define MPCIE_CD5_RE5    0x00000020u   // CD5=RE5
-#define MPCIE_CD6_RE6    0x00000040u   // CD6=RE6
-#define MPCIE_CD7_RE7    0x00000080u   // CD7=RE7
-#define MPCIE_CD_MASK_RC 0x00006000u   // RC13-RC14
-#define MPCIE_CD_MASK_RE 0x000000FCu   // RE2-RE7
-
-// Control Data Strobe (/CDS) and Control Write (/CWR)
-#define MPCIE_CDS_RD4     0x00000010u   // /CDS=RD4
-#define MPCIE_CWR_RD5     0x00000020u   // /CWR=RD5
+/*
+	On the A3053B we have the Control Address Bus (CAB) consisting of eight bits
+	RE0-RE7. We have the Control Data Bus (CDB) consisting of eight bits
+	RA0-RA7. We have Control Data Strobe (!CDS) on RA10 and Control Write (!CWR)
+	on RA9.
+	
+	NOTE: We have not yet implemented the A3053B code in the PIC32MZ utility
+	library. Attempting to compile with for the A3053B will fail.
+*/
+#ifdef EEM_MODULE_A3053B
+#define MPCIE_CAB_MASK      0x000000FFu  // RE0-RE7
+#define MPCIE_CDB_MASK      0x000000FFu  // RA0-RA7
+#define MPCIE_CDS_MASK      0x00000400u  // !CDS=RA10
+#define MPCIE_CWR_MASK      0x00000200u  // !CWR=RA9
+#endif
 
 // Determine if we want the slower access cycles. This depends upon the
 // motherboard.
@@ -85,45 +90,44 @@ static inline void pic_d5_toggle(void) {GPIO_PortToggle(GPIO_PORT_A, 0x00000004)
 #define MPCIE_SLOW_ACCESS
 #endif
 
-
 /*
-	mpcie_wr_assert drives /CWR low to indicate an MPCIE bus write cycle. After
+	mpcie_wr_assert drives !CWR low to indicate an mPCIe bus write cycle. After
 	we assert CWR, we can set the PIC controller data bus pins to be outputs. We
 	assume the controller will turn off its line drivers immediately.
 */
 static inline void mpcie_wr_assert(void) {
-	LATDCLR = MPCIE_CWR_RD5;
+	LATDCLR = MPCIE_CWR_MASK;
 }
 
 /*
-	mpcie_wr_unassert drives /CWR high to indicate a MPCIE bus read cycle. When
+	mpcie_wr_unassert drives !CWR high to indicate a mPCIe bus read cycle. When
 	we unassert CWR, the motherboard can drive the controller data bus lines.
 */
 static inline void mpcie_wr_unassert(void) {
-	LATDSET = MPCIE_CWR_RD5;
+	LATDSET = MPCIE_CWR_MASK;
 }
 
 /* 
-	mpcie_data_output sets the MPCIE data bus pins on the PIC as outputs. Must
-	be preceeded by asserting Control Write (/CWR).
+	mpcie_data_output sets the mPCIe data bus pins on the PIC as outputs. Must
+	be preceeded by asserting Control Write (!CWR).
 */
 static inline void mpcie_data_output(void) {
-    TRISCCLR = MPCIE_CD_MASK_RC;   // RC13-RC14 as outputs
-    TRISECLR = MPCIE_CD_MASK_RE;   // RE2–RE7 as outputs
+    TRISCCLR = MPCIE_CDB_MASK_RC;   // RC13-RC14 as outputs
+    TRISECLR = MPCIE_CDB_MASK_RE;   // RE2–RE7 as outputs
 }
 
 /*
 	mpcie_data_input sets the controller data bus pins on the PIC as inputs. Must
-	preceed unasserting Controle Write (/CWR). We assume the PIC will turn off its
+	preceed unasserting Controle Write (!CWR). We assume the PIC will turn off its
 	line drivers immediately.
 */
 static inline void mpcie_data_input(void) {
-    TRISCSET = MPCIE_CD_MASK_RC;   // RC13, RC14 as inputs
-    TRISESET = MPCIE_CD_MASK_RE;   // RE2–RE7 as inputs
+    TRISCSET = MPCIE_CDB_MASK_RC;   // RC13, RC14 as inputs
+    TRISESET = MPCIE_CDB_MASK_RE;   // RE2–RE7 as inputs
 }
 
 /*
-	mpcie_ds_assert drives asserts data strobe by driving the /CDS line low.
+	mpcie_ds_assert drives asserts data strobe by driving the !CDS line low.
 	Indicates that data is valid on a write cycle. Indicates that data is
 	requested on a read cycle. We insert an access delay after CDS to allow time
 	for the controller to respond. We make the delay out of PIC "nop"
@@ -134,7 +138,7 @@ static inline void mpcie_data_input(void) {
 */
 static inline void mpcie_ds_assert(void)   {
 
-	LATDCLR = MPCIE_CDS_RD4;
+	LATDCLR = MPCIE_CDS_MASK;
 
 	__asm__ volatile (
 		"nop\n\t"
@@ -190,7 +194,7 @@ static inline void mpcie_ds_assert(void)   {
 	mpcie_ds_unassert drives the data strobe HI, which unasserts data strobe.
 */
 static inline void mpcie_ds_unassert(void) {
-	LATDSET = MPCIE_CDS_RD4;
+	LATDSET = MPCIE_CDS_MASK;
 }
 
 /*
@@ -204,8 +208,8 @@ static inline void mpcie_ds_unassert(void) {
 	normal and slow access respectively, as selected by a compiler flag.
 */
 static inline void mpcie_addr_set(uint8_t addr) {
-    LATC = (LATC & ~MPCIE_CA_MASK_RC) | ((uint32_t)(addr & 0x0Fu) << 1);
-    LATE = (LATE & ~MPCIE_CA_MASK_RE) | ((uint32_t)(addr >> 4) & 0x03u);
+    LATC = (LATC & ~MPCIE_CAB_MASK_RC) | ((uint32_t)(addr & 0x0Fu) << 1);
+    LATE = (LATE & ~MPCIE_CAB_MASK_RE) | ((uint32_t)(addr >> 4) & 0x03u);
 
 	__asm__ volatile (
 		"nop\n\t"
@@ -243,8 +247,8 @@ static inline void mpcie_addr_set(uint8_t addr) {
 	bit2-bit7. 
 */
 static inline void mpcie_data_set(uint8_t data) {
-	LATC = (LATC & ~MPCIE_CD_MASK_RC) | ((uint32_t) (data & 0x03u) << 13);
-	LATE = (LATE & ~MPCIE_CD_MASK_RE) | ((uint32_t) (data & 0xFCu));
+	LATC = (LATC & ~MPCIE_CDB_MASK_RC) | ((uint32_t) (data & 0x03u) << 13);
+	LATE = (LATE & ~MPCIE_CDB_MASK_RE) | ((uint32_t) (data & 0xFCu));
 }
 
 /*
