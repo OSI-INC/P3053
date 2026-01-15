@@ -134,7 +134,7 @@ static inline void mpcie_data_input(void) {
 	instructions, or "no operation" instructions. Each of these takes 5 ns for a
 	PIC clock speed of 200 MHz, so each set of twenty is 100 ns. Our controllers
 	interfaces run off either a 40-MHz or 80-MHz clock. We use hold time of 200
-	ns and 100 ns ns respectively for these interfaces.
+	ns and 150 ns ns respectively for these interfaces.
 */
 static inline void mpcie_ds_assert(void)   {
 
@@ -161,20 +161,20 @@ static inline void mpcie_ds_assert(void)   {
 		"nop\n\t"
 		"nop\n\t"
 		"nop\n\t"
+		"nop\n\t"
+		"nop\n\t"
+		"nop\n\t"
+		"nop\n\t"
+		"nop\n\t"
+		"nop\n\t"
+		"nop\n\t"
+		"nop\n\t"
+		"nop\n\t"
+		"nop\n\t"
      );    
      
 #ifdef MPCIE_SLOW_ACCESS
 	__asm__ volatile (
-		"nop\n\t"
-		"nop\n\t"
-		"nop\n\t"
-		"nop\n\t"
-		"nop\n\t"
-		"nop\n\t"
-		"nop\n\t"
-		"nop\n\t"
-		"nop\n\t"
-		"nop\n\t"
 		"nop\n\t"
 		"nop\n\t"
 		"nop\n\t"
