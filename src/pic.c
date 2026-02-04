@@ -258,12 +258,12 @@ void pic_gpio_initialize(void) {
     LATDSET = MPCIE_CDS_MASK | MPCIE_CWR_MASK;
 
 	// So far, on our A3053A, we have have D3 and D4 dedicated to UART2, but D2
-	// and D5 are available as test points on RC15/U1-50 and RA2/U1-59
+	// and D5 are available as test points on RF3/U1-56 and RA2/U1-59
 	// respectively. We set both these pins as outputs. The constants that hold
 	// the numerical port codes are defined in plib_gpio.h. To specify the bit,
 	// we provide a mask.
    	GPIO_PortOutputEnable(GPIO_PORT_A,0x00000004);
-   	GPIO_PortOutputEnable(GPIO_PORT_C,0x00008000);
+   	GPIO_PortOutputEnable(GPIO_PORT_F,0x00000008);
 }
 
 /*

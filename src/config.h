@@ -117,7 +117,7 @@ extern bool debug;
 	We use the motherboard macro to define a motherboard name string for each of
 	the motherboard versions listed in the table above.
 */
-#define EEM_MOTHERBOARD_A2071
+#define EEM_MOTHERBOARD_A3042
 
 #ifdef EEM_MOTHERBOARD_A2071
 #define EEM_MOTHERBOARD_NAME "A2071"

@@ -87,7 +87,7 @@
 #pragma config PGL1WAY =    ON
 #pragma config PMDL1WAY =   ON
 #pragma config IOL1WAY =    ON
-#pragma config FUSBIDIO =   ON
+#pragma config FUSBIDIO =   OFF
 
 /*** BF1SEQ0 ***/
 #pragma config TSEQ =       0xffff
