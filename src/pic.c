@@ -201,9 +201,11 @@ void pic_reset(void) {
 
 /*
 	pic_configure sets the PIC32MZ general-purpose input-output pins for our
-	application.
+	application. 
 */
 void pic_gpio_initialize(void) {
+
+#ifdef EEM_MODULE_A3053A	
 	// The A3053A is all-digital. so we configure all pins as digital pins. We
 	// don't even bother to check the data sheet to see which pins can be
 	// non-digital, we just set them all to digital even if they are always
@@ -228,8 +230,9 @@ void pic_gpio_initialize(void) {
 	// writing to the Peripheral Pin Selection (PPS) registers.
 	CFGCONbits.IOLOCK = 0U;
 
-	// Select RF8 as the source of UART2 RX. On the A3053A, RF8 is U1-58,
-	// connected to R11, which in turn feeds D4, the white test point LED.
+	// Select RF8 as the source of UART2 RX. On the A3053A and A3053B, RF8 is
+	// U1-58, connected to R11, which in turn feeds D4, the white test point
+	// LED.
 	U2RXR = 0b1011;
 	
 	// Select UART2 TX as the source of RF2. On the A3053A, RF2 is U1-57,
@@ -258,12 +261,82 @@ void pic_gpio_initialize(void) {
     LATDSET = MPCIE_CDS_MASK | MPCIE_CWR_MASK;
 
 	// So far, on our A3053A, we have have D3 and D4 dedicated to UART2, but D2
-	// and D5 are available as test points on RF3/U1-56 and RA2/U1-59
-	// respectively. We set both these pins as outputs. The constants that hold
-	// the numerical port codes are defined in plib_gpio.h. To specify the bit,
-	// we provide a mask.
+	// and D5 are available as test points on RF3 and RA2 respectively. We set
+	// both these pins as outputs. The constants that hold the numerical port
+	// codes are defined in plib_gpio.h. To specify the bit, we provide a mask.
    	GPIO_PortOutputEnable(GPIO_PORT_A,0x00000004);
    	GPIO_PortOutputEnable(GPIO_PORT_F,0x00000008);
+#endif
+
+#ifdef EEM_MODULE_A3053B	
+	// The A3053B is all-digital. so we configure all pins as digital pins. We
+	// don't even bother to check the data sheet to see which pins can be
+	// non-digital, we just set them all to digital even if they are always
+	// digital.
+	ANSELA = 0x00000000;
+	ANSELB = 0x00000000;
+	ANSELC = 0x00000000;
+	ANSELD = 0x00000000;
+	ANSELE = 0x00000000;
+	ANSELF = 0x00000000;
+	ANSELG = 0x00000000;
+	
+	// We unlock access to the configuration registers by writing a sequence of
+	// three values to the SYSKEY register. These three key values work on all
+	// PIC32 microprocessors. 
+	SYSKEY = 0x00000000U;
+	SYSKEY = 0xAA996655U;
+	SYSKEY = 0x556699AAU;
+	
+	// Now that we have unlocked the configuration registers for writing, we
+	// write to the IOLOCK bit of the configuration control register to enable
+	// writing to the Peripheral Pin Selection (PPS) registers.
+	CFGCONbits.IOLOCK = 0U;
+
+	// Select RF8 as the source of UART2 RX. On the A3053A and A3053B, RF8 is
+	// U1-58, connected to R11, which in turn feeds D4, the white test point
+	// LED.
+	U2RXR = 0b1011;
+	
+	// Select UART2 TX as the source of RF2. On the A3053A, RF2 is U1-57,
+	// connected to, R10, which in turn feeds D3, the blue test point LED.
+	RPF2R = 0b0010;
+	
+	// Lock the PPS registers.
+	CFGCONbits.IOLOCK = 1U;
+	
+	// Lock the configuration registers. We write a value that is not one of
+	// the three key values we use to unlock the registers.
+	SYSKEY = 0x33333333;
+	
+    // Configure the mPCIe address bus lines as outputs. These lines are
+    // RE0-RE7.
+    TRISECLR = MPCIE_CAB_MASK;
+
+    // Set the mPCIe data bus as inputs to start with. We do not want to drive the
+    // lines in case one of the slaves starts up driving the lines. The data bus 
+    // lines are RA0-RA7.
+    TRISASET = MPCIE_CDB_MASK;  
+
+	// Configure the mPCIe write line and data strobe pins as outputs. These lines
+	// are RA9 for !CWR and RA10 for !CDS. 
+	TRISACLR = MPCIE_CWR_MASK;
+	TRISACLR = MPCIE_CDS_MASK;
+	
+	// Having configured !CWR and !CDS as outputs, we unassert them both by
+	// driving them HI, which in the PIC terminology is to "set" them.
+    LATASET = MPCIE_CDS_MASK;
+    LATASET = MPCIE_CWR_MASK;
+
+	// We have four test points with indicator lamps on the A3053B. They are
+	// connected to RF3 (D2), RF4 (D3), RF5 (D4), and RD9 (D5). We configure
+	// these four test point pins as outputs. The constants that hold the
+	// numerical port codes are defined in plib_gpio.h. To specify each bit, we
+	// use a mask.
+   	TRISDCLR = 0x00000200;
+   	TRISFCLR = 0x00000038;
+#endif
+
 }
 
 /*

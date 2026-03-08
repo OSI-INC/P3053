@@ -84,7 +84,7 @@ extern bool debug;
 	We define a macro below and use it to define a name string for each of the
 	module versions listed in the table above.
 */
-#define EEM_MODULE_A3053A
+#define EEM_MODULE_A3053B
 
 #ifdef EEM_MODULE_A3053A
 #define EEM_MODULE_NAME "A3053A"
