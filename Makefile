@@ -50,13 +50,17 @@
 #
 
 #
-# Define the exact processor, the location of its device pack, point to its
-# linker script, and assign a minimum heap size so that we can be sure to have
-# enough RAM for our network connections.
+# Define the exact processor, the location of its device pack, and point to its
+# linker script
 #
-CPU=32MZ2048EFH100
-DFP_DIR=../Microchip/PIC32MZ-EF_DFP/1.3.58
-CPULD=$(DFP_DIR)/xc32/$(CPU)/p$(CPU).ld
+CPU := 32MZ2048EFH100
+DFP_DIR := $(abspath ../Microchip/PIC32MZ-EF_DFP/1.3.58)
+CPULD := $(DFP_DIR)/xc32/$(CPU)/p$(CPU).ld
+
+#
+# Assign a minimum heap size so that we can be sure to have enough RAM for our
+# network connections.
+#
 HEAPSIZE=200000
 
 #
@@ -71,24 +75,24 @@ RESET  := \033[0m
 #
 # All the x32 build tools: compilers, linkers, archivers, and assemblers.
 #
-MP_DIR=/Applications/microchip/xc32/v4.60/bin
-MP_BIN2HEX=$(MP_DIR)/xc32-bin2hex
-MP_CC=$(MP_DIR)/xc32-gcc
-MP_CPPC=$(MP_DIR)/xc32-g++
-MP_AS=$(MP_DIR)/xc32-as
-MP_LD=$(MP_DIR)/xc32-ld
-MP_AR=$(MP_DIR)/xc32-ar
+MP_DIR := /Applications/microchip/xc32/v4.60/bin
+MP_BIN2HEX := $(MP_DIR)/xc32-bin2hex
+MP_CC := $(MP_DIR)/xc32-gcc
+MP_CPPC := $(MP_DIR)/xc32-g++
+MP_AS := $(MP_DIR)/xc32-as
+MP_LD := $(MP_DIR)/xc32-ld
+MP_AR := $(MP_DIR)/xc32-ar
 
 #
 # Define the build and distribution directories, the final output file and the
 # map file names.
 #
-TARGET=P3053
-BUILD_DIR=build
-$(info BUILD_DIR=$(BUILD_DIR))
-OUTPUT_FILE=$(BUILD_DIR)/$(TARGET).elf
-$(info OUTPUT_FILE=$(OUTPUT_FILE))
-MAP_FILE=$(BUILD_DIR)/$(TARGET).map
+TARGET := P3053
+BUILD_DIR := build
+$(info BUILD_DIR = $(BUILD_DIR))
+OUTPUT_FILE := $(BUILD_DIR)/$(TARGET).elf
+$(info OUTPUT_FILE = $(OUTPUT_FILE))
+MAP_FILE := $(BUILD_DIR)/$(TARGET).map
 
 #
 # Get a list of all the sources in the source directory. These are C and
@@ -103,9 +107,9 @@ OBJECTFILES := $(OBJECTFILES:.S=.o)
 # Initialize our flag variables. If we specify any of these at the commmand line
 # when we invoke Make, our local values will be over-written.
 #
-CFLAGS=
-ASFLAGS=
-LDFLAGS=
+CFLAGS :=
+ASFLAGS :=
+LDFLAGS :=
 
 #
 # Flags that are shared by the release and debug builds.
