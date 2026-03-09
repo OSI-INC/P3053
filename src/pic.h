@@ -14,11 +14,11 @@
 
 	This program is distributed in the hope that it will be useful, but WITHOUT
 	ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-	FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+	FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
 	more details.
 
 	You should have received a copy of the GNU General Public License along with
-	this program.  If not, see <https://www.gnu.org/licenses/>.
+	this program. If not, see <https://www.gnu.org/licenses/>.
 */
 
 #ifndef PIC_H
@@ -37,9 +37,9 @@
 */
 
 /*
-	On the A3053A, D2 and D5 are connected to RF3 and RA2 respectively and act as
-	test lamps. But D3 and D4 are used for the TX and RX lines of UART2, so we 
-	provide no toggle routines for those outputs.
+	In the A3053A, lamps D2 and D5 are connected to RF3 and RA2 respectively and
+	act as test lamps. But lamps D3 and D4 are used for the TX and RX lines of
+	UART2, so we provide no toggle routines for those outputs.
 */
 #ifdef EEM_MODULE_A3053A
 static inline void pic_d2_on(void) {GPIO_PortSet(GPIO_PORT_F, 0x00000008);}
@@ -51,8 +51,8 @@ static inline void pic_d5_toggle(void) {GPIO_PortToggle(GPIO_PORT_A, 0x00000004)
 #endif
 
 /*
-	On the A3053B, D2, D3, D4, and D5 are connected to RF3, RF4, RF5, and RD9
-	respectively.
+	In the A3053B, lamps D2, D3, D4, and D5 are connected to RF3, RF4, RF5, and
+	RD9 respectively.
 */
 #ifdef EEM_MODULE_A3053B
 static inline void pic_d2_on(void) {GPIO_PortSet(GPIO_PORT_F, 0x00000008);}
@@ -80,7 +80,7 @@ static inline void pic_d5_toggle(void) {GPIO_PortToggle(GPIO_PORT_D, 0x00000200)
 */
 
 /*
-	On the A3053A we have the Control Address Bus (CAB) consisting of six
+	In the A3053A we have the Control Address Bus (CAB) consisting of six
 	bits CA0-CA5 on RC1-RC4, RE0-RE1. We have the Control Data Bus (CDB) 
 	consisting of eight bits CD0-CD7 on RC13, RC14, RE2-RE7. We have
 	Control Data Strobe (!CDS) on RD4 and Control Write (!CWR) on RD5.
@@ -95,7 +95,7 @@ static inline void pic_d5_toggle(void) {GPIO_PortToggle(GPIO_PORT_D, 0x00000200)
 #endif
 
 /*
-	On the A3053B we have the Control Address Bus (CAB) consisting of eight bits
+	In the A3053B we have the Control Address Bus (CAB) consisting of eight bits
 	RE0-RE7. We have the Control Data Bus (CDB) consisting of eight bits
 	RA0-RA7. We have Control Data Strobe (!CDS) on RA10 and Control Write (!CWR)
 	on RA9.
@@ -119,7 +119,14 @@ static inline void pic_d5_toggle(void) {GPIO_PortToggle(GPIO_PORT_D, 0x00000200)
 	assume the controller will turn off its line drivers immediately.
 */
 static inline void mpcie_wr_assert(void) {
+
+#ifdef EEM_MODULE_A3053A
 	LATDCLR = MPCIE_CWR_MASK;
+#endif
+
+#ifdef EEM_MODULE_A3053B
+	LATACLR = MPCIE_CWR_MASK;
+#endif
 }
 
 /*
@@ -127,11 +134,13 @@ static inline void mpcie_wr_assert(void) {
 	we unassert CWR, the motherboard can drive the controller data bus lines.
 */
 static inline void mpcie_wr_unassert(void) {
+
 #ifdef EEM_MODULE_A3053A
 	LATDSET = MPCIE_CWR_MASK;
 #endif
-#ifdef EEM_MODULE_A3053B
 
+#ifdef EEM_MODULE_A3053B
+	LATASET = MPCIE_CWR_MASK;
 #endif
 }
 
@@ -140,12 +149,14 @@ static inline void mpcie_wr_unassert(void) {
 	be preceeded by asserting Control Write (!CWR).
 */
 static inline void mpcie_data_output(void) {
-#ifdef EEM_MODULE_A3053A
-    TRISCCLR = MPCIE_CDB_MASK_RC;   // RC13-RC14 as outputs
-    TRISECLR = MPCIE_CDB_MASK_RE;   // RE2–RE7 as outputs
-#endif
-#ifdef EEM_MODULE_A3053B
 
+#ifdef EEM_MODULE_A3053A
+    TRISCCLR = MPCIE_CDB_MASK_RC;
+    TRISECLR = MPCIE_CDB_MASK_RE;
+#endif
+
+#ifdef EEM_MODULE_A3053B
+	TRISACLR = MPCIE_CDB_MASK;
 #endif
 }
 
@@ -155,12 +166,14 @@ static inline void mpcie_data_output(void) {
 	line drivers immediately.
 */
 static inline void mpcie_data_input(void) {
- #ifdef EEM_MODULE_A3053A
-	TRISCSET = MPCIE_CDB_MASK_RC;   // RC13, RC14 as inputs
-	TRISESET = MPCIE_CDB_MASK_RE;   // RE2–RE7 as inputs
-#endif
-#ifdef EEM_MODULE_A3053B
 
+ #ifdef EEM_MODULE_A3053A
+	TRISCSET = MPCIE_CDB_MASK_RC; 
+	TRISESET = MPCIE_CDB_MASK_RE;
+#endif
+
+#ifdef EEM_MODULE_A3053B
+	TRISASET = MPCIE_CDB_MASK;
 #endif
 }
 
@@ -169,18 +182,19 @@ static inline void mpcie_data_input(void) {
 	Indicates that data is valid on a write cycle. Indicates that data is
 	requested on a read cycle. We insert an access delay after CDS to allow time
 	for the controller to respond. We make the delay out of PIC "nop"
-	instructions, or "no operation" instructions. Each of these takes 5 ns for a
-	PIC clock speed of 200 MHz, so each set of twenty is 100 ns. Our controllers
-	interfaces run off either a 40-MHz or 80-MHz clock. We use hold time of 200
-	ns and 150 ns ns respectively for these interfaces.
+	operations. Each of these takes 5 ns for a PIC clock speed of 200 MHz, so
+	each set of twenty is 100 ns. Our controllers interfaces run off either a
+	40-MHz or 80-MHz clock. We use hold time of 200 ns and 150 ns ns
+	respectively for these interfaces.
 */
 static inline void mpcie_ds_assert(void)   {
 
 #ifdef EEM_MODULE_A3053A
 	LATDCLR = MPCIE_CDS_MASK;
 #endif
-#ifdef EEM_MODULE_A3053B
 
+#ifdef EEM_MODULE_A3053B
+	LATACLR = MPCIE_CDS_MASK;
 #endif
 
 	__asm__ volatile (
@@ -237,11 +251,13 @@ static inline void mpcie_ds_assert(void)   {
 	mpcie_ds_unassert drives the data strobe HI, which unasserts data strobe.
 */
 static inline void mpcie_ds_unassert(void) {
+
 #ifdef EEM_MODULE_A3053A
 	LATDSET = MPCIE_CDS_MASK;
 #endif
-#ifdef EEM_MODULE_A3053B
 
+#ifdef EEM_MODULE_A3053B
+	LATASET = MPCIE_CDS_MASK;
 #endif
 }
 
@@ -256,12 +272,14 @@ static inline void mpcie_ds_unassert(void) {
 	normal and slow access respectively, as selected by a compiler flag.
 */
 static inline void mpcie_addr_set(uint8_t addr) {
+
 #ifdef EEM_MODULE_A3053A
     LATC = (LATC & ~MPCIE_CAB_MASK_RC) | ((uint32_t)(addr & 0x0Fu) << 1);
     LATE = (LATE & ~MPCIE_CAB_MASK_RE) | ((uint32_t)(addr >> 4) & 0x03u);
 #endif
-#ifdef EEM_MODULE_A3053B
 
+#ifdef EEM_MODULE_A3053B
+    LATE = (LATE & ~MPCIE_CAB_MASK) | ((uint32_t) (addr & 0xFFu));
 #endif
 
 	__asm__ volatile (
@@ -296,39 +314,37 @@ static inline void mpcie_addr_set(uint8_t addr) {
 /*
 	mpcie_data_set assigns the mpcie interface data pins with the specified
 	value. Note that this value will not appear on the data pins unless the pins
-	are set as outputs. We have RC13 as bit0, RC14 as bit1, and RE2-RE7 as
-	bit2-bit7. 
+	are set as outputs using the separate inline routine mpcie_data_output.
 */
 static inline void mpcie_data_set(uint8_t data) {
+
 #ifdef EEM_MODULE_A3053A
 	LATC = (LATC & ~MPCIE_CDB_MASK_RC) | ((uint32_t) (data & 0x03u) << 13);
 	LATE = (LATE & ~MPCIE_CDB_MASK_RE) | ((uint32_t) (data & 0xFCu));
 #endif
-#ifdef EEM_MODULE_A3053B
 
+#ifdef EEM_MODULE_A3053B
+	LATA = (LATA & ~MPCIE_CDB_MASK) | ((uint32_t) (data & 0xFFu));
 #endif
 }
 
 /*
-	mpcie_data_get obtains the byte value on the mpcie interface data pins.
-	This byte value is whatever is on the pins. We have to compose a byte from
-	the various PIC pins we have assigned to the data bus, but this turns out to
-	be straightforward: we take PORTC and shift it thirteen times to the right,
-	at which point RC14 is in bit1 and RC13 is in bit0, so we AND it with 0x03. We
-	take PORTE and we AND it immediately with 0xFC so that we get the bits
-	RE2..RE7 in positions bit2..bit7. We OR these two bytes together and we have our
-	value.
+	mpcie_data_get obtains the byte value on the mpcie interface data pins. This
+	byte value is whatever is on the pins.
 */
 static inline uint8_t mpcie_data_get(void) {
     uint8_t value = 0;
+    
 #ifdef EEM_MODULE_A3053A
 	uint32_t c = PORTC;
 	uint32_t e = PORTE;
 	value = (uint8_t) ((c >> 13) & 0x03u) | (e  & 0xFCu);
 #endif
-#ifdef EEM_MODULE_A3053B
 
+#ifdef EEM_MODULE_A3053B
+	value = (uint8_t) PORTA;	
 #endif
+
     return value;
 }
 
