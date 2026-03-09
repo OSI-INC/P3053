@@ -628,14 +628,22 @@ int server_info(char *out) {
 
 /*
 	tcpip_server manages connections to a TCP/IP server and deploys a messaging
-	protocol to them using a messaging task function we provide. To service a
-	socket, the server routine calls this task function, passing to the task
-	function the complete server record, which includes a handle to the socket.
+	protocol for them using a server structure and a task function. To service a
+	socket, the server routine calls the task function, passing to the task
+	function the complete server structure. The server structure includes a
+	handle to the socket that must requires servicing.
 
-	The tcpip_server is a sequence of conditional clauses that implement the
-	server logic with the help of a few flags, an active socket, a listening
-	socket, and a socket queue. The routine does not block unless its protocol
-	task blocks. The protocol task is permitted to block, but it must call
+	The server record we pass to tcpip_server must include a valid pointer to an
+	indicator function. This function must be of the form "void name (bool
+	value)". The server will call this routine with value "true" when it takes a
+	socket from its queue and begins servicing the socket with its task routine.
+	It will call the routine with value "false" when it closes the active
+	socket. 
+
+	The server is a sequence of conditional clauses that implement the server
+	logic with the help of a few flags, an active socket, a listening socket,
+	and a socket queue. The routine does not block unless its protocol task
+	blocks. The protocol task is permitted to block, but it must call
 	tcp_sock_tick while it is blocking, so as to maintain the TCP/IP stack, and
 	to detect closure of the socket by the client. If the client closes the
 	socket, the protocol task must abort and return a negative value.
@@ -658,11 +666,11 @@ int server_info(char *out) {
 	socket or when the timeout expires. Only then will the next socket in the
 	queue be serviced.
 
-	The protocol task call-back function takes as a parameter the server status
-	record, which includes an initialization flag and a socket handle. The
-	server sets the initialization flag before the first call to the tasks
-	routine on a new socket and clears it after. The task function can use the
-	initialization flag to initialize itself. It uses the socket handle to
+	The tasks function takes as a parameter the server structure. This structure
+	includes an initialization flag and a socket handle. The server sets the
+	initialization flag before the first call to the tasks routine on a
+	newly-activated socket and clears the flag it after. The task function uses
+	the initialization flag to initialize itself. It uses the socket handle to
 	communicate with the client. The server will close the socket whenever it
 	sees a negative return value. The task call-back function should not close
 	the socket itself. A return value of EEM_SOCK_ERR indicates that the client
@@ -819,9 +827,9 @@ void tcpip_server(tcpip_server_type *server, tcpip_tasks_type tasks) {
 		if (close_socket) {
 			TCPIP_TCP_Close(server->socket);
 			server->socket = INVALID_SOCKET;
-			server->indicator_off();
+			server->indicator(false);
 		} else {
-			server->indicator_on();
+			server->indicator(true);
 		}
 	}
 	

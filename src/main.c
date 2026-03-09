@@ -125,8 +125,7 @@ tcpip_server_type telnet_server = {
     .last_tick = 0,
     .socket = INVALID_SOCKET,
     .listening = INVALID_SOCKET,
-    .indicator_on = d3_on,
-    .indicator_off = d3_off
+    .indicator = d3_on
 };
 
 /*
@@ -235,22 +234,22 @@ void lamp_signal(uint32_t period) {
 	static uint32_t i = 0;
 	
 	if (period == 0) {
-		d2_on();
-   		d5_on();
+		d2_on(true);
+   		d5_on(true);
    		i = 0;
    		return;
 	} else {
 		i++;
-		if (i % 100 == 0) d2_off();
-		if (i % 1000 == 0) d2_on();
+		if (i % 100 == 0) d2_on(false);
+		if (i % 1000 == 0) d2_on(true);
 		if (server_network_up() && server_link_up() && i == 10000) {
-			d5_off();
+			d5_on(false);
 		}
 		if (server_network_up() && !server_link_up() && i == period - 100000) {
-			d5_off();
+			d5_on(false);
 		}
 		if (i == period) {
-			d5_on();
+			d5_on(true);
 			i = 0;
 		}
 		return;
@@ -351,7 +350,7 @@ int main (void) {
 	while (true) {
 		tcp_tick();
 		cli_server(&console_chan);
-		tcpip_server(&lwdaq_server, lwdaq_tasks);
+		if (EEM_LWDAQ_ENABLE) tcpip_server(&lwdaq_server, lwdaq_tasks);
 		if (EEM_TELNET_ENABLE) tcpip_server(&telnet_server, telnet_tasks);
 		lamp_signal(5e5);
 	}

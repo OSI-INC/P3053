@@ -805,19 +805,19 @@ void cli_lamp(cli_chan_type *ch, char *args) {
 
 	switch (lamp_index) {
 		case 2: 
-			if (on_flag) {d2_on();} else {d2_off();};
+			if (on_flag) {d2_on(true);} else {d2_on(false);};
 			break;
 			
 		case 3: 
-			if (on_flag) {d3_on();} else {d3_off();};
+			if (on_flag) {d3_on(true);} else {d3_on(false);};
 			break;
 
 		case 4: 
-			if (on_flag) {d4_on();} else {d4_off();};
+			if (on_flag) {d4_on(true);} else {d4_on(false);};
 			break;
 
 		case 5: 
-			if (on_flag) {d5_on();} else {d5_off();};
+			if (on_flag) {d5_on(true);} else {d5_on(false);};
 			break;
 
 		default:

@@ -270,8 +270,7 @@ typedef struct {
 	TCP_SOCKET socket;
 	TCP_SOCKET listening;
 	TCP_SOCKET queue[EEM_TCB_QUEUE_SIZE];
-	void (*indicator_on)(void);
-    void (*indicator_off)(void);
+	void (*indicator)(bool on);
 } tcpip_server_type;
 
 /*

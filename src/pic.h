@@ -67,14 +67,10 @@
 #define D3_MASK  0x00000004u  // RF2
 #define D4_MASK  0x00000100u  // RF8
 #define D5_MASK  0x00000004u  // RA2
-static inline void d2_on(void) {LATFSET = D2_MASK;}
-static inline void d2_off(void) {LATFCLR = D2_MASK;}
-static inline void d3_on(void) {;}
-static inline void d3_off(void) {;}
-static inline void d4_on(void) {;}
-static inline void d4_off(void) {;}
-static inline void d5_on(void) {LATASET = D5_MASK;}
-static inline void d5_off(void) {LATACLR = D5_MASK;}
+static inline void d2_on(bool on) {if (on) LATFSET = D2_MASK; else LATFCLR = D2_MASK;}
+static inline void d3_on(bool on) {;}
+static inline void d4_on(bool on) {;}
+static inline void d5_on(bool on) {if (on) LATASET = D5_MASK; else LATACLR = D5_MASK}
 #endif
 
 #ifdef EEM_MODULE_A3053B
@@ -82,14 +78,10 @@ static inline void d5_off(void) {LATACLR = D5_MASK;}
 #define D3_MASK    0x00000010u  // RF4
 #define D4_MASK    0x00000020u  // RF5
 #define D5_MASK    0x00000200u  // RD9
-static inline void d2_on(void) {LATFSET = D2_MASK;}
-static inline void d2_off(void) {LATFCLR = D2_MASK;}
-static inline void d3_on(void) {LATFSET = D3_MASK;}
-static inline void d3_off(void) {LATFCLR = D3_MASK;}
-static inline void d4_on(void) {LATFSET = D4_MASK;}
-static inline void d4_off(void) {LATFCLR = D4_MASK;}
-static inline void d5_on(void) {LATDSET = D5_MASK;}
-static inline void d5_off(void) {LATDCLR = D5_MASK;}
+static inline void d2_on(bool on) {if (on) LATFSET = D2_MASK; else LATFCLR = D2_MASK;}
+static inline void d3_on(bool on) {if (on) LATFSET = D3_MASK; else LATFCLR = D3_MASK;}
+static inline void d4_on(bool on) {if (on) LATFSET = D4_MASK; else LATFCLR = D4_MASK;}
+static inline void d5_on(bool on) {if (on) LATDSET = D5_MASK; else LATDCLR = D5_MASK;}
 #endif
 
 /*
