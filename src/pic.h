@@ -50,9 +50,9 @@
 #include "cli.h"
 
 /*
-	These routines turn on, turn off, and toggle the available test point
-	indicator lamps. We declare them as static inline so they can be fast, which
-	we like when we use these outputs as test points.
+	These routines turn on and of the available test point indicator lamps. We
+	declare them as static inline so they can be fast, which we like when we use
+	these outputs as test points.
 
 	In the A3053A, lamps D2, D3, D4, and D5 are connected to RF3, RF2, RF8, and
 	RA2 respectively. Lamps D3 and D4 are reserved for the TX and RX lines of
@@ -69,16 +69,12 @@
 #define D5_MASK  0x00000004u  // RA2
 static inline void d2_on(void) {LATFSET = D2_MASK;}
 static inline void d2_off(void) {LATFCLR = D2_MASK;}
-static inline void d2_toggle(void) {LATFINV = D2_MASK;}
 static inline void d3_on(void) {;}
 static inline void d3_off(void) {;}
-static inline void d3_toggle(void) {;}
 static inline void d4_on(void) {;}
 static inline void d4_off(void) {;}
-static inline void d4_toggle(void) {;}
 static inline void d5_on(void) {LATASET = D5_MASK;}
 static inline void d5_off(void) {LATACLR = D5_MASK;}
-static inline void d5_toggle(void) {LATAINV = D5_MASK;}
 #endif
 
 #ifdef EEM_MODULE_A3053B
@@ -88,16 +84,12 @@ static inline void d5_toggle(void) {LATAINV = D5_MASK;}
 #define D5_MASK    0x00000200u  // RD9
 static inline void d2_on(void) {LATFSET = D2_MASK;}
 static inline void d2_off(void) {LATFCLR = D2_MASK;}
-static inline void d2_toggle(void) {LATFINV = D2_MASK;}
 static inline void d3_on(void) {LATFSET = D3_MASK;}
 static inline void d3_off(void) {LATFCLR = D3_MASK;}
-static inline void d3_toggle(void) {LATFINV = D3_MASK;}
 static inline void d4_on(void) {LATFSET = D4_MASK;}
 static inline void d4_off(void) {LATFCLR = D4_MASK;}
-static inline void d4_toggle(void) {LATFINV = D4_MASK;}
 static inline void d5_on(void) {LATDSET = D5_MASK;}
 static inline void d5_off(void) {LATDCLR = D5_MASK;}
-static inline void d5_toggle(void) {LATDINV = D5_MASK;}
 #endif
 
 /*
