@@ -270,7 +270,6 @@ void lamp_signal(uint32_t period) {
 int main (void) {
    	TRISFCLR = D2_MASK | D3_MASK | D4_MASK;
    	TRISDCLR = D5_MASK;
-	d2_on();
 
 	// Initialize the microcontroller and its peripherals, which include clock,
 	// memory, core timers, system timer, UART console, Ethernet physical
