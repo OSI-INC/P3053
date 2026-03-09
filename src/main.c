@@ -268,6 +268,9 @@ void lamp_signal(uint32_t period) {
 	burden of its tasks.
 */
 int main (void) {
+   	TRISFCLR = D2_MASK | D3_MASK | D4_MASK;
+   	TRISDCLR = D5_MASK;
+	d2_on();
 
 	// Initialize the microcontroller and its peripherals, which include clock,
 	// memory, core timers, system timer, UART console, Ethernet physical
@@ -275,7 +278,7 @@ int main (void) {
 	// input-output pins to communicate with indicator lamps, test pins, and
 	// the eight-bit parallel bus.
 	pic_initialize();
-	
+
 	// Register commands in the Command-Line Interpreter (CLI). This is the only 
 	// initialization the CLI requires. The "help" command will list the commands
 	// in the order we register them.

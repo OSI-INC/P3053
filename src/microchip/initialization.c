@@ -297,6 +297,5 @@ void TCPIP_Initialize (void)
 			(const SYS_MODULE_INIT *) &drvMiimInitData_0); 
 	sysObj.tcpip = TCPIP_STACK_Init();
 	SYS_ASSERT(sysObj.tcpip != SYS_MODULE_OBJ_INVALID, "TCPIP_STACK_Init Failed" );
-	EVIC_Initialize();
 }
 

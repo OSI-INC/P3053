@@ -197,6 +197,7 @@ void pic_reset(void) {
     RSWRSTSET = _RSWRST_SWRST_MASK;
     (void) RSWRST;
     while(1);
+    return;
 }
 
 /*
@@ -337,6 +338,7 @@ void pic_gpio_initialize(void) {
    	TRISDCLR = D5_MASK;
 #endif
 
+	return;
 }
 
 /*
@@ -366,6 +368,9 @@ void pic_initialize(void) {
 	// Necessary if we use the flash memory.
 	NVM_Initialize();
 	
+	// Initialize the interrupt manager.
+	EVIC_Initialize();
+	
 	// Initialize the hardware core timer routines. These allows us to implement
 	// interrupt-driven timers and delays.
 	CORETIMER_Initialize();
@@ -374,17 +379,20 @@ void pic_initialize(void) {
 	// of the UART and TCP/IP stack.
 	SYSTIME_Initialize();
 	
-	// Configure the functions of the gerneral-purpose input and output pins.
+ 	// Configure the functions of the gerneral-purpose input and output pins.
 	pic_gpio_initialize();
-	
+
 	// Initialize the console, which communicates through a three-wire UART.
 	console_initialize();
-	
+
 	// Set up the Ethernet physical interface and start up the TCP/IP stack.
 	TCPIP_Initialize();
 	
-	// Re-enable interrupts and report initialization complete.
+	// Re-enable interrupts.
 	(void)__builtin_enable_interrupts();
+	
+	// Return.
+	return;
 }
 
 /*
