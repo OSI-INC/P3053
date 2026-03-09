@@ -1,10 +1,29 @@
 /*
-	pic.h -- Interface of the PIC32MZ Utility library for the Embedded Ethernet
-	Module (EEM). Provides communication with the system hardware, including
-	flash memory, the MPCIE parallel bus, the PIC32MZ internal registers, and
-	the UART interfaces. Does not include control of the Ethernet physical
-	layer, which you will find in server.h.
-
+	pic.h -- Interface of the PIC32MZ library of routines for the Embedded
+	Ethernet Module (EEM). Provides communication with the system hardware,
+	including flash memory, the MPCIE parallel bus, the PIC32MZ internal
+	registers, and the UART interfaces. Does not include control of the Ethernet
+	physical layer, which you will find in server.h. In this interface, and also
+	in the pic.c implementation file, you will see compiler macros that are
+	defined in the interface file p32mz2048efh100.h, which is part of the
+	PIC32MZ-EF_DFP device package. These macros define the addresses of PIC32
+	registers. The macros use "LAT" for "LATCH" and "TRIS" for "Tri-State". Here
+	are some examples.
+	
+	LATFSET Write 1 to bit N, port F bit N goes HI.
+	LATACLR Write 1 to bit N, port A bit N goes LO.
+	LATCINV Write 1 to bit N, port C bit N switches logic level.
+    TRISECLR Write 1 to bit N, port E bit N becomes an output (not high impedance). 
+    TRISASET Write 1 to bit N, port A bit N becomes an input (not high impedance). 
+    
+	Note that in all the above registers, writing a zero to a bit does nothing.
+	They are registers that perform actions when we write a one to one or more
+	of their bits. In our file structure, we have a Microchip directory next to
+	our P3053 repository. Within the Microchip directory, we have a bunch of
+	device packages. The one we use for the A3053 is:
+	
+	Microchip/PIC32MZ-EF_DFP/1.3.58/include/proc/p32mz2048efh100.h
+	
 	Copyright (C) 2025-2026, Kevan Hashemi, Open Source Instruments Inc.
 
 	This program is free software: you can redistribute it and/or modify it

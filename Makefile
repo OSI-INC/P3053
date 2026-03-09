@@ -1,5 +1,5 @@
 #
-# P3053A Makefile. 
+# P3053 Makefile. 
 #
 # This makefile uses GNUMake to compile and link a hexadecimail programming file
 # for a PIC32MZ microcontroller. The makefile finds all source files in the /src
@@ -7,13 +7,13 @@
 # create a binary executable. It converts this executable into a hexadecimal
 # file for the Microship programmer.
 #
-# We do not use compiler flags to configure the type of build. We turn on and
-# off internal code features, such as debug-level console reporting and
-# provision of a Telnet command-line interface, using compiler macros in a
-# config.h file. After modifying config.h, we build again using "make", and the
-# build will take place in the build directory.
+# We do not use compiler flags to configure the build. We turn on and off
+# internal code features, such as debug-level console reporting and provision of
+# a Telnet command-line interface, using compiler macros in a config.h file.
+# After modifying config.h, we build again using "make", and the build will take
+# place in the build directory.
 #
-# We developed this makefile for the PIC32MZ2048EFH100. These we compile for our
+# We developed this makefile for the PIC32MZ2048EFH100. We compile for our
 # Embedded Ethernet Module (A3053) target. We trust that the same Makefult
 # structure can be adapted to other, similar embedded ethernet modules. The
 # build uses the xc32 compiler, as well as a Microchip Device Package
@@ -24,7 +24,14 @@
 # each object it builds. In this way, the makefile will re-compile objects for
 # which one or more required headers have been modified.
 #
-# [22-DEC-25] Kevan Hashemi.
+# The makefile compiles the source code in the SRC_DIRS directory tree and links
+# them to one another and to a Microchip library using a a Microchip linker
+# script. The library and linker script combined are what Microchip calls a
+# "device package". We use devide package PIC32MZ-EF_DFP version 1.3.58. The
+# P3053 repository does not include this device package, but you can download
+# the package from our website using a link you will find the the A3053 manual.
+#
+# [08-MAR-26] Kevan Hashemi.
 #
 # Copyright Copyright (C) 2025-2026-2026, Kevan Hashemi, Open Source Instruments Inc.
 # 
@@ -43,9 +50,9 @@
 #
 
 #
-# Define the exact processor, its family, the location of its device pack, and
-# point to the linker script. We are using the linker script and device pack
-# that are provided by our Microchip Device Package repository.
+# Define the exact processor, the location of its device pack, point to its
+# linker script, and assign a minimum heap size so that we can be sure to have
+# enough RAM for our network connections.
 #
 CPU=32MZ2048EFH100
 DFP_DIR=/Users/kevan/Code/Microchip/PIC32MZ-EF_DFP/1.3.58
