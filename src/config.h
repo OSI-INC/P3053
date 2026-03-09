@@ -68,7 +68,7 @@ extern bool debug;
 	unreliable as the EEM is powering up. When we plug the EEM into a life mPCIe
 	socket, we might see an unwanted reset to factory default configuration.
 */
-#define EEM_POWERUP_WAIT_MS 200
+#define EEM_POWERUP_WAIT_MS 500
 
 /*
 	The module is the EEM circuit board. The A3053A is the first EEM circuit
@@ -117,7 +117,7 @@ extern bool debug;
 	We use the motherboard macro to define a motherboard name string for each of
 	the motherboard versions listed in the table above.
 */
-#define EEM_MOTHERBOARD_A3042
+#define EEM_MOTHERBOARD_A2071
 
 #ifdef EEM_MOTHERBOARD_A2071
 #define EEM_MOTHERBOARD_NAME "A2071"
