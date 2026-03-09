@@ -113,7 +113,9 @@ tcpip_server_type lwdaq_server = {
     .tcp_timeout = 0,
     .last_tick = 0,
     .socket = INVALID_SOCKET,
-    .listening = INVALID_SOCKET
+    .listening = INVALID_SOCKET,
+    .indicator_on = d4_on,
+    .indicator_off = d4_off
 };
 	
 /*

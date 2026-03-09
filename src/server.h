@@ -250,7 +250,12 @@ int tcp_writeall(void *context, const uint8_t *buf, uint16_t len);
 	socket. We use this in the server state machine to implement a timeout. The
 	only feature of the server that is not encoded in this structure is the
 	protocol task procedure, which we pass into the server routine as a separate
-	argument.
+	argument. Included in the server structure are two function pointers to
+	routines that turn on and off an indicator of some sort. These must be
+	initialized to dummy procedures, or set to indicator on and off procedures.
+	The server will call them as it opens and closes sockets. If we do not want
+	to provided indicator functions for the server, we can assign both of these
+	function pointers to the global "dummy_void_func" defined in utils.h.
 */
 typedef struct {
  	bool network_up;
@@ -265,6 +270,8 @@ typedef struct {
 	TCP_SOCKET socket;
 	TCP_SOCKET listening;
 	TCP_SOCKET queue[EEM_TCB_QUEUE_SIZE];
+	void (*indicator_on)(void);
+    void (*indicator_off)(void);
 } tcpip_server_type;
 
 /*
@@ -285,10 +292,14 @@ int server_info(char *out);
 /*
  	A tcpip_tasks_type is the type of procedure that will be called by our
  	generic TCP/IP server. It must take as argument a tcpip_server_info
- 	structure. If it blocks the server, it must call tcp_sock_tick while it
- 	is blocking. If tcp_sock_tick returns a negative value, the task must
- 	abort and return a negative value itself. We include below the negative
- 	value error codes.
+ 	structure. If it blocks the server, it must call tcp_sock_tick while it is
+ 	blocking. If tcp_sock_tick returns a negative value, the task must abort
+ 	and return a negative value itself. We include below the negative value
+ 	error codes. The ERR code means an error occurred in our attempts to open
+ 	or maintain the socket. The END code means the client closed the socket or
+ 	sent a request to close the socket. The SIN code means the client violated
+ 	a rule of the server, and the task routine requests that the server close
+ 	the socket.
 */
 #define EEM_SOCK_ERR -1
 #define EEM_SOCK_END -2

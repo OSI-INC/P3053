@@ -56,7 +56,8 @@
 
 	In the A3053A, lamps D2, D3, D4, and D5 are connected to RF3, RF2, RF8, and
 	RA2 respectively. Lamps D3 and D4 are reserved for the TX and RX lines of
-	UART2. But we can use D2 and D5 as indicator lamps.
+	UART2. For D3 and D4 we provide dummy routines. But we can use D2 and D5 as
+	indicator lamps.
 
 	In the A3053B, lamps D2, D3, D4, and D5 are connected to RF3, RF4, RF5, and
 	RD9 respectively.
@@ -66,12 +67,18 @@
 #define D3_MASK  0x00000004u  // RF2
 #define D4_MASK  0x00000100u  // RF8
 #define D5_MASK  0x00000004u  // RA2
-static inline void pic_d2_on(void) {LATFSET = D2_MASK;}
-static inline void pic_d2_off(void) {LATFCLR = D2_MASK;}
-static inline void pic_d2_toggle(void) {LATFINV = D2_MASK;}
-static inline void pic_d5_on(void) {LATASET = D5_MASK;}
-static inline void pic_d5_off(void) {LATACLR = D5_MASK;}
-static inline void pic_d5_toggle(void) {LATAINV = D5_MASK;}
+static inline void d2_on(void) {LATFSET = D2_MASK;}
+static inline void d2_off(void) {LATFCLR = D2_MASK;}
+static inline void d2_toggle(void) {LATFINV = D2_MASK;}
+static inline void d3_on(void) {;}
+static inline void d3_off(void) {;}
+static inline void d3_toggle(void) {;}
+static inline void d4_on(void) {;}
+static inline void d4_off(void) {;}
+static inline void d4_toggle(void) {;}
+static inline void d5_on(void) {LATASET = D5_MASK;}
+static inline void d5_off(void) {LATACLR = D5_MASK;}
+static inline void d5_toggle(void) {LATAINV = D5_MASK;}
 #endif
 
 #ifdef EEM_MODULE_A3053B
@@ -79,18 +86,18 @@ static inline void pic_d5_toggle(void) {LATAINV = D5_MASK;}
 #define D3_MASK    0x00000010u  // RF4
 #define D4_MASK    0x00000020u  // RF5
 #define D5_MASK    0x00000200u  // RD9
-static inline void pic_d2_on(void) {LATFSET = D2_MASK;}
-static inline void pic_d2_off(void) {LATFCLR = D2_MASK;}
-static inline void pic_d2_toggle(void) {LATFINV = D2_MASK;}
-static inline void pic_d3_on(void) {LATFSET = D3_MASK;}
-static inline void pic_d3_off(void) {LATFCLR = D3_MASK;}
-static inline void pic_d3_toggle(void) {LATFINV = D3_MASK;}
-static inline void pic_d4_on(void) {LATFSET = D4_MASK;}
-static inline void pic_d4_off(void) {LATFCLR = D4_MASK;}
-static inline void pic_d4_toggle(void) {LATFINV = D4_MASK;}
-static inline void pic_d5_on(void) {LATDSET = D5_MASK;}
-static inline void pic_d5_off(void) {LATDCLR = D5_MASK;}
-static inline void pic_d5_toggle(void) {LATDINV = D5_MASK;}
+static inline void d2_on(void) {LATFSET = D2_MASK;}
+static inline void d2_off(void) {LATFCLR = D2_MASK;}
+static inline void d2_toggle(void) {LATFINV = D2_MASK;}
+static inline void d3_on(void) {LATFSET = D3_MASK;}
+static inline void d3_off(void) {LATFCLR = D3_MASK;}
+static inline void d3_toggle(void) {LATFINV = D3_MASK;}
+static inline void d4_on(void) {LATFSET = D4_MASK;}
+static inline void d4_off(void) {LATFCLR = D4_MASK;}
+static inline void d4_toggle(void) {LATFINV = D4_MASK;}
+static inline void d5_on(void) {LATDSET = D5_MASK;}
+static inline void d5_off(void) {LATDCLR = D5_MASK;}
+static inline void d5_toggle(void) {LATDINV = D5_MASK;}
 #endif
 
 /*
@@ -502,5 +509,6 @@ int uart2_flush(void *context);
 void cli_reset(cli_chan_type *ch, char *args);
 #define CLI_MPCIE_MAX_DATA 512
 void cli_mpcie(cli_chan_type *ch, char *args);
+void cli_lamp(cli_chan_type *ch, char *args);
 
 #endif

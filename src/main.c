@@ -69,7 +69,7 @@
 	the Microchip license. Anyone incorporating GPL files into their own work
 	must release the completed work under GPL as well.
 
-	Copyright Copyright (C) 2025-2026-2026, Kevan Hashemi, Open Source Instruments Inc.
+	Copyright Copyright (C) 2025-2026, Kevan Hashemi, Open Source Instruments Inc.
 
 	This program is free software: you can redistribute it and/or modify it
 	under the terms of the GNU General Public License as published by the Free
@@ -124,7 +124,9 @@ tcpip_server_type telnet_server = {
     .tcp_timeout = 0,
     .last_tick = 0,
     .socket = INVALID_SOCKET,
-    .listening = INVALID_SOCKET
+    .listening = INVALID_SOCKET,
+    .indicator_on = d3_on,
+    .indicator_off = d3_off
 };
 
 /*
@@ -218,39 +220,37 @@ int telnet_tasks(tcpip_server_type *server) {
 
 /*
 	lamp_signal uses an unsigned integer period and an internal index to apply
-	signals to the green lamp (d2) and the red lamp (d5). The blue (d3) and
-	white (d4) lamps are used by the UART2 console in the A3053A, so they will
-	show if the console is enabled and a USB-to-UART bridge is connected. We
-	will use d2 as a power indicator, turning it on for 10% of the time so
-	quickly that it looks constant when the EEM is idle, and will flicker when
-	the EEM is laboring. We will use d5 as a heartbeat, flashing briefly every
-	second in the main loop when the network and link are up and running. The
-	time between flashes will be longer when the EEM is laboring. If the network
-	and link are both down, d5 will turn on continuously. If the network is up,
-	but the link is down, which seems to happen sometimes after re-programming
-	the EEM, d5 will turn off briefly every two seconds. If the EEM crashes, the
-	green and red lights will be stuck on or off.
+	signals to the green lamp (d2) and the red lamp (d5). We use d2 as a power
+	indicator, turning it on for 10% of the time so quickly that it looks
+	constant when the EEM is idle, and will flicker when the EEM is laboring. We
+	use d5 as a heartbeat, flashing briefly every second in the main loop when
+	the network and link are up and running. The time between flashes will be
+	longer when the EEM is laboring. If the network and link are both down, d5
+	will turn on continuously. If the network is up, but the link is down, which
+	seems to happen sometimes after re-programming the PIC32MZ, d5 will turn off
+	briefly every two seconds. If the EEM crashes, the green and red lights will
+	be stuck on or off.
 */
 void lamp_signal(uint32_t period) {
 	static uint32_t i = 0;
 	
 	if (period == 0) {
-		pic_d2_on();
-   		pic_d5_on();
+		d2_on();
+   		d5_on();
    		i = 0;
    		return;
 	} else {
 		i++;
-		if (i % 100 == 0) pic_d2_off();
-		if (i % 1000 == 0) pic_d2_on();
+		if (i % 100 == 0) d2_off();
+		if (i % 1000 == 0) d2_on();
 		if (server_network_up() && server_link_up() && i == 10000) {
-			pic_d5_off();
+			d5_off();
 		}
 		if (server_network_up() && !server_link_up() && i == period - 100000) {
-			pic_d5_off();
+			d5_off();
 		}
 		if (i == period) {
-			pic_d5_on();
+			d5_on();
 			i = 0;
 		}
 		return;
@@ -283,6 +283,7 @@ int main (void) {
 	cli_cmd_register("debug",cli_debug);
 	cli_cmd_register("exit",cli_exit);
 	cli_cmd_register("help",cli_help);
+	cli_cmd_register("lamp",cli_lamp);
 	cli_cmd_register(CLI_LOGIN_CMD,cli_login);
 	cli_cmd_register("mpcie",cli_mpcie);
 	cli_cmd_register("prompt",cli_prompt);

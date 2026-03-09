@@ -62,4 +62,9 @@ const char *string_trim(const char *s);
 bool parse_uint8(const char *tok, uint8_t *out_ptr);
 bool parse_uint32(const char *tok, uint32_t *out_ptr);
 
+/*
+	Dummy functions for function pointers.
+*/
+static inline void dummy_void_func(void) { ; }
+
 #endif

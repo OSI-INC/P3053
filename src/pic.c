@@ -647,18 +647,18 @@ void cli_mpcie(cli_chan_type *ch, char *args) {
 "  as many values as we pass on the command line. The 'write' operation starts\n"
 "   writing at location 'addr' and increments the location after each write. The\n"
 "  'stream-write' writes all bytes to the same location 'addr'. The command reads\n"
-"  bytes as a space-delimited string either in hexadecimal or decimal, just as for\n"
-"  the 'addr'. The 'read' operation reads 'length' bytes from consecutive\n"
+"  bytes as a space-delimited string either in hexadecimal or decimal, just as\n"
+"  for the 'addr'. The 'read' operation reads 'length' bytes from consecutive\n"
 "  locations, starting at location 'addr'. The 'stream-read' operation reads\n"
 "  'length' bytes from the same location 'addr'. If we omit 'length', it\n"
 "  defaults to 1. By default, the returned bytes will be written as sixteen bytes\n"
 "  to a line, each byte two hexadecimal digits separated from its neighbors by \n"
 "  a space, and with each line of sixteen bytes starting with the mPCIe address\n"
 "  of the first byte, expressed in hexadecimal with a '0x' prefix. With the\n"
-"  '--decimal' option,the bytes read will be expressed as decimal values separated\n"
-"  by spaces. With '--packed', the bytes will be returned as a packed string of\n"
-"  hexadecimal digits with no separators, no newlines, and no address markers.\n"
-"  \n"
+"  '--decimal' option,the bytes read will be expressed as decimal values\n"
+"  separated by spaces. With '--packed', the bytes will be returned as a packed\n"
+"  string of hexadecimal digits with no separators, no newlines, and no address\n"
+"  markers.\n"
 "Verbs:\n"
 "  read         Read multiple bytes from consecutive mPCIe locations.\n"
 "  stream-read  Read multiple bytes from the same mPCIe location.\n"
@@ -721,6 +721,103 @@ void cli_mpcie(cli_chan_type *ch, char *args) {
 		}
 	}
 
+    return;
+}
+
+/*
+	cli_lamp is a Command-Line Interpreter (CLI) procedure that turns on and
+	off the indicator lamps. We pass it the number of the lamp and the state
+	we want it to be in: on or off.
+*/
+void cli_lamp(cli_chan_type *ch, char *args) {
+	bool print_info = false;
+	bool print_help = false;
+	bool on_flag = false;
+	bool off_flag = false;
+	bool index_received = false;
+	uint8_t lamp_index = 1;
+
+	char *tok = strtok(args, " \t");
+	while (tok != NULL) {
+ 		if (strcmp(tok, "--info") == 0) {
+ 			print_info = true;
+ 		} else if (strcmp(tok, "--help") == 0) {
+ 			print_help = true;
+ 		} else if (parse_uint8(tok, &lamp_index)) {
+ 			index_received = true;
+ 		} else if (strcmp(tok, "on") == 0 
+ 				|| strcmp(tok, "off") == 0) {
+ 			if (strcmp(tok, "on") == 0) on_flag = true;
+ 			if (strcmp(tok, "off") == 0) off_flag = true;
+ 		} else {
+            cli_print(ch, "ERROR: Unrecognized option '%s' in %s.\n", tok, __func__);
+            return;
+        }
+        tok = strtok(NULL, " \t");
+    }
+    
+	if (print_info) {
+		cli_message(ch, "Turns on and off indicator lamps.\n");
+		return;
+	}
+
+	if (print_help) {
+		cli_message(ch,
+"Usage:\n"
+"  lamp index <on|off>\n"
+"  lamp [--info] [--help]\n"
+"\n"
+"Summary:\n"
+"  The lamp command turns on or off the indicator lamp specified by the 'index'\n"
+"  value. On the A3053B, indeces 2, 3, 4, and 5 control the test point indicator\n"
+"  lamps D2 (green), D3 (blue), D4 (white), and D5 (red) respectively. Note that\n"
+"  TCPIP servers and the main program loop may be making use of these lamps as\n"
+"  indicators. The lamp command can turn on and off lamps at any time, but the\n"
+"  lamps may change state due to the activity in the servers and main loop.\n"
+"\n"
+"Verbs:\n"
+"  on           Turn on the lamp specified by 'index'.\n"
+"  off          Turn off the lamp specified by 'index'.\n"
+"\n"
+"Options:\n"
+"  --info        Print a one-line summary of this command.\n"
+"  --help        Print this help text.\n"
+		);
+		return;
+	}
+
+	if (!index_received) {
+		cli_print(ch, "ERROR: No lamp index specified in %s.\n", __func__);
+		return;
+	}
+	if (!on_flag && !off_flag) {
+		cli_print(ch, "ERROR: No verb 'on' or 'off' provided in %s.\n", __func__);
+		return;
+	}
+
+	switch (lamp_index) {
+		case 2: 
+			if (on_flag) {d2_on();} else {d2_off();};
+			break;
+			
+		case 3: 
+			if (on_flag) {d3_on();} else {d3_off();};
+			break;
+
+		case 4: 
+			if (on_flag) {d4_on();} else {d4_off();};
+			break;
+
+		case 5: 
+			if (on_flag) {d5_on();} else {d5_off();};
+			break;
+
+		default:
+			cli_print(ch, "ERROR: Invalid lamp index '%d' in %s.\n",
+				lamp_index, __func__);
+			break;
+	}
+	
     return;
 }
 

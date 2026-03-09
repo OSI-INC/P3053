@@ -83,7 +83,7 @@ MP_AR=$(MP_DIR)/xc32-ar
 # Define the build and distribution directories, the final output file and the
 # map file names.
 #
-TARGET=P3053A
+TARGET=P3053
 BUILD_DIR=build
 $(info BUILD_DIR=$(BUILD_DIR))
 OUTPUT_FILE=$(BUILD_DIR)/$(TARGET).elf

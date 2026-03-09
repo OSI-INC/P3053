@@ -819,15 +819,20 @@ void tcpip_server(tcpip_server_type *server, tcpip_tasks_type tasks) {
 		if (close_socket) {
 			TCPIP_TCP_Close(server->socket);
 			server->socket = INVALID_SOCKET;
+			server->indicator_off();
+		} else {
+			server->indicator_on();
 		}
 	}
 	
 	// If our active socket is invalid, but we have a valid socket at the front
 	// of the queue, we move this valid socket to the active position and shift
 	// all the sockets in the queue one step forwards, filling in the last one
-	// with the invalid socket value. No servicing of manipulating of the
-	// communication channels takes place here, and we do not return after
+	// with the invalid socket value. No servicing or manipulating of the
+	// communication channels takes place here. Nor do not return after
 	// completing the shift. We still have to attend to the listening socket.
+	// The new active socket will be serviced when we next call the server
+	// routine.
 	if (server->socket == INVALID_SOCKET && server->queue[0] != INVALID_SOCKET) {
 		server->socket = server->queue[0];
 		server->sock_init = true;
@@ -842,10 +847,10 @@ void tcpip_server(tcpip_server_type *server, tcpip_tasks_type tasks) {
 	
 	// If our listening socket is open, we check to see if it has a connection.
 	// If it has a connection, it is no longer a listening socket, but a
-	// connected socket. We move the connected socket to the back of the queue.
-	// If there is no space in the queue, we close the socket. Having moved or
-	// closed the formerly listening socket we set the current listening socket
-	// to the invalid code.
+	// connected socket. We move the newly-connected socket to the back of the
+	// queue. If there is no space in the queue, we close the socket. Having
+	// moved or closed the formerly listening socket we set the current
+	// listening socket to the invalid code.
 	if (server->listening != INVALID_SOCKET) {
 		if (TCPIP_TCP_IsConnected(server->listening)) {
 			if (TCPIP_TCP_SocketInfoGet(server->listening, &sock_info)) {
@@ -883,12 +888,12 @@ void tcpip_server(tcpip_server_type *server, tcpip_tasks_type tasks) {
 		}
 	}
 
-	// After we first receive our address, this is the only clause in the server
-	// routine that will be executed. All other sockets are invalid, including
-	// the listening socket itself. We try to open a listening sockeet. If we
-	// fail, we make an announcement and set a flag so that we don't keep making
-	// the same announcement. But we will keep trying to open a listening
-	// socket, and if we succeed, we will announce our success.
+	// After the TCPIP stack first receives its IP address, this clause is the
+	// only one that will be executed. All the servers sockets are invalid,
+	// including the listening socket itself. We try to open a listening
+	// sockeet. If we fail, we make an announcement and set a flag so that we
+	// don't keep making the same announcement. But we will keep trying to open
+	// a listening socket, and if we succeed, we will announce our success.
 	if (server->listening == INVALID_SOCKET) {
 		static bool flag = true;
 		server->listening = TCPIP_TCP_ServerOpen(IP_ADDRESS_TYPE_IPV4, server->port, 0);
