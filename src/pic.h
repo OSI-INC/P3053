@@ -34,39 +34,44 @@
 	These routines turn on, turn off, and toggle the available test point
 	indicator lamps. We declare them as static inline so they can be fast, which
 	we like when we use these outputs as test points.
-*/
 
-/*
-	In the A3053A, lamps D2 and D5 are connected to RF3 and RA2 respectively and
-	act as test lamps. But lamps D3 and D4 are used for the TX and RX lines of
-	UART2, so we provide no toggle routines for those outputs.
-*/
-#ifdef EEM_MODULE_A3053A
-static inline void pic_d2_on(void) {GPIO_PortSet(GPIO_PORT_F, 0x00000008);}
-static inline void pic_d2_off(void) {GPIO_PortClear(GPIO_PORT_F, 0x00000008);}
-static inline void pic_d2_toggle(void) {GPIO_PortToggle(GPIO_PORT_F, 0x00000008);}
-static inline void pic_d5_on(void) {GPIO_PortSet(GPIO_PORT_A, 0x00000004);}
-static inline void pic_d5_off(void) {GPIO_PortClear(GPIO_PORT_A, 0x00000004);}
-static inline void pic_d5_toggle(void) {GPIO_PortToggle(GPIO_PORT_A, 0x00000004);}
-#endif
+	In the A3053A, lamps D2, D3, D4, and D5 are connected to RF3, RF2, RF8, and
+	RA2 respectively. Lamps D3 and D4 are reserved for the TX and RX lines of
+	UART2. But we can use D2 and D5 as indicator lamps.
 
-/*
 	In the A3053B, lamps D2, D3, D4, and D5 are connected to RF3, RF4, RF5, and
 	RD9 respectively.
 */
+#ifdef EEM_MODULE_A3053A
+#define D2_MASK  0x00000008u  // RF3
+#define D3_MASK  0x00000004u  // RF2
+#define D4_MASK  0x00000100u  // RF8
+#define D5_MASK  0x00000004u  // RA2
+static inline void pic_d2_on(void) {LATFSET = D2_MASK;}
+static inline void pic_d2_off(void) {LATFCLR = D2_MASK;}
+static inline void pic_d2_toggle(void) {LATFINV = D2_MASK;}
+static inline void pic_d5_on(void) {LATASET = D5_MASK;}
+static inline void pic_d5_off(void) {LATACLR = D5_MASK;}
+static inline void pic_d5_toggle(void) {LATAINV = D5_MASK;}
+#endif
+
 #ifdef EEM_MODULE_A3053B
-static inline void pic_d2_on(void) {GPIO_PortSet(GPIO_PORT_F, 0x00000008);}
-static inline void pic_d2_off(void) {GPIO_PortClear(GPIO_PORT_F, 0x00000008);}
-static inline void pic_d2_toggle(void) {GPIO_PortToggle(GPIO_PORT_F, 0x00000008);}
-static inline void pic_d3_on(void) {GPIO_PortSet(GPIO_PORT_F, 0x00000010);}
-static inline void pic_d3_off(void) {GPIO_PortClear(GPIO_PORT_F, 0x00000010);}
-static inline void pic_d3_toggle(void) {GPIO_PortToggle(GPIO_PORT_F, 0x00000010);}
-static inline void pic_d4_on(void) {GPIO_PortSet(GPIO_PORT_F, 0x00000020);}
-static inline void pic_d4_off(void) {GPIO_PortClear(GPIO_PORT_F, 0x00000020);}
-static inline void pic_d4_toggle(void) {GPIO_PortToggle(GPIO_PORT_F, 0x00000020);}
-static inline void pic_d5_on(void) {GPIO_PortSet(GPIO_PORT_D, 0x00000200);}
-static inline void pic_d5_off(void) {GPIO_PortClear(GPIO_PORT_D, 0x00000200);}
-static inline void pic_d5_toggle(void) {GPIO_PortToggle(GPIO_PORT_D, 0x00000200);}
+#define D2_MASK    0x00000008u  // RF3
+#define D3_MASK    0x00000010u  // RF4
+#define D4_MASK    0x00000020u  // RF5
+#define D5_MASK    0x00000200u  // RD9
+static inline void pic_d2_on(void) {LATFSET = D2_MASK;}
+static inline void pic_d2_off(void) {LATFCLR = D2_MASK;}
+static inline void pic_d2_toggle(void) {LATFINV = D2_MASK;}
+static inline void pic_d3_on(void) {LATFSET = D3_MASK;}
+static inline void pic_d3_off(void) {LATFCLR = D3_MASK;}
+static inline void pic_d3_toggle(void) {LATFINV = D3_MASK;}
+static inline void pic_d4_on(void) {LATFSET = D4_MASK;}
+static inline void pic_d4_off(void) {LATFCLR = D4_MASK;}
+static inline void pic_d4_toggle(void) {LATFINV = D4_MASK;}
+static inline void pic_d5_on(void) {LATDSET = D5_MASK;}
+static inline void pic_d5_off(void) {LATDCLR = D5_MASK;}
+static inline void pic_d5_toggle(void) {LATDINV = D5_MASK;}
 #endif
 
 /*
@@ -77,14 +82,18 @@ static inline void pic_d5_toggle(void) {GPIO_PortToggle(GPIO_PORT_D, 0x00000200)
 	to access the mPCIe parallel bus. All procedures are declared here as static
 	and inline so they will be combined together and placed in our code without
 	any actual function calls.
+
+	In the A3053A we have the Control Address Bus (CAB) consisting of six bits
+	CA0-CA5 on RC1-RC4, RE0-RE1. We have the Control Data Bus (CDB) consisting
+	of eight bits CD0-CD7 on RC13, RC14, RE2-RE7. We have Control Data Strobe
+	(!CDS) on RD4 and Control Write (!CWR) on RD5.
+
+	In the A3053B we have the Control Address Bus (CAB) consisting of eight bits
+	RE0-RE7. We have the Control Data Bus (CDB) consisting of eight bits
+	RA0-RA7. We have Control Data Strobe (!CDS) on RA10 and Control Write (!CWR)
+	on RA9.
 */
 
-/*
-	In the A3053A we have the Control Address Bus (CAB) consisting of six
-	bits CA0-CA5 on RC1-RC4, RE0-RE1. We have the Control Data Bus (CDB) 
-	consisting of eight bits CD0-CD7 on RC13, RC14, RE2-RE7. We have
-	Control Data Strobe (!CDS) on RD4 and Control Write (!CWR) on RD5.
-*/
 #ifdef EEM_MODULE_A3053A
 #define MPCIE_CAB_MASK_RC   0x0000001Eu  // RC1–RC4 
 #define MPCIE_CAB_MASK_RE   0x00000003u  // RE0–RE1 
@@ -94,12 +103,6 @@ static inline void pic_d5_toggle(void) {GPIO_PortToggle(GPIO_PORT_D, 0x00000200)
 #define MPCIE_CWR_MASK      0x00000020u  // !CWR=RD5
 #endif
 
-/*
-	In the A3053B we have the Control Address Bus (CAB) consisting of eight bits
-	RE0-RE7. We have the Control Data Bus (CDB) consisting of eight bits
-	RA0-RA7. We have Control Data Strobe (!CDS) on RA10 and Control Write (!CWR)
-	on RA9.
-*/
 #ifdef EEM_MODULE_A3053B
 #define MPCIE_CAB_MASK      0x000000FFu  // RE0-RE7
 #define MPCIE_CDB_MASK      0x000000FFu  // RA0-RA7
@@ -107,8 +110,8 @@ static inline void pic_d5_toggle(void) {GPIO_PortToggle(GPIO_PORT_D, 0x00000200)
 #define MPCIE_CWR_MASK      0x00000200u  // !CWR=RA9
 #endif
 
-// Determine if we want the slower access cycles. This depends upon the
-// motherboard.
+// Some motherboards require a slower mPCIe access cycle. Here we set a slow
+// access compiler flag for such motherboards.
 #if defined(EEM_MOTHERBOARD_A3038) || defined(EEM_MOTHERBOARD_A3042)
 #define MPCIE_SLOW_ACCESS
 #endif
@@ -127,6 +130,7 @@ static inline void mpcie_wr_assert(void) {
 #ifdef EEM_MODULE_A3053B
 	LATACLR = MPCIE_CWR_MASK;
 #endif
+
 }
 
 /*
@@ -142,6 +146,7 @@ static inline void mpcie_wr_unassert(void) {
 #ifdef EEM_MODULE_A3053B
 	LATASET = MPCIE_CWR_MASK;
 #endif
+
 }
 
 /* 
@@ -158,6 +163,7 @@ static inline void mpcie_data_output(void) {
 #ifdef EEM_MODULE_A3053B
 	TRISACLR = MPCIE_CDB_MASK;
 #endif
+
 }
 
 /*
@@ -167,7 +173,7 @@ static inline void mpcie_data_output(void) {
 */
 static inline void mpcie_data_input(void) {
 
- #ifdef EEM_MODULE_A3053A
+#ifdef EEM_MODULE_A3053A
 	TRISCSET = MPCIE_CDB_MASK_RC; 
 	TRISESET = MPCIE_CDB_MASK_RE;
 #endif
@@ -175,6 +181,7 @@ static inline void mpcie_data_input(void) {
 #ifdef EEM_MODULE_A3053B
 	TRISASET = MPCIE_CDB_MASK;
 #endif
+
 }
 
 /*
@@ -259,6 +266,7 @@ static inline void mpcie_ds_unassert(void) {
 #ifdef EEM_MODULE_A3053B
 	LATASET = MPCIE_CDS_MASK;
 #endif
+
 }
 
 /*
@@ -309,6 +317,7 @@ static inline void mpcie_addr_set(uint8_t addr) {
 		"nop\n\t"
      );    
 #endif
+
 }
 
 /*
@@ -326,6 +335,7 @@ static inline void mpcie_data_set(uint8_t data) {
 #ifdef EEM_MODULE_A3053B
 	LATA = (LATA & ~MPCIE_CDB_MASK) | ((uint32_t) (data & 0xFFu));
 #endif
+
 }
 
 /*
@@ -333,19 +343,19 @@ static inline void mpcie_data_set(uint8_t data) {
 	byte value is whatever is on the pins.
 */
 static inline uint8_t mpcie_data_get(void) {
-    uint8_t value = 0;
     
 #ifdef EEM_MODULE_A3053A
+    uint8_t value = 0;
 	uint32_t c = PORTC;
 	uint32_t e = PORTE;
 	value = (uint8_t) ((c >> 13) & 0x03u) | (e  & 0xFCu);
+    return value;
 #endif
 
 #ifdef EEM_MODULE_A3053B
-	value = (uint8_t) PORTA;	
+	return (uint8_t) PORTA;	
 #endif
 
-    return value;
 }
 
 /*

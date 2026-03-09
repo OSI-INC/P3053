@@ -260,13 +260,13 @@ void pic_gpio_initialize(void) {
     // Unassert mPCIe bus data strobe and control write.
     LATDSET = MPCIE_CDS_MASK | MPCIE_CWR_MASK;
 
-	// So far, on our A3053A, we have have D3 and D4 dedicated to UART2, but D2
-	// and D5 are available as test points on RF3 and RA2 respectively. We set
-	// both these pins as outputs. The constants that hold the numerical port
-	// codes are defined in plib_gpio.h. To specify the bit, we provide a mask.
-   	GPIO_PortOutputEnable(GPIO_PORT_A,0x00000004);
-   	GPIO_PortOutputEnable(GPIO_PORT_F,0x00000008);
-#endif
+	// In the A3053A, lamps D2, D3, D4, and D5 are connected to RF3, RF2, RF8,
+	// and RA2 respectively. Lamps D3 and D4 are reserved for the TX and RX
+	// lines of UART2. But we can use D2 (RF2) and D5 (RA2) as indicator lamps.
+	// So we set their pins as outputs.
+   	TRISFCLR = D2_MASK;
+   	TRISACLR = D5_MASK;
+ #endif
 
 #ifdef EEM_MODULE_A3053B	
 	// The A3053B is all-digital. so we configure all pins as digital pins. We
@@ -333,8 +333,8 @@ void pic_gpio_initialize(void) {
 	// these four test point pins as outputs. The constants that hold the
 	// numerical port codes are defined in plib_gpio.h. To specify each bit, we
 	// use a mask.
-   	TRISDCLR = 0x00000200;
-   	TRISFCLR = 0x00000038;
+   	TRISFCLR = D2_MASK | D3_MASK | D4_MASK;
+   	TRISDCLR = D5_MASK;
 #endif
 
 }
