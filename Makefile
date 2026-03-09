@@ -33,7 +33,7 @@
 #
 # [08-MAR-26] Kevan Hashemi.
 #
-# Copyright Copyright (C) 2025-2026-2026, Kevan Hashemi, Open Source Instruments Inc.
+# Copyright Copyright (C) 2025-2026, Kevan Hashemi, Open Source Instruments Inc.
 # 
 # This program is free software: you can redistribute it and/or modify it under
 # the terms of the GNU General Public License as published by the Free Software
@@ -55,7 +55,7 @@
 # enough RAM for our network connections.
 #
 CPU=32MZ2048EFH100
-DFP_DIR=/Users/kevan/Code/Microchip/PIC32MZ-EF_DFP/1.3.58
+DFP_DIR=../Microchip/PIC32MZ-EF_DFP/1.3.58
 CPULD=$(DFP_DIR)/xc32/$(CPU)/p$(CPU).ld
 HEAPSIZE=200000
 

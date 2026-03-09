@@ -286,7 +286,7 @@ int main (void) {
 	cli_cmd_register(CLI_LOGIN_CMD,cli_login);
 	cli_cmd_register("mpcie",cli_mpcie);
 	cli_cmd_register("prompt",cli_prompt);
-	cli_cmd_register("report",cli_report);
+	cli_cmd_register("status",cli_status);
 	cli_cmd_register("reset",cli_reset);
 	
 	// Wait for the power supplies to settle before we check the configuration
