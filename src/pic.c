@@ -368,9 +368,6 @@ void pic_initialize(void) {
 	// Necessary if we use the flash memory.
 	NVM_Initialize();
 	
-	// Initialize the interrupt manager.
-	EVIC_Initialize();
-	
 	// Initialize the hardware core timer routines. These allows us to implement
 	// interrupt-driven timers and delays.
 	CORETIMER_Initialize();
@@ -387,6 +384,9 @@ void pic_initialize(void) {
 
 	// Set up the Ethernet physical interface and start up the TCP/IP stack.
 	TCPIP_Initialize();
+	
+	// Initialize the interrupt manager.
+	EVIC_Initialize();
 	
 	// Re-enable interrupts.
 	(void)__builtin_enable_interrupts();
