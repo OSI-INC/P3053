@@ -830,23 +830,28 @@ void cli_lamp(cli_chan_type *ch, char *args) {
 }
 
 /*
-	cli_gpio is a Command-Line Interpreter (CLI) procedure that turns manipulates
-	the general-purpose input-output pins on the EEM's PIC32MZ2048EFH100. We pass
-	to it a port letter and a bit number followed by one or more verbs: set, clear,
-	enable, disable, and read. The set and clear verbs set and clear the pin's 
-	latch. The enable and disable verbs enable and disable the pin's output driver.
-	The read verb reads the state of the pin and appends to the return string a zero
-	or one for LO and HI. The command can contain many verbs, all of which will be
-	executed. Multiple read verbs result in multiple bits being added to the return
-	string.
+	cli_gpio is a Command-Line Interpreter (CLI) procedure that turns
+	manipulates the general-purpose input-output pins on the EEM's PIC32MZ. We
+	pass to it a port letter and a bit number followed by one or more verbs:
+	set, clear, output, input, and read. The set and clear verbs set and clear
+	the pin's latch. The output and input verbs enable and disable the pin's
+	output driver respectively. The read verb reads the state of the pin and
+	appends to the return string a zero or one for LO and HI. The command can
+	contain many verbs, all of which will be executed. Multiple read verbs
+	result in multiple bits being added to the return string. To perform the pin
+	functions, we use the GPIO family of routines defined in the Microchip
+	liberary plib_gpio.c.
 */
 void cli_gpio(cli_chan_type *ch, char *args) {
 	bool print_info = false;
 	bool print_help = false;
-	uint8_t port_index = 255;
+	GPIO_PORT port = 0;
 	bool port_received = false;
-	uint8_t bit_index = 255;
+	uint8_t bit = 0;
 	bool bit_received = false;
+	uint32_t mask = 0;
+	uint32_t value = 0;
+	bool need_newline = false;
 
 	char *tok = strtok(args, " \t");
 	while (tok != NULL) {
@@ -855,24 +860,27 @@ void cli_gpio(cli_chan_type *ch, char *args) {
  		} else if (strcmp(tok, "--help") == 0) {
  			print_help = true;
  		} else if (strcmp(tok, "A") == 0) {
- 			port_index = 1;
+ 			port = GPIO_PORT_A;
  			port_received = true;
  		} else if (strcmp(tok, "B") == 0) {
- 			port_index = 2;
+ 			port = GPIO_PORT_B;
  			port_received = true;
  		} else if (strcmp(tok, "C") == 0) {
- 			port_index = 3;
+ 			port = GPIO_PORT_C;
+ 			port_received = true;
+ 		} else if (strcmp(tok, "D") == 0) {
+ 			port = GPIO_PORT_D;
  			port_received = true;
  		} else if (strcmp(tok, "E") == 0) {
- 			port_index = 5;
+ 			port = GPIO_PORT_E;
  			port_received = true;
  		} else if (strcmp(tok, "F") == 0) {
- 			port_index = 6;
+ 			port = GPIO_PORT_F;
  			port_received = true;
  		} else if (strcmp(tok, "G") == 0) {
- 			port_index = 7;
+ 			port = GPIO_PORT_G;
  			port_received = true;
- 		} else if (parse_uint8(tok, &bit_index)) {
+ 		} else if (parse_uint8(tok, &bit)) {
  			bit_received = true;
  		} else {
             cli_print(ch, "ERROR: Unrecognized port or bit '%s' in %s.\n", 
@@ -884,39 +892,39 @@ void cli_gpio(cli_chan_type *ch, char *args) {
     }
     
 	if (print_info) {
-		cli_message(ch, "Turns on and off indicator lamps.\n");
+		cli_message(ch, "Configures, sets, and reads GPIO pins.\n");
 		return;
 	}
 
 	if (print_help) {
 		cli_message(ch,
 "Usage:\n"
-"  gpio port bit <set|clear|enable|disable|read>\n"
+"  gpio port bit <set|clear|output|input|read>\n"
 "  gpio [--info] [--help]\n"
 "\n"
 "Summary:\n"
 "  The gpio command allows us to configure general-purpose input-output pins\n"
 "  as either digital inputs or digital outputs, and to write to and read from\n"
 "  these same pins. The command operates upon a single pin, which we specify\n"
-"  with its port letter and bit number. The command is restricted to those pins\n"
-"  that are available for use on the EEM's mPCIe connector. The port letter can\n"
-"  be A, B, C, E, F, or G. But it cannot be D because no D-Port pins are connected\n"
-"  to the mPCIe pins. The bit numbers are likewise restricted to those that are\n"
-"  available on the mPCIe connector. If we specify a pin that is not available on\n"
-"  the mPCIe connector, the routine will return an error. We can specify multiple\n"
-"  verbs in this command, and all will be executed, one after another. The read\n"
-"  verb adds a zero or one to the return string, indicating the state of the pin.\n"
-"  Note that the state of the pin is distinct from the value stored in the pin's\n"
-"  latch. The latch value we drive LO with 'clear' and HI with 'set', but its\n"
-"  value will not appear on the pin unless we enable the pin driver with the\n"
-"  'enable' verb. Only then can we read back the latch value. Otherwise, the pin\n"
-"  acts as an input for an external logic signal.\n"
+"  with its port letter and bit number. The command supports bits 0-31 of ports\n"
+"  A through G, even though fewer than half of these bits are available on the\n"
+"  package of the EEM's PIC32MZ controller, and fewer than that are available\n"
+"  on the EEM's mPCIe connector. The routine translates port letters into an\n"
+"  internal index, but it uses the bit number directly. If we specify a pin that\n"
+"  that does not belong in any of the thirty-two bit ports A-G, the routine\n"
+"  returns an error. We can specify multiple verbs in this command, and all will\n"
+"  be executed, one after another. The read verb adds a zero or one to the return\n"
+"  string, indicating the state of the pin. The state of the pin is distinct from\n"
+"  the value stored in the pin's latch. The latch value we drive LO with 'clear'\n"
+"  and HI with 'set', but its value will not appear on the pin unless we enable\n"
+"  the pin driver with the 'output' verb. Only then can we read back the latch\n"
+"  value. Otherwise, the pin acts as an input for an external logic signal.\n"
 "\n"
 "Verbs:\n"
 "  set       Write logic HI to gpio pin latch.\n"
 "  clear     Write logic LO to gpio pin latch.\n"
-"  enable    Enable gpio pin output driver.\n"
-"  disable   Disable gpio pin output driver.\n"
+"  output    Enable gpio pin output driver.\n"
+"  input     Disable gpio pin output driver.\n"
 "  read      Read gpio pin value and return as 0 or 1.\n"
 "\n"
 "Options:\n"
@@ -925,24 +933,43 @@ void cli_gpio(cli_chan_type *ch, char *args) {
 		return;
 	}
 	
+	if (!port_received) {
+		cli_print(ch, "ERROR: No port letter specified in %s.\n", __func__);
+		return;
+	}
+	if (!bit_received) {
+		cli_print(ch, "ERROR: No bit bit specified in %s.\n", __func__);
+		return;
+	} 
+	if (bit > 31) {
+		cli_print(ch, "ERROR: Bit bit '%d' out of range in %s.\n",
+			bit, __func__);
+		return;
+	} 
+	
+	mask = ((uint32_t)1 << bit);
+
 	while (tok != NULL) {
-		if (strcmp(tok, "set") == 0) {
-			cli_print(ch, "set bit %d on port %d.\n", bit_index, port_index);		
- 		} else if (strcmp(tok, "clear") == 0) {
-			cli_print(ch, "clear bit %d on port %d.\n", bit_index, port_index);		
- 		}  else if (strcmp(tok, "enable") == 0) {
-			cli_print(ch, "enable bit %d on port %d.\n", bit_index, port_index);		
- 		}  else if (strcmp(tok, "disable") == 0) {
-			cli_print(ch, "disable bit %d on port %d.\n", bit_index, port_index);		
- 		}  else if (strcmp(tok, "read") == 0) {
-			cli_print(ch, "read bit %d on port %d.\n", bit_index, port_index);		
+		if (strcmp(tok, "set") == 0) GPIO_PortSet(port,mask);
+		else if (strcmp(tok, "clear") == 0) GPIO_PortClear(port,mask);
+		else if (strcmp(tok, "output") == 0) GPIO_PortOutputEnable(port,mask);
+		else if (strcmp(tok, "input") == 0) GPIO_PortInputEnable(port,mask);
+		else if (strcmp(tok, "read") == 0) {
+			value = GPIO_PortRead(port);
+			if (value & mask) {
+				cli_print(ch,"1");
+			} else {
+				cli_print(ch,"0");
+			}
+			need_newline = true;
   		} else {
+  			if (need_newline) cli_print(ch, "\n");
             cli_print(ch, "ERROR: Unrecognized verb '%s' in %s.\n", tok, __func__);
             return;
         }
         tok = strtok(NULL, " \t");
-        if (port_received && bit_received) break;
     }	
+  	if (need_newline) cli_print(ch, "\n");
 	
     return;
 }
