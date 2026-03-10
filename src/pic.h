@@ -494,5 +494,6 @@ void cli_reset(cli_chan_type *ch, char *args);
 #define CLI_MPCIE_MAX_DATA 512
 void cli_mpcie(cli_chan_type *ch, char *args);
 void cli_lamp(cli_chan_type *ch, char *args);
+void cli_gpio(cli_chan_type *ch, char *args);
 
 #endif

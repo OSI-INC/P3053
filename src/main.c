@@ -281,6 +281,7 @@ int main (void) {
 	cli_cmd_register("config",cli_config);
 	cli_cmd_register("debug",cli_debug);
 	cli_cmd_register("exit",cli_exit);
+	cli_cmd_register("gpio",cli_gpio);
 	cli_cmd_register("help",cli_help);
 	cli_cmd_register("lamp",cli_lamp);
 	cli_cmd_register(CLI_LOGIN_CMD,cli_login);

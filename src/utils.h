@@ -65,6 +65,9 @@ bool parse_uint32(const char *tok, uint32_t *out_ptr);
 /*
 	Dummy functions for function pointers.
 */
-static inline void dummy_void_func(void) { ; }
+static inline void dummy_void_void(void) { ; }
+static inline void dummy_void_bool(bool value) { ; }
+static inline void dummy_void_int(int value) { ; }
+static inline int dummy_int_int(int value) { return 0; }
 
 #endif

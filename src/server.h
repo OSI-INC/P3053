@@ -250,12 +250,15 @@ int tcp_writeall(void *context, const uint8_t *buf, uint16_t len);
 	socket. We use this in the server state machine to implement a timeout. The
 	only feature of the server that is not encoded in this structure is the
 	protocol task procedure, which we pass into the server routine as a separate
-	argument. Included in the server structure are two function pointers to
-	routines that turn on and off an indicator of some sort. These must be
-	initialized to dummy procedures, or set to indicator on and off procedures.
-	The server will call them as it opens and closes sockets. If we do not want
-	to provided indicator functions for the server, we can assign both of these
-	function pointers to the global "dummy_void_func" defined in utils.h.
+	argument. Included in the server structure is a pointer to an indicator
+	function that the server can use to indicate the existence of an active
+	connection. We can disable this indicator by assigning the function pointer
+	to the dummy function dummy_void_bool, declared in utils.h. Or we can assign
+	the pointer a function that takes a single boolean parameter and returns no
+	value. When the server calls this function with value "true" the indicator
+	flag should assert itself. For example, an indicator lamp might turn on or a
+	logic level might go HI. When the server calls it with "false", the flag
+	unasserts.
 */
 typedef struct {
  	bool network_up;
