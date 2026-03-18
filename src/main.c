@@ -219,16 +219,40 @@ int telnet_tasks(tcpip_server_type *server) {
 
 /*
 	lamp_signal uses an unsigned integer period and an internal index to apply
-	signals to the green lamp (d2) and the red lamp (d5). We use d2 as a power
-	indicator, turning it on for 10% of the time so quickly that it looks
-	constant when the EEM is idle, and will flicker when the EEM is laboring. We
-	use d5 as a heartbeat, flashing briefly every second in the main loop when
-	the network and link are up and running. The time between flashes will be
-	longer when the EEM is laboring. If the network and link are both down, d5
-	will turn on continuously. If the network is up, but the link is down, which
-	seems to happen sometimes after re-programming the PIC32MZ, d5 will turn off
-	briefly every two seconds. If the EEM crashes, the green and red lights will
-	be stuck on or off.
+	signals to the green lamp (d2) and the red lamp (d5). We use these lamps to
+	indicate the state and activity of the EEM. 
+	
+	+----------------------------------------+--------------+----------------------+
+	| EEM State                              | Green        | Red                  |
+	+----------------------------------------+--------------+----------------------+
+	| Booting up                             | OFF          | OFF                  |
+	| MCU Initialized                        | ON           | ON                   |
+	| Waiting for network interface to start | 10%          | ON, blink off        |
+	| Network interface up, linked, idle     | 10%          | OFF, heartbeat flash |
+	| Network interface up, linked, busy     | 10%, flicker | OFF, irregular flash |
+	| Network interface up, no link          | 10%          | ON, blink off        |
+	| Network interface down                 | 10%          | ON                   |
+	| Crashed, frozen, or stuck in loop      | OFF or ON    | OFF or ON            |
+	+----------------------------------------+--------------+----------------------+	
+	
+	The heartbeat flash should be a quick flash ever one or two seconds. The
+	blink off should be a half-second of the lamp off every one or two seconds.
+	When the EEM is laboring with server tasks, the main loop calls lamp_signal
+	less often. The green lamp starts to flicker. When the EEM is stretched to
+	the limit, the green light will be blinking at full power several times a
+	second and the red light will be blinking at full power once every few
+	seconds.
+
+	If the EEM loses its link, the red light will blink off once a second. If
+	the EEM freezes, the red and green lamps will each either be fully on or
+	fully off, depending upon their state immediately before the freeze. If the
+	EEM is unresponsive and we see both lights shining, look at the green light
+	more carefully, moving your eye around. If the green light is turning on and
+	off, you will see its image flickering as you move your eye. This flicker
+	means the EEM main loop is running. The red light being on means the network
+	interface is down. But if the green light does not flicker, it must be at
+	full power. The red light is stuck on. The EEM has crashed or is stuck in a
+	loop.
 */
 void lamp_signal(uint32_t period) {
 	static uint32_t i = 0;
@@ -257,14 +281,13 @@ void lamp_signal(uint32_t period) {
 }
 
 /*
-	The main program, from which all other programs are called. We initialize
-	all Embedded Ethernet Module (EEM) system processes. We wait for the TCP/IP
-	stack to start up. We assert IP configuration we read from flash memory. We
-	enter the task management loop, in which we attend to our console and our
-	server sockets. During the network startup delay, and during the task
-	management loop, we manipulate the indicator lamps to show that the EEM is
-	running, which loop it is in, and whether the loop is slowing down with the
-	burden of its tasks.
+	The main program. We initialize all Embedded Ethernet Module (EEM) system
+	processes. We wait for the TCP/IP stack to start up. We assert IP
+	configuration we read from flash memory. We enter the task management loop,
+	in which we attend to our console and our server sockets. During the network
+	startup delay, and during the task management loop, we manipulate the
+	indicator lamps to show that the EEM is running, which loop it is in, and
+	whether the loop is slowing down with the burden of its tasks.
 */
 int main (void) {
 
@@ -347,7 +370,7 @@ int main (void) {
 	telnet_server.tcp_timeout = eem_config_active.telnet_timeout;
 
    	// Perform maintenance tasks one after another and repeat. The lamp
-   	// signaling will show that the EEM is alive.
+   	// signaling will show that the EEM is alive. 
 	while (true) {
 		tcp_tick();
 		cli_server(&console_chan);
