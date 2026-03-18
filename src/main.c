@@ -246,13 +246,13 @@ int telnet_tasks(tcpip_server_type *server) {
 	If the EEM loses its link, the red light will blink off once a second. If
 	the EEM freezes, the red and green lamps will each either be fully on or
 	fully off, depending upon their state immediately before the freeze. If the
-	EEM is unresponsive and we see both lights shining, look at the green light
-	more carefully, moving your eye around. If the green light is turning on and
-	off, you will see its image flickering as you move your eye. This flicker
-	means the EEM main loop is running. The red light being on means the network
-	interface is down. But if the green light does not flicker, it must be at
-	full power. The red light is stuck on. The EEM has crashed or is stuck in a
-	loop.
+	EEM is unresponsive and we see both lights shining, move your gaze back and
+	forth over the green light. If the green light flickers across your retina,
+	it is being turned on and off by the main loop running. In this case, the
+	red light will be shining steadily. It will not flicker across your retina.
+	The main loop is running but the network interface is down. On the other
+	hand, if both the green and red lights are steady, leaving no flickering
+	image on your retina, the EEM has crashed or is stuck in a loop.
 */
 void lamp_signal(uint32_t period) {
 	static uint32_t i = 0;

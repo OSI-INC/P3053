@@ -51,7 +51,11 @@
 
 #
 # Define the exact processor, the location of its device pack, and point to its
-# linker script
+# linker script. Do not use a relative path for the device pack. If you do, the
+# linker will find a default device pack and use that to build the executable.
+# The resulting code will fail in unpredictable ways and it will be a while
+# before you figure out that it's a linker problem not a source code or hardware
+# problem.
 #
 CPU := 32MZ2048EFH100
 DFP_DIR := $(abspath ../Microchip/PIC32MZ-EF_DFP/1.3.58)
