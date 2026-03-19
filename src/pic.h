@@ -54,25 +54,14 @@
 	declare them as static inline so they can be fast, which we like when we use
 	these outputs as test points.
 
+	In the A3053B, lamps D2, D3, D4, and D5 are connected to RF3, RF4, RF5, and
+	RD9 respectively.
+
 	In the A3053A, lamps D2, D3, D4, and D5 are connected to RF3, RF2, RF8, and
 	RA2 respectively. Lamps D3 and D4 are reserved for the TX and RX lines of
 	UART2. For D3 and D4 we provide dummy routines. But we can use D2 and D5 as
 	indicator lamps.
-
-	In the A3053B, lamps D2, D3, D4, and D5 are connected to RF3, RF4, RF5, and
-	RD9 respectively.
 */
-#ifdef EEM_MODULE_A3053A
-#define D2_MASK  0x00000008u  // RF3
-#define D3_MASK  0x00000004u  // RF2
-#define D4_MASK  0x00000100u  // RF8
-#define D5_MASK  0x00000004u  // RA2
-static inline void d2_on(bool on) {if (on) LATFSET = D2_MASK; else LATFCLR = D2_MASK;}
-static inline void d3_on(bool on) {;}
-static inline void d4_on(bool on) {;}
-static inline void d5_on(bool on) {if (on) LATASET = D5_MASK; else LATACLR = D5_MASK}
-#endif
-
 #ifdef EEM_MODULE_A3053B
 #define D2_MASK    0x00000008u  // RF3
 #define D3_MASK    0x00000010u  // RF4
@@ -84,6 +73,17 @@ static inline void d4_on(bool on) {if (on) LATFSET = D4_MASK; else LATFCLR = D4_
 static inline void d5_on(bool on) {if (on) LATDSET = D5_MASK; else LATDCLR = D5_MASK;}
 #endif
 
+#ifdef EEM_MODULE_A3053A
+#define D2_MASK  0x00000008u  // RF3
+#define D3_MASK  0x00000004u  // RF2
+#define D4_MASK  0x00000100u  // RF8
+#define D5_MASK  0x00000004u  // RA2
+static inline void d2_on(bool on) {if (on) LATFSET = D2_MASK; else LATFCLR = D2_MASK;}
+static inline void d3_on(bool on) {;}
+static inline void d4_on(bool on) {;}
+static inline void d5_on(bool on) {if (on) LATASET = D5_MASK; else LATACLR = D5_MASK}
+#endif
+
 /*
 	We define masks for the mPCIe eight-bit parallel bus. This is the bus by
 	which the EEM controls the motherboard. The EEM is master of this bus. The
@@ -93,16 +93,23 @@ static inline void d5_on(bool on) {if (on) LATDSET = D5_MASK; else LATDCLR = D5_
 	and inline so they will be combined together and placed in our code without
 	any actual function calls.
 
-	In the A3053A we have the Control Address Bus (CAB) consisting of six bits
-	CA0-CA5 on RC1-RC4, RE0-RE1. We have the Control Data Bus (CDB) consisting
-	of eight bits CD0-CD7 on RC13, RC14, RE2-RE7. We have Control Data Strobe
-	(!CDS) on RD4 and Control Write (!CWR) on RD5.
-
 	In the A3053B we have the Control Address Bus (CAB) consisting of eight bits
 	RE0-RE7. We have the Control Data Bus (CDB) consisting of eight bits
 	RA0-RA7. We have Control Data Strobe (!CDS) on RA10 and Control Write (!CWR)
 	on RA9.
+	
+	In the A3053A we have the Control Address Bus (CAB) consisting of six bits
+	CA0-CA5 on RC1-RC4, RE0-RE1. We have the Control Data Bus (CDB) consisting
+	of eight bits CD0-CD7 on RC13, RC14, RE2-RE7. We have Control Data Strobe
+	(!CDS) on RD4 and Control Write (!CWR) on RD5.
 */
+
+#ifdef EEM_MODULE_A3053B
+#define MPCIE_CAB_MASK      0x000000FFu  // RE0-RE7
+#define MPCIE_CDB_MASK      0x000000FFu  // RA0-RA7
+#define MPCIE_CDS_MASK      0x00000400u  // !CDS=RA10
+#define MPCIE_CWR_MASK      0x00000200u  // !CWR=RA9
+#endif
 
 #ifdef EEM_MODULE_A3053A
 #define MPCIE_CAB_MASK_RC   0x0000001Eu  // RC1–RC4 
@@ -111,13 +118,6 @@ static inline void d5_on(bool on) {if (on) LATDSET = D5_MASK; else LATDCLR = D5_
 #define MPCIE_CDB_MASK_RE   0x000000FCu  // RE2-RE7
 #define MPCIE_CDS_MASK      0x00000010u  // !CDS=RD4
 #define MPCIE_CWR_MASK      0x00000020u  // !CWR=RD5
-#endif
-
-#ifdef EEM_MODULE_A3053B
-#define MPCIE_CAB_MASK      0x000000FFu  // RE0-RE7
-#define MPCIE_CDB_MASK      0x000000FFu  // RA0-RA7
-#define MPCIE_CDS_MASK      0x00000400u  // !CDS=RA10
-#define MPCIE_CWR_MASK      0x00000200u  // !CWR=RA9
 #endif
 
 // Some motherboards require a slower mPCIe access cycle. Here we set a slow
@@ -133,12 +133,12 @@ static inline void d5_on(bool on) {if (on) LATDSET = D5_MASK; else LATDCLR = D5_
 */
 static inline void mpcie_wr_assert(void) {
 
-#ifdef EEM_MODULE_A3053A
-	LATDCLR = MPCIE_CWR_MASK;
-#endif
-
 #ifdef EEM_MODULE_A3053B
 	LATACLR = MPCIE_CWR_MASK;
+#endif
+
+#ifdef EEM_MODULE_A3053A
+	LATDCLR = MPCIE_CWR_MASK;
 #endif
 
 }
@@ -149,12 +149,12 @@ static inline void mpcie_wr_assert(void) {
 */
 static inline void mpcie_wr_unassert(void) {
 
-#ifdef EEM_MODULE_A3053A
-	LATDSET = MPCIE_CWR_MASK;
-#endif
-
 #ifdef EEM_MODULE_A3053B
 	LATASET = MPCIE_CWR_MASK;
+#endif
+
+#ifdef EEM_MODULE_A3053A
+	LATDSET = MPCIE_CWR_MASK;
 #endif
 
 }
@@ -165,13 +165,13 @@ static inline void mpcie_wr_unassert(void) {
 */
 static inline void mpcie_data_output(void) {
 
+#ifdef EEM_MODULE_A3053B
+	TRISACLR = MPCIE_CDB_MASK;
+#endif
+
 #ifdef EEM_MODULE_A3053A
     TRISCCLR = MPCIE_CDB_MASK_RC;
     TRISECLR = MPCIE_CDB_MASK_RE;
-#endif
-
-#ifdef EEM_MODULE_A3053B
-	TRISACLR = MPCIE_CDB_MASK;
 #endif
 
 }
@@ -183,13 +183,13 @@ static inline void mpcie_data_output(void) {
 */
 static inline void mpcie_data_input(void) {
 
+#ifdef EEM_MODULE_A3053B
+	TRISASET = MPCIE_CDB_MASK;
+#endif
+
 #ifdef EEM_MODULE_A3053A
 	TRISCSET = MPCIE_CDB_MASK_RC; 
 	TRISESET = MPCIE_CDB_MASK_RE;
-#endif
-
-#ifdef EEM_MODULE_A3053B
-	TRISASET = MPCIE_CDB_MASK;
 #endif
 
 }
@@ -206,12 +206,12 @@ static inline void mpcie_data_input(void) {
 */
 static inline void mpcie_ds_assert(void)   {
 
-#ifdef EEM_MODULE_A3053A
-	LATDCLR = MPCIE_CDS_MASK;
-#endif
-
 #ifdef EEM_MODULE_A3053B
 	LATACLR = MPCIE_CDS_MASK;
+#endif
+
+#ifdef EEM_MODULE_A3053A
+	LATDCLR = MPCIE_CDS_MASK;
 #endif
 
 	__asm__ volatile (
@@ -269,12 +269,12 @@ static inline void mpcie_ds_assert(void)   {
 */
 static inline void mpcie_ds_unassert(void) {
 
-#ifdef EEM_MODULE_A3053A
-	LATDSET = MPCIE_CDS_MASK;
-#endif
-
 #ifdef EEM_MODULE_A3053B
 	LATASET = MPCIE_CDS_MASK;
+#endif
+
+#ifdef EEM_MODULE_A3053A
+	LATDSET = MPCIE_CDS_MASK;
 #endif
 
 }
@@ -291,13 +291,13 @@ static inline void mpcie_ds_unassert(void) {
 */
 static inline void mpcie_addr_set(uint8_t addr) {
 
+#ifdef EEM_MODULE_A3053B
+    LATE = (LATE & ~MPCIE_CAB_MASK) | ((uint32_t) (addr & 0xFFu));
+#endif
+
 #ifdef EEM_MODULE_A3053A
     LATC = (LATC & ~MPCIE_CAB_MASK_RC) | ((uint32_t)(addr & 0x0Fu) << 1);
     LATE = (LATE & ~MPCIE_CAB_MASK_RE) | ((uint32_t)(addr >> 4) & 0x03u);
-#endif
-
-#ifdef EEM_MODULE_A3053B
-    LATE = (LATE & ~MPCIE_CAB_MASK) | ((uint32_t) (addr & 0xFFu));
 #endif
 
 	__asm__ volatile (
@@ -337,13 +337,13 @@ static inline void mpcie_addr_set(uint8_t addr) {
 */
 static inline void mpcie_data_set(uint8_t data) {
 
+#ifdef EEM_MODULE_A3053B
+	LATA = (LATA & ~MPCIE_CDB_MASK) | ((uint32_t) (data & 0xFFu));
+#endif
+
 #ifdef EEM_MODULE_A3053A
 	LATC = (LATC & ~MPCIE_CDB_MASK_RC) | ((uint32_t) (data & 0x03u) << 13);
 	LATE = (LATE & ~MPCIE_CDB_MASK_RE) | ((uint32_t) (data & 0xFCu));
-#endif
-
-#ifdef EEM_MODULE_A3053B
-	LATA = (LATA & ~MPCIE_CDB_MASK) | ((uint32_t) (data & 0xFFu));
 #endif
 
 }
@@ -354,16 +354,16 @@ static inline void mpcie_data_set(uint8_t data) {
 */
 static inline uint8_t mpcie_data_get(void) {
     
+#ifdef EEM_MODULE_A3053B
+	return (uint8_t) PORTA;	
+#endif
+
 #ifdef EEM_MODULE_A3053A
     uint8_t value = 0;
 	uint32_t c = PORTC;
 	uint32_t e = PORTE;
 	value = (uint8_t) ((c >> 13) & 0x03u) | (e  & 0xFCu);
     return value;
-#endif
-
-#ifdef EEM_MODULE_A3053B
-	return (uint8_t) PORTA;	
 #endif
 
 }

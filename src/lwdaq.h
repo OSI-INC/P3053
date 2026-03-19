@@ -42,6 +42,7 @@
 	LWDAQ Controller register addresses on the MPCIE bus.
 */
 #define LWDAQ_CONFIG_ADDR 40
+#define LWDAQ_RESET_ADDR 41
 
 /*
 	LWDAQ Server routines and configuration.

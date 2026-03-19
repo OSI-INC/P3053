@@ -40,6 +40,7 @@
 #include "server.h"
 #include "cli.h"
 #include "pic.h"
+#include "lwdaq.h"
 
 /*
 	The buffer we use when writing to flash memory. We are reading plib_nvm.h
@@ -497,10 +498,18 @@ int uart2_flush(void *context) {
 }
 
 /*
-	cli_reset is a Command-Line Interpreter (CLI) procedure that performs a
-	software reset of the Embedded Ethernet Module (EEM). It notifies the client
-	on the CLI that the reset is about to take place, waits for a fraction of a
-	second to make sure this announcement propagates, and resets the PIC32MZ.
+	cli_reset is a Command-Line Interpreter (CLI) procedure that attempts to
+	reset the host board logic and then proceeds to reset the Embedded Ethernet
+	Module (EEM) itself. Whatever code exists below to initiate a host board
+	reset will be particular to the host board. In our LWDAQ Controller boards,
+	we set bit zero at mPCIe bus location LWDAQ_RESET_ADDR to reset the
+	controller logic. But this does not cause the controller to assert the mPCIe
+	signal !RSTIN, so !MCLR on the EEM will not be asserted. We follow the host
+	board reset with a PIC softawre reset. After the PIC software reset, the PIC
+	should assert its !RST signal for a few milliseconds, which resets the EEM's
+	Ethernet physical interface, and asserts the mPCIe signal !RSTOUT. The
+	command notifies the client on the CLI that the reset is about to take place
+	and waits for a fraction of a second before proceeding with the reset tasks.
 */
 void cli_reset(cli_chan_type *ch, char *args) {
 	bool print_info = false;
@@ -525,12 +534,17 @@ void cli_reset(cli_chan_type *ch, char *args) {
 	if (print_help) {
 		cli_message(ch,
 "Usage:\n"
+"  reset\n"
 "  reset [--info] [--help]\n"
 "\n"
 "Summary:\n"
-"  Performs a software reset of the Embedded Ethernet Module (EEM). With no\n"
-"  options, the command prints a reset notification. It waits for a quarter-\n"
-"  second before initiating the reset.\n"
+"  Attempts to perform a host board reset by writing to a host board reset location.\n"
+"  If this host board reset fails, the command performs a software reset of the EEM's\n"
+"  microcontroller. A software reset alone will not reset the Ethernet physical,\n"
+"  although it will restart the microcontroller's TCP/IP stack. The command prints a\n"
+"  notification and executes a short delay before proceeding with the reset\n"
+"  operation. If we pass the --info or --help options, the command prints an info\n"
+"  or help message instead of performing a reset.\n"
 "\n"
 "Options:\n"
 "  --info        Print a one-line summary of this command.\n"
@@ -545,6 +559,8 @@ void cli_reset(cli_chan_type *ch, char *args) {
 		tcp_tick();
 		counter--;
 	}
+	
+	mpcie_byte_write(LWDAQ_RESET_ADDR, 0x01);
 	pic_reset();
     return;
 }
