@@ -62,7 +62,7 @@
 	UART2. For D3 and D4 we provide dummy routines. But we can use D2 and D5 as
 	indicator lamps.
 */
-#ifdef EEM_MODULE_A3053B
+#if defined(EEM_MODULE_A3053B) || defined(EEM_MODULE_A3053C)
 #define D2_MASK    0x00000008u  // RF3
 #define D3_MASK    0x00000010u  // RF4
 #define D4_MASK    0x00000020u  // RF5
@@ -73,7 +73,7 @@ static inline void d4_on(bool on) {if (on) LATFSET = D4_MASK; else LATFCLR = D4_
 static inline void d5_on(bool on) {if (on) LATDSET = D5_MASK; else LATDCLR = D5_MASK;}
 #endif
 
-#ifdef EEM_MODULE_A3053A
+#if defined(EEM_MODULE_A3053A)
 #define D2_MASK  0x00000008u  // RF3
 #define D3_MASK  0x00000004u  // RF2
 #define D4_MASK  0x00000100u  // RF8
@@ -83,6 +83,19 @@ static inline void d3_on(bool on) {;}
 static inline void d4_on(bool on) {;}
 static inline void d5_on(bool on) {if (on) LATASET = D5_MASK; else LATACLR = D5_MASK}
 #endif
+
+/*
+	Define the local reset signal, which emerges on the mPCIe connector as !RST,
+	and which the PIC32MZ uses to reset its Ethernet physical interface. This
+	signal exists only on the A3053C and later, but the A3053A and A3053B do not
+	use the pin we assign to !RST, so we do not disable this code for those
+	earlier versions.
+*/
+#define RST_MASK 0x00008000u // RG15
+static inline void reset_assert(bool assert) {
+	if (assert) LATFCLR = RST_MASK; 
+	else LATFSET = RST_MASK;
+}
 
 /*
 	We define masks for the mPCIe eight-bit parallel bus. This is the bus by
@@ -104,14 +117,14 @@ static inline void d5_on(bool on) {if (on) LATASET = D5_MASK; else LATACLR = D5_
 	(!CDS) on RD4 and Control Write (!CWR) on RD5.
 */
 
-#ifdef EEM_MODULE_A3053B
+#if defined(EEM_MODULE_A3053B) || defined(EEM_MODULE_A3053C)
 #define MPCIE_CAB_MASK      0x000000FFu  // RE0-RE7
 #define MPCIE_CDB_MASK      0x000000FFu  // RA0-RA7
 #define MPCIE_CDS_MASK      0x00000400u  // !CDS=RA10
 #define MPCIE_CWR_MASK      0x00000200u  // !CWR=RA9
 #endif
 
-#ifdef EEM_MODULE_A3053A
+#if defined(EEM_MODULE_A3053A)
 #define MPCIE_CAB_MASK_RC   0x0000001Eu  // RC1–RC4 
 #define MPCIE_CAB_MASK_RE   0x00000003u  // RE0–RE1 
 #define MPCIE_CDB_MASK_RC   0x00006000u  // RC13-RC14
@@ -133,11 +146,11 @@ static inline void d5_on(bool on) {if (on) LATASET = D5_MASK; else LATACLR = D5_
 */
 static inline void mpcie_wr_assert(void) {
 
-#ifdef EEM_MODULE_A3053B
+#if defined(EEM_MODULE_A3053B) || defined(EEM_MODULE_A3053C)
 	LATACLR = MPCIE_CWR_MASK;
 #endif
 
-#ifdef EEM_MODULE_A3053A
+#if defined(EEM_MODULE_A3053A)
 	LATDCLR = MPCIE_CWR_MASK;
 #endif
 
@@ -149,11 +162,11 @@ static inline void mpcie_wr_assert(void) {
 */
 static inline void mpcie_wr_unassert(void) {
 
-#ifdef EEM_MODULE_A3053B
+#if defined(EEM_MODULE_A3053B) || defined(EEM_MODULE_A3053C)
 	LATASET = MPCIE_CWR_MASK;
 #endif
 
-#ifdef EEM_MODULE_A3053A
+#if defined(EEM_MODULE_A3053A)
 	LATDSET = MPCIE_CWR_MASK;
 #endif
 
@@ -165,11 +178,11 @@ static inline void mpcie_wr_unassert(void) {
 */
 static inline void mpcie_data_output(void) {
 
-#ifdef EEM_MODULE_A3053B
+#if defined(EEM_MODULE_A3053B) || defined(EEM_MODULE_A3053C)
 	TRISACLR = MPCIE_CDB_MASK;
 #endif
 
-#ifdef EEM_MODULE_A3053A
+#if defined(EEM_MODULE_A3053A)
     TRISCCLR = MPCIE_CDB_MASK_RC;
     TRISECLR = MPCIE_CDB_MASK_RE;
 #endif
@@ -183,11 +196,11 @@ static inline void mpcie_data_output(void) {
 */
 static inline void mpcie_data_input(void) {
 
-#ifdef EEM_MODULE_A3053B
+#if defined(EEM_MODULE_A3053B) || defined(EEM_MODULE_A3053C)
 	TRISASET = MPCIE_CDB_MASK;
 #endif
 
-#ifdef EEM_MODULE_A3053A
+#if defined(EEM_MODULE_A3053A)
 	TRISCSET = MPCIE_CDB_MASK_RC; 
 	TRISESET = MPCIE_CDB_MASK_RE;
 #endif
@@ -206,11 +219,11 @@ static inline void mpcie_data_input(void) {
 */
 static inline void mpcie_ds_assert(void)   {
 
-#ifdef EEM_MODULE_A3053B
+#if defined(EEM_MODULE_A3053B) || defined(EEM_MODULE_A3053C)
 	LATACLR = MPCIE_CDS_MASK;
 #endif
 
-#ifdef EEM_MODULE_A3053A
+#if defined(EEM_MODULE_A3053A)
 	LATDCLR = MPCIE_CDS_MASK;
 #endif
 
@@ -269,11 +282,11 @@ static inline void mpcie_ds_assert(void)   {
 */
 static inline void mpcie_ds_unassert(void) {
 
-#ifdef EEM_MODULE_A3053B
+#if defined(EEM_MODULE_A3053B) || defined(EEM_MODULE_A3053C)
 	LATASET = MPCIE_CDS_MASK;
 #endif
 
-#ifdef EEM_MODULE_A3053A
+#if defined(EEM_MODULE_A3053A)
 	LATDSET = MPCIE_CDS_MASK;
 #endif
 
@@ -291,11 +304,11 @@ static inline void mpcie_ds_unassert(void) {
 */
 static inline void mpcie_addr_set(uint8_t addr) {
 
-#ifdef EEM_MODULE_A3053B
+#if defined(EEM_MODULE_A3053B) || defined(EEM_MODULE_A3053C)
     LATE = (LATE & ~MPCIE_CAB_MASK) | ((uint32_t) (addr & 0xFFu));
 #endif
 
-#ifdef EEM_MODULE_A3053A
+#if defined(EEM_MODULE_A3053A)
     LATC = (LATC & ~MPCIE_CAB_MASK_RC) | ((uint32_t)(addr & 0x0Fu) << 1);
     LATE = (LATE & ~MPCIE_CAB_MASK_RE) | ((uint32_t)(addr >> 4) & 0x03u);
 #endif
@@ -337,11 +350,11 @@ static inline void mpcie_addr_set(uint8_t addr) {
 */
 static inline void mpcie_data_set(uint8_t data) {
 
-#ifdef EEM_MODULE_A3053B
+#if defined(EEM_MODULE_A3053B) || defined(EEM_MODULE_A3053C)
 	LATA = (LATA & ~MPCIE_CDB_MASK) | ((uint32_t) (data & 0xFFu));
 #endif
 
-#ifdef EEM_MODULE_A3053A
+#if defined(EEM_MODULE_A3053A)
 	LATC = (LATC & ~MPCIE_CDB_MASK_RC) | ((uint32_t) (data & 0x03u) << 13);
 	LATE = (LATE & ~MPCIE_CDB_MASK_RE) | ((uint32_t) (data & 0xFCu));
 #endif
@@ -354,11 +367,11 @@ static inline void mpcie_data_set(uint8_t data) {
 */
 static inline uint8_t mpcie_data_get(void) {
     
-#ifdef EEM_MODULE_A3053B
+#if defined(EEM_MODULE_A3053B) || defined(EEM_MODULE_A3053C)
 	return (uint8_t) PORTA;	
 #endif
 
-#ifdef EEM_MODULE_A3053A
+#if defined(EEM_MODULE_A3053A)
     uint8_t value = 0;
 	uint32_t c = PORTC;
 	uint32_t e = PORTE;

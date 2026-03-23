@@ -297,7 +297,7 @@ int main (void) {
 	// input-output pins to communicate with indicator lamps, test pins, and
 	// the eight-bit parallel bus.
 	pic_initialize();
-
+	
 	// Register commands in the Command-Line Interpreter (CLI). This is the only 
 	// initialization the CLI requires. The "help" command will list the commands
 	// in the order we register them.
@@ -315,12 +315,15 @@ int main (void) {
 	
 	// Wait for the power supplies to settle before we check the configuration
 	// switch. If we read the switch location too soon, we will think it is
-	// depressed when it is not.
+	// depressed when it is not. During this time we also assert the !RST line
+	// so as to reset the Ethernet physical interface.
 	lamp_signal(0);
+	reset_assert(true);
 	uint32_t last_tick = SYS_TMR_TickCountGet();
 	while (SYS_TMR_TickCountGet() - last_tick < EEM_POWERUP_WAIT_MS) {
 		tcp_tick();
 	}
+	reset_assert(false);
 	
 	// Check the configuration switch on the motherboard. If it is depressed,
 	// the least significant bit of location forty will be zero. If depressed,

@@ -207,7 +207,7 @@ void pic_reset(void) {
 */
 void pic_gpio_initialize(void) {
 
-#ifdef EEM_MODULE_A3053A	
+#if defined(EEM_MODULE_A3053A)	
 	// The A3053A is all-digital. so we configure all pins as digital pins. We
 	// don't even bother to check the data sheet to see which pins can be
 	// non-digital, we just set them all to digital even if they are always
@@ -270,7 +270,7 @@ void pic_gpio_initialize(void) {
    	TRISACLR = D5_MASK;
  #endif
 
-#ifdef EEM_MODULE_A3053B	
+#if defined(EEM_MODULE_A3053B) || defined(EEM_MODULE_A3053C)
 	// The A3053B is all-digital. so we configure all pins as digital pins. We
 	// don't even bother to check the data sheet to see which pins can be
 	// non-digital, we just set them all to digital even if they are always
@@ -330,13 +330,19 @@ void pic_gpio_initialize(void) {
     LATASET = MPCIE_CDS_MASK;
     LATASET = MPCIE_CWR_MASK;
 
-	// We have four test points with indicator lamps on the A3053B. They are
-	// connected to RF3 (D2), RF4 (D3), RF5 (D4), and RD9 (D5). We configure
-	// these four test point pins as outputs. The constants that hold the
-	// numerical port codes are defined in plib_gpio.h. To specify each bit, we
-	// use a mask.
+	// We have four test points with lamps. They are connected to RF3 (D2), RF4
+	// (D3), RF5 (D4), and RD9 (D5). We configure these four test point pins as
+	// outputs. To specify each bit, we use a mask.
    	TRISFCLR = D2_MASK | D3_MASK | D4_MASK;
    	TRISDCLR = D5_MASK;
+#endif
+
+#if defined(EEM_MODULE_A3053C)
+   	// Configure the !RST output, which is on RG15. We make it open-drain and
+   	// release it, so it will be HI by default.
+   	ODCGSET = RST_MASK;
+   	TRISGCLR = RST_MASK;
+   	LATGSET = RST_MASK;
 #endif
 
 	return;
