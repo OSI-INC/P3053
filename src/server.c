@@ -939,18 +939,18 @@ void tcpip_server(tcpip_server_type *server, tcpip_tasks_type tasks) {
 	not permitted to modify the active configuration. To change the
 	configuration of the EEM, we write to the configuration record stored in
 	flash memory. We might want to write the factory configuration to flash so
-	as to perform a factory reset when we do not have access to the motherboard
+	as to perform a factory reset when we do not have access to the host
 	configuration switch. We might want to write the active configuration to
 	flash in order to undo changes to the flash configuration we made earlier
 	with this routines.
 
 	The next time the EEM boots up, it will load the flash configuration as its
 	active configuration. The flash configuration we write now will be loaded
-	after reset later, so long as the configuration switch on the motherboard
-	is not depressed during the reset. If this switch is depressed, the EEM will
-	first over-write the flash configuration with the factory configuration and
-	the factory configuration is the one that will be applied after reset.
-	
+	after reset later, so long as the configuration switch on the host is not
+	depressed during the reset. If this switch is depressed, the EEM will first
+	over-write the flash configuration with the factory configuration and the
+	factory configuration is the one that will be applied after reset.
+
 	The cli_config command respects the security level field of the active EEM
 	configuration. If the security level is 1 or higher, cli_config will insist
 	that the client be logged in before performing any function other than

@@ -3,20 +3,19 @@
 
 	The EEM is a programmable TCP/IP server built on a Mini Peripheral
 	Connection Interface Express (mPCIe) card. The EEM plugs into an mPCIe
-	socket on its motherboard. The EEM uses a PIC32MZ2048EFH microcontroller
-	and LAN8720A Ethernet physical layer to provide computing, memory, and
-	networking. The motherboard provides the EEM with 3.3-V power and an RJ-45
-	socket with internal magnetics for the EEM's 100-Base-T network interface.
-	The motherboard provides a pin header of some sorth through which we can
-	program the EEM's microcontroller with the code compiled from this
-	repository. The motherboard can also provide three pins for the EEM's UART
-	console interface. The mPCIe pins on the EEM provide all eighteen
-	connections needed for an eight-bit parallel bus: eight data lines, eight
-	address lines, one data strobe, and one write line. This data bus is the
-	means by which the EEM communicates with the motherboard. In all our EEM
-	applications, the EEM is the master of this bus, and it uses the bus to
-	configure and control the motherboard. We use the EEM to provide TCP/IP
-	access to a motherboard.
+	socket on its host. The EEM uses a PIC32MZ2048EFH microcontroller and
+	LAN8720A Ethernet physical layer to provide computing, memory, and
+	networking. The host provides the EEM with 3.3-V power and an RJ-45 socket
+	with internal magnetics for the EEM's 100-Base-T network interface. The host
+	provides a pin header of some sorth through which we can program the EEM's
+	microcontroller with the code compiled from this repository. The host can
+	also provide three pins for the EEM's UART console interface. The mPCIe pins
+	on the EEM provide all eighteen connections needed for an eight-bit parallel
+	bus: eight data lines, eight address lines, one data strobe, and one write
+	line. This data bus is the means by which the EEM communicates with the
+	host. In all our EEM applications, the EEM is the master of this bus, and it
+	uses the bus to configure and control the host. We use the EEM to provide
+	TCP/IP access to a host.
 
 	This is the main program of our P3053 repository, where "3053" is the Open
 	Source Instruments Inc. (OSI) assembly number for the Embedded Etherenet
@@ -325,9 +324,9 @@ int main (void) {
 	}
 	reset_assert(false);
 	
-	// Check the configuration switch on the motherboard. If it is depressed,
-	// the least significant bit of location forty will be zero. If depressed,
-	// write the factory EEM configuration to flash, for factory reset.
+	// Check the configuration switch on the host. If it is depressed, the least
+	// significant bit of location forty will be zero. If depressed, write the
+	// factory EEM configuration to flash, for factory reset.
 	uint8_t val = mpcie_byte_read(40);
    	if ((val & 0x01) == 0) {
    		console_message("FACTORY RESET: Detected configuration switch depressed.\n");

@@ -99,8 +99,8 @@ static inline void reset_assert(bool assert) {
 
 /*
 	We define masks for the mPCIe eight-bit parallel bus. This is the bus by
-	which the EEM controls the motherboard. The EEM is master of this bus. The
-	bus consists of the Control Address Bus (CA0-CA7), the Control Data Bus
+	which the EEM controls the host. The EEM is master of this bus. The bus
+	consists of the Control Address Bus (CA0-CA7), the Control Data Bus
 	(DC0-CD7), Data Strobe (!CDS) and Control Write (!CWR). We define procedures
 	to access the mPCIe parallel bus. All procedures are declared here as static
 	and inline so they will be combined together and placed in our code without
@@ -133,9 +133,9 @@ static inline void reset_assert(bool assert) {
 #define MPCIE_CWR_MASK      0x00000020u  // !CWR=RD5
 #endif
 
-// Some motherboards require a slower mPCIe access cycle. Here we set a slow
-// access compiler flag for such motherboards.
-#if defined(EEM_MOTHERBOARD_A3038) || defined(EEM_MOTHERBOARD_A3042)
+// Some hosts require a slower mPCIe access cycle. Here we set a slow access
+// compiler flag for such hosts.
+#if defined(EEM_HOST_A3038) || defined(EEM_HOST_A3042)
 #define MPCIE_SLOW_ACCESS
 #endif
 
@@ -158,7 +158,7 @@ static inline void mpcie_wr_assert(void) {
 
 /*
 	mpcie_wr_unassert drives !CWR high to indicate a mPCIe bus read cycle. When
-	we unassert CWR, the motherboard can drive the controller data bus lines.
+	we unassert CWR, the host can drive the controller data bus lines.
 */
 static inline void mpcie_wr_unassert(void) {
 

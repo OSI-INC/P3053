@@ -79,19 +79,19 @@
 // Standard LWDAQ controller addresses.
 #define FIFO_STROBE_ADDR 62
 
-// Compiler switches based upon motherboard assembly number.
-#if defined(EEM_MOTHERBOARD_A3038) \
-	|| defined(EEM_MOTHERBOARD_A3042)
+// Compiler switches based upon host assembly number.
+#if defined(EEM_HOST_A3038) \
+	|| defined(EEM_HOST_A3042)
 #define ENABLE_FIFO_STROBE
 #endif
 
-#if defined(EEM_MOTHERBOARD_A2071) \
-	|| defined(EEM_MOTHERBOARD_A3050) \
-	|| defined(EEM_MOTHERBOARD_A3052)
+#if defined(EEM_HOST_A2071) \
+	|| defined(EEM_HOST_A3050) \
+	|| defined(EEM_HOST_A3052)
 #define ENABLE_STREAM_WRITE
 #endif
 
-#if defined(EEM_MOTHERBOARD_A2071)
+#if defined(EEM_HOST_A2071)
 #define ENABLE_STREAM_DELETE
 #endif
 
@@ -408,11 +408,11 @@ int lwdaq_handle_message(tcpip_server_type *server,
 				register_addr, tx_len, __func__);
 			lwdaq_header(server->socket, DATA_RETURN, tx_len);
 			
-		// Here we are setting up a stream read, where we assert the address and 
-		// unassert /CW only once. Subsequent reads are faster because the 
+		// Here we are setting up a stream read, where we assert the address and
+		// unassert /CW only once. Subsequent reads are faster because the
 		// controller logic is incrementing the data address. But these three
-		// instructions don't do anything for the motherboards that have to
-		// check the FIFO strobe register.
+		// instructions don't do anything for hosts that have to check the FIFO
+		// strobe register.
 #ifndef ENABLE_FIFO_STROBE		
 			mpcie_addr_set(register_addr);
 			mpcie_data_input();

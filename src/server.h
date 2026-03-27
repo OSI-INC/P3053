@@ -121,10 +121,9 @@ typedef struct {
 /*
 	The factory EEM configuration is the one we use when we have not yet written
 	a configuration to flash memory, or during a factory reset with the
-	configuration button on the motherboard depressed. The factory reset
-	security level must be zero or else we will find ourselves unable to read
-	the configuration file to find out what the password is, and then be unable
-	to log in.
+	configuration button on the host depressed. The factory reset security level
+	must be zero or else we will find ourselves unable to read the configuration
+	file to find out what the password is, and then be unable to log in.
 */
 static const eem_config_type eem_config_factory = {
 	.flash_magic = CONFIG_FLASH_MAGIC,
@@ -161,18 +160,18 @@ extern eem_config_type eem_config_active;
 	store the configuration in flash memory. On start-up, we load the
 	configuration into our active configuration record and we use the active
 	configuration record to configure the server. If the configuration switch on
-	the motherboard is pressed, however, the EEM performs a factory reset by
-	writing its factory configuration record to flash memory before it reads the
-	flash memory configuration into the active configuration record. By this
-	means, the EEM provides both persistent configuration and restorable
-	configuration. The EEM configuration rules are simple: we are not permitted
-	to modify the EEM network settings while the EEM is running. Instead, if we
-	want to change the network settings, we write the values we want to flash
-	memory, then reboot the EEM to apply these values. This rule simplifies our
-	configuration implementation and debugging. We apply network settings only
-	once: during start-up. We have a record of settings we can examine to see
-	what is going on, but we do not have to worry about keeping this record up
-	to date with the current EEM settings.
+	the host is pressed, however, the EEM performs a factory reset by writing
+	its factory configuration record to flash memory before it reads the flash
+	memory configuration into the active configuration record. By this means,
+	the EEM provides both persistent configuration and restorable configuration.
+	The EEM configuration rules are simple: we are not permitted to modify the
+	EEM network settings while the EEM is running. Instead, if we want to change
+	the network settings, we write the values we want to flash memory, then
+	reboot the EEM to apply these values. This rule simplifies our configuration
+	implementation and debugging. We apply network settings only once: during
+	start-up. We have a record of settings we can examine to see what is going
+	on, but we do not have to worry about keeping this record up to date with
+	the current EEM settings.
 
 	The PIC32MZ2048EFH's 2 MByte of flash memory appears twice in the CPU's
 	virtual address space. Once in the range 0x9D000000 to 0x9D0FFFFF, in which

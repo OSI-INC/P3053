@@ -464,7 +464,7 @@ void cli_status(cli_chan_type *ch, char *args) {
 "Summary:\n"
 "  Print a table of system information. This includes network status, software tick\n"
 "  frequency, microprocessor clock frequency, login status of the command-line\n"
-"  interpreter, motherboard name, platform name, and software version number.\n"
+"  interpreter, host name, platform name, and software version number.\n"
 "\n"
 "Options:\n"
 "  --info        Print a one-line summary of this command.\n"
@@ -473,7 +473,7 @@ void cli_status(cli_chan_type *ch, char *args) {
 		return;
 	}
 
-	cli_print(ch, "Motherboard     %s\n", EEM_MOTHERBOARD_NAME);
+	cli_print(ch, "Host            %s\n", EEM_HOST_NAME);
 	cli_print(ch, "Module          %s\n", EEM_MODULE_NAME);
 	cli_print(ch, "Software        %d\n", EEM_SOFTWARE_VERSION);
 	server_info(ch->tx_buff);

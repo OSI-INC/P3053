@@ -51,7 +51,7 @@ extern bool debug;
 
 /*
 	Here is another flag that turns off the LWDAQ server. This server is one we
-	at OSI use on all our data acquisition motherboards, and acts as an example
+	use on all our data acquisition host boards, and acts as an example
 	of a binary interface. But you can turn it off by setting the flag below
 	to false.
 */
@@ -71,11 +71,11 @@ extern bool debug;
 #define EEM_TCB_QUEUE_SIZE 4
 
 /*
-	The power-up wait delays checking the configuration switch until the
-	motherboard is ready. Note that the power-up wait will not be effective when
-	we load the EEM into a powered mPCIe socket because the contacts will be
-	unreliable as the EEM is powering up. When we plug the EEM into a life mPCIe
-	socket, we might see an unwanted reset to factory default configuration.
+	The power-up wait delays checking the configuration switch until the host is
+	ready. Note that the power-up wait will not be effective when we load the
+	EEM into a powered mPCIe socket because the contacts will be unreliable as
+	the EEM is powering up. When we plug the EEM into a life mPCIe socket, we
+	might see an unwanted reset to factory default configuration.
 */
 #define EEM_POWERUP_WAIT_MS 500
 
@@ -93,7 +93,7 @@ extern bool debug;
 	We define a macro below and use it to define a name string for each of the
 	module versions listed in the table above.
 */
-#define EEM_MODULE_A3053C
+#define EEM_MODULE_A3053B
 
 #ifdef EEM_MODULE_A3053A
 #define EEM_MODULE_NAME "A3053A"
@@ -112,13 +112,13 @@ extern bool debug;
 #endif
 
 /*
-	The motherboard is the board that the EEM plugs into. In our case, this
-	might be a LWDAQ Driver with Ethernet Interface, a an Animal Location
-	Tracker, a Telemetry Control Box, or an Analog Signal Generator, to name a
-	few. We define a name string for the motherboard and a compiler macro that
-	contains the motherboard name. We use the macro to perform conditional
-	compilation that configures the EEM for each particular motherboard. Here
-	are the assembly numbers the EEM code recognises.
+	The host is the board that the EEM plugs into. In our case, this might be a
+	LWDAQ Driver with Ethernet Interface, a an Animal Location Tracker, a
+	Telemetry Control Box, or an Analog Signal Generator, to name a few. We
+	define a name string for the host and a compiler macro that contains the
+	host name. We use the macro to perform conditional compilation that
+	configures the EEM for each particular host. Here are the assembly numbers
+	the EEM code recognises.
 	
 	LWDAQ Driver with Ethernet Interface  A2071
 	TCPIP-VME Interface                   A2087
@@ -127,37 +127,37 @@ extern bool debug;
 	Function Generator                    A3050
 	Analog Signal Generator               A3052
 	
-	We use the motherboard macro to define a motherboard name string for each of
-	the motherboard versions listed in the table above.
+	We use the host macro to define a host name string for each of the host
+	versions listed in the table above.
 */
-#define EEM_MOTHERBOARD_A2071
+#define EEM_HOST_A3042
 
-#ifdef EEM_MOTHERBOARD_A2071
-#define EEM_MOTHERBOARD_NAME "A2071"
+#ifdef EEM_HOST_A2071
+#define EEM_HOST_NAME "A2071"
 #endif
 
-#ifdef EEM_MOTHERBOARD_A2087
-#define EEM_MOTHERBOARD_NAME "A2087"
+#ifdef EEM_HOST_A2087
+#define EEM_HOST_NAME "A2087"
 #endif
 
-#ifdef EEM_MOTHERBOARD_A3038
-#define EEM_MOTHERBOARD_NAME "A3038"
+#ifdef EEM_HOST_A3038
+#define EEM_HOST_NAME "A3038"
 #endif
 
-#ifdef EEM_MOTHERBOARD_A3042
-#define EEM_MOTHERBOARD_NAME "A3042"
+#ifdef EEM_HOST_A3042
+#define EEM_HOST_NAME "A3042"
 #endif
 
-#ifdef EEM_MOTHERBOARD_A3050
-#define EEM_MOTHERBOARD_NAME "A3050"
+#ifdef EEM_HOST_A3050
+#define EEM_HOST_NAME "A3050"
 #endif
 
-#ifdef EEM_MOTHERBOARD_A3052
-#define EEM_MOTHERBOARD_NAME "A3052"
+#ifdef EEM_HOST_A3052
+#define EEM_HOST_NAME "A3052"
 #endif
 
-#ifndef EEM_MOTHERBOARD_NAME
-#define EEM_MOTHERBOARD_NAME "UNKNOWN"
+#ifndef EEM_HOST_NAME
+#define EEM_HOST_NAME "UNKNOWN"
 #endif
 
 /*
