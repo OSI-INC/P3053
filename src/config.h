@@ -93,7 +93,7 @@ extern bool debug;
 	We define a macro below and use it to define a name string for each of the
 	module versions listed in the table above.
 */
-#define EEM_MODULE_A3053B
+#define EEM_MODULE_A3053C
 
 #ifdef EEM_MODULE_A3053A
 #define EEM_MODULE_NAME "A3053A"
@@ -130,7 +130,7 @@ extern bool debug;
 	We use the host macro to define a host name string for each of the host
 	versions listed in the table above.
 */
-#define EEM_HOST_A3042
+#define EEM_HOST_A2071
 
 #ifdef EEM_HOST_A2071
 #define EEM_HOST_NAME "A2071"
