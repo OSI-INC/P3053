@@ -300,8 +300,7 @@ void pic_gpio_initialize(void) {
 	// LED.
 	U2RXR = 0b1011;
 	
-	// Select UART2 TX as the source of RF2. On the A3053A, RF2 is U1-57,
-	// connected to, R10, which in turn feeds D3, the blue test point LED.
+	// Select UART2 TX as the source of RF2.
 	RPF2R = 0b0010;
 	
 	// Lock the PPS registers.
