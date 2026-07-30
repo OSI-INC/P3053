@@ -315,7 +315,8 @@ int main (void) {
 	// Wait for the power supplies to settle before we check the configuration
 	// switch. If we read the switch location too soon, we will think it is
 	// depressed when it is not. During this time we also assert the !RST line
-	// so as to reset the Ethernet physical interface.
+	// so as to reset the Ethernet physical interface and any logic on the 
+	// host board that is reset by !RST.
 	lamp_signal(0);
 	reset_assert(true);
 	uint32_t last_tick = SYS_TMR_TickCountGet();
