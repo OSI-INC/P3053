@@ -82,13 +82,20 @@ extern bool debug;
 /*
 	The module is the EEM circuit board. The A3053A is the first EEM circuit
 	board, with an inconvenient allocation of PIC32MZ pins to the mPCIe bus. The
-	A3053B is the second EEM, which has a more convenient allocation. We define
-	a name string for the module and a compiler macro that contains the module
-	name. We use the macro to perform conditional compilation that configures
-	the EEM for each particular module. 
+	A3053B is the second EEM, which has a more convenient allocation. The A3053C
+	is the first production version and the only one for which we will maintain
+	support in the long-term. The A3053C separates the incoming !MCLR master
+	reset from an outgoing !RST reset. The !RST resets the Ethernet physiccal
+	interface as well as the host board. The !MCLR comes from a host board
+	switch with power-up reset monitor. The reset monitor provides power-up
+	reset and debounces the switch as well. We define a name string for the
+	module and a compiler macro that contains the module name. We use the macro
+	to perform conditional compilation that configures the EEM for each
+	particular module. 
 	
 	Embedded Ethernet Module             A3053A
 	Embedded Ethernet Module             A3053B
+	Embedded Ethernet Module             A3053C
 	
 	We define a macro below and use it to define a name string for each of the
 	module versions listed in the table above.
@@ -130,7 +137,7 @@ extern bool debug;
 	We use the host macro to define a host name string for each of the host
 	versions listed in the table above.
 */
-#define EEM_HOST_A2071
+#define EEM_HOST_A2042
 
 #ifdef EEM_HOST_A2071
 #define EEM_HOST_NAME "A2071"
