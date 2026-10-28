@@ -1,4 +1,4 @@
-# Firmware for the A3053 Embedded Ethernet Module (EEM)
+# A3053 Embedded Ethernet Module (EEM) Firmware
 
 Copyright (C) 2025-2026, Kevan Hashemi, Open Source Instruments Inc.  
 Copyright (C) 2019 Microchip Technology Inc. and its subsidiaries.
