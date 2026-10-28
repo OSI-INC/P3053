@@ -93,8 +93,8 @@ static inline void d5_on(bool on) {if (on) LATASET = D5_MASK; else LATACLR = D5_
 */
 #define RST_MASK 0x00008000u // RG15
 static inline void reset_assert(bool assert) {
-	if (assert) LATFCLR = RST_MASK; 
-	else LATFSET = RST_MASK;
+	if (assert) LATGCLR = RST_MASK; 
+	else LATGSET = RST_MASK;
 }
 
 /*

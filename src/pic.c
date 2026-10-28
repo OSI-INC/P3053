@@ -337,11 +337,13 @@ void pic_gpio_initialize(void) {
 #endif
 
 #if defined(EEM_MODULE_A3053C)
-   	// Configure the !RST output, which is on RG15. We make it open-drain and
-   	// release it, so it will be HI by default.
+   	// Configure the !RST output, which is on RG15. We make it open-drain turn
+   	// off the output transistor and clear the tristate bit. Because this signal
+   	// is pulled up by a resistor on the A3053C, the !RST will start HI and stay
+   	// HI during this configuration.
    	ODCGSET = RST_MASK;
-   	TRISGCLR = RST_MASK;
    	LATGSET = RST_MASK;
+   	TRISGCLR = RST_MASK;
 #endif
 
 	return;
@@ -385,6 +387,16 @@ void pic_initialize(void) {
  	// Configure the functions of the gerneral-purpose input and output pins.
 	pic_gpio_initialize();
 
+	// Assert the !RST signal for the power-up reset duration. The !RST signal
+	// resets the Ethernet physical interface and is exported to the host board
+	// where it might reset the host board logic. We use the PIC's core timer
+	// because we are sure it does not rely upon interrupts.
+	reset_assert(true);
+	uint32_t start_time = _CP0_GET_COUNT();
+	uint32_t end_time = start_time + (100000 * EEM_POWERUP_RST_MS); 
+	while ((uint32_t)(_CP0_GET_COUNT()) < end_time);
+	reset_assert(false);
+	
 	// Initialize the console, which communicates through a three-wire UART.
 	console_initialize();
 

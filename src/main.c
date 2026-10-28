@@ -290,12 +290,17 @@ void lamp_signal(uint32_t period) {
 */
 int main (void) {
 
-	// Initialize the microcontroller and its peripherals, which include clock,
-	// memory, core timers, system timer, UART console, Ethernet physical
-	// interface, and the TCP/IP stack. Configure the general-purpose
-	// input-output pins to communicate with indicator lamps, test pins, and
-	// the eight-bit parallel bus.
+	// The pic_initialize routine configures the general-purpose input-output
+	// pins to communicate with indicator lamps, test pins, and the eight-bit
+	// parallel bus. Assert the RST line for the Ethernet physical interface and
+	// the host board. Initialize the microcontroller's internal and external
+	// peripherals, which include clock, memory, core timers, system timer, UART
+	// console, and Ethernet physical interface. Start initialization of the
+	// TCP/IP stack. Enable interrupts.
 	pic_initialize();
+	
+	// Turn on the red lamp to show that we are through the initialization routine.
+	lamp_signal(0);
 	
 	// Register commands in the Command-Line Interpreter (CLI). This is the only 
 	// initialization the CLI requires. The "help" command will list the commands
@@ -312,18 +317,13 @@ int main (void) {
 	cli_cmd_register("status",cli_status);
 	cli_cmd_register("reset",cli_reset);
 	
-	// Wait for the power supplies to settle before we check the configuration
-	// switch. If we read the switch location too soon, we will think it is
-	// depressed when it is not. During this time we also assert the !RST line
-	// so as to reset the Ethernet physical interface and any logic on the 
-	// host board that is reset by !RST.
-	lamp_signal(0);
-	reset_assert(true);
+	// Wait for power supplies to settle before we check the configuration 
+	// switch. When we plug an EEM into a live socket and read the configuration
+	// switch too soon, we can get a false LO in bit zero of the configuration
+	// location in the host logic, which will cause an unwanted factory reset
+	// of the EEM's configuration.
 	uint32_t last_tick = SYS_TMR_TickCountGet();
-	while (SYS_TMR_TickCountGet() - last_tick < EEM_POWERUP_WAIT_MS) {
-		tcp_tick();
-	}
-	reset_assert(false);
+	while (SYS_TMR_TickCountGet() - last_tick < EEM_POWERUP_WAIT_MS) { ; }
 	
 	// Check the configuration switch on the host. If it is depressed, the least
 	// significant bit of location forty will be zero. If depressed, write the
@@ -337,14 +337,15 @@ int main (void) {
 	// Read the flash configuration into the active configuration.
 	eem_config_read(&eem_config_active);
 
-   	// Wait for the TCP/IP stack to establish itself. Once the stack is ready,
-	// we apply our IP address, gateway address, and network mask, as read from
-	// the active configuration. Lamp signaling shows that the EEM is alive
-	// during the wait.
+   	// Wait for the TCP/IP stack to establish itself. Lamp signaling
+	// shows that the EEM is alive during the wait.
    	while (TCPIP_STACK_Status(sysObj.tcpip) != SYS_STATUS_READY) { 
    		tcp_tick();
    		lamp_signal(1e5);
    	}
+   	
+	// The TCP/IP stack is ready, so we apply our IP address, gateway address,
+	// and network mask, as read from the active configuration.
    	server_set_ip(eem_config_active.ip_str, 
    		eem_config_active.gw_str,
    		eem_config_active.nm_str);
@@ -372,8 +373,8 @@ int main (void) {
 	telnet_server.port = eem_config_active.telnet_port;
 	telnet_server.tcp_timeout = eem_config_active.telnet_timeout;
 
-   	// Perform maintenance tasks one after another and repeat. The lamp
-   	// signaling will show that the EEM is alive. 
+   	// Perform maintenance tasks one after another and repeat. Lamp signaling
+   	// shows that the EEM is alive. 
 	while (true) {
 		tcp_tick();
 		cli_server(&console_chan);

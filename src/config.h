@@ -33,6 +33,14 @@
 #define CONFIG_H
 
 /*
+	When our GitHub repository version is X.Y, we let the software version we report
+	for our EEM be 32+X. We do this so that we can tell the difference between LWDAQ
+	Relays equipped with the RCM6700 from those equipped with the EEM. The RCM6700
+	relays have software version numbers less than 32.
+*/
+#define EEM_SOFTWARE_VERSION 34
+
+/*
 	When we want to provide a global flag that we can subsequently change in
 	software, we give it a default value, and initialize a global variable with
 	this default value.
@@ -61,7 +69,6 @@ extern bool debug;
 	Default server configurations.
 */
 #define DEFAULT_TELNET_PORT 23
-#define DEFAULT_MONITOR_PORT 91
 
 /*
 	The length of the TCP socket queue. This is the number of sockets that
@@ -71,10 +78,17 @@ extern bool debug;
 #define EEM_TCB_QUEUE_SIZE 4
 
 /*
+	The power-up reset asserts the !RST signal during initialization. This
+	signal resets the Ethernet physical interface and is also exported to
+	the host board.
+*/
+#define EEM_POWERUP_RST_MS 10
+
+/*
 	The power-up wait delays checking the configuration switch until the host is
 	ready. Note that the power-up wait will not be effective when we load the
 	EEM into a powered mPCIe socket because the contacts will be unreliable as
-	the EEM is powering up. When we plug the EEM into a life mPCIe socket, we
+	the EEM is powering up. When we plug the EEM into a live mPCIe socket, we
 	might see an unwanted reset to factory default configuration.
 */
 #define EEM_POWERUP_WAIT_MS 500
@@ -120,7 +134,7 @@ extern bool debug;
 
 /*
 	The host is the board that the EEM plugs into. In our case, this might be a
-	LWDAQ Driver with Ethernet Interface, a an Animal Location Tracker, a
+	LWDAQ Driver with Ethernet Interface, an Animal Location Tracker, a
 	Telemetry Control Box, or an Analog Signal Generator, to name a few. We
 	define a name string for the host and a compiler macro that contains the
 	host name. We use the macro to perform conditional compilation that
@@ -137,7 +151,7 @@ extern bool debug;
 	We use the host macro to define a host name string for each of the host
 	versions listed in the table above.
 */
-#define EEM_HOST_A2042
+#define EEM_HOST_A3042
 
 #ifdef EEM_HOST_A2071
 #define EEM_HOST_NAME "A2071"
@@ -166,14 +180,6 @@ extern bool debug;
 #ifndef EEM_HOST_NAME
 #define EEM_HOST_NAME "UNKNOWN"
 #endif
-
-/*
-	When our GitHub repository version is X.Y, we let the software version we report
-	for our EEM be 32+X. We do this so that we can tell the difference between LWDAQ
-	Relays equipped with the RCM6700 from those equipped with the EEM. The RCM6700
-	relays have software version numbers less than 32.
-*/
-#define EEM_SOFTWARE_VERSION 33
 
 /*
 	Default configuration of the CLI.
